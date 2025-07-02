@@ -22,7 +22,7 @@ ANNOTATION_FORMAT=['json', 'coco_json', 'csv', 'png']
 LOCAL_EXPORT_FORMAT=['json', 'coco_json', 'csv', 'png']
 LOCAL_EXPORT_STATUS=['review', 'r_assigned','client_review', 'cr_assigned','accepted']
 
-## DATA TYPES: image, video, audio, document, text
+# DATA TYPES: image, video, audio, document, text
 DATA_TYPES=('image', 'video', 'audio', 'document', 'text')
 DATA_TYPE_FILE_EXT = {
     'image': ['.jpg','.jpeg', '.png', '.tiff'],
@@ -892,10 +892,10 @@ class LabellerrClient:
         """
         url = f"{constants.BASE_URL}/projects/create?client_id={client_id}"
         
-        # CRITICAL: Make sure this payload includes attached_datasets
+        
         payload = json.dumps({
             "project_name": project_name,
-            "attached_datasets": [dataset_id],  # THIS LINE MUST BE PRESENT
+            "attached_datasets": [dataset_id],
             "data_type": data_type,
             "annotation_template_id": annotation_template_id,
             "rotations": rotation_config,
@@ -909,14 +909,14 @@ class LabellerrClient:
             'Content-Type': 'application/json'
         }
         
-        print(f"DEBUG: Sending payload: {payload}")  # Add this debug line
+        # print(f"{payload}")
         
         response = requests.post(url, headers=headers, data=payload)
         response_data = response.json()
         
-        # print(f"DEBUG: Response: {response_data}")  # Add this debug line
+        # print(f"{response_data}")  
         
-        # Check for validation errors
+        
         if 'error' in response_data and response_data['error']:
             error_details = response_data['error']
             error_msg = f"Validation Error: {response_data.get('message', 'Unknown error')}"
@@ -933,14 +933,14 @@ class LabellerrClient:
         and final project setup.
         """
         try:
-            # Validate required parameters
+            
             required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type',
                             'created_by', 'project_name', 'annotation_guide', 'autolabel']
             for param in required_params:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")
                 
-                # Specific validations
+                
                 if param == 'client_id' and not isinstance(payload[param], str):
                     raise LabellerrError("client_id must be a non-empty string")
                 
@@ -951,14 +951,14 @@ class LabellerrClient:
                         if guide['option_type'] not in OPTION_TYPE_LIST:
                             raise LabellerrError(f"option_type must be one of {OPTION_TYPE_LIST}")
             
-            # Validate file inputs
+            
             if 'folder_to_upload' in payload and 'files_to_upload' in payload:
                 raise LabellerrError("Cannot provide both files_to_upload and folder_to_upload")
             
             if 'folder_to_upload' not in payload and 'files_to_upload' not in payload:
                 raise LabellerrError("Either files_to_upload or folder_to_upload must be provided")
             
-            # Set default rotation config if not provided
+            
             if 'rotation_config' not in payload:
                 payload['rotation_config'] = {
                     'annotation_rotation_count': 1,
@@ -967,13 +967,13 @@ class LabellerrClient:
                 }
             self.validate_rotation_config(payload['rotation_config'])
             
-            # Validate data type
+            
             if payload['data_type'] not in DATA_TYPES:
                 raise LabellerrError(f"Invalid data_type. Must be one of {DATA_TYPES}")
             
             print("Rotation configuration validated . . .")
             
-            # Create dataset
+            
             print("Creating dataset . . .")
             dataset_response = self.create_dataset({
                 'client_id': payload['client_id'],
@@ -986,34 +986,34 @@ class LabellerrClient:
             
             dataset_id = dataset_response['dataset_id']
             
-            # FIXED: Proper polling that handles dictionary return from get_dataset
+            
             def dataset_ready():
                 try:
                     dataset_status = self.get_dataset(payload['client_id'], dataset_id)
-                    # get_dataset returns a dictionary, check for successful response
+                    
                     if isinstance(dataset_status, dict):
-                        # Check if response indicates dataset is ready (status_code 200 means ready)
+                        
                         if 'response' in dataset_status:
                             return dataset_status['response'].get('status_code', 200) == 300
                         else:
-                            # If no specific status_code, assume ready if we got a valid response
+                            
                             return True
                     return False
                 except Exception as e:
                     print(f"Error checking dataset status: {e}")
                     return False
             
-            # Poll with correct condition
+            
             utils.poll(
                 function=dataset_ready,
                 condition=lambda x: x is True,
                 interval=5,
-                timeout=60  # Reduced timeout
+                timeout=60  
             )
             
             print("Dataset created and ready for use")
             
-            # Create annotation guidelines
+            
             annotation_template_id = self.create_annotation_guideline(
                 payload['client_id'],
                 payload['annotation_guide'],
@@ -1022,7 +1022,7 @@ class LabellerrClient:
             )
             print("Annotation guidelines created")
             
-            # Create project
+            
             project_response = self.create_project(
                 project_name=payload['project_name'],
                 data_type=payload['data_type'],
@@ -1033,7 +1033,7 @@ class LabellerrClient:
                 created_by=payload['created_by']
             )
             
-            # Return success response
+            
             return {
                 'status': 'success',
                 'message': 'Project created successfully',

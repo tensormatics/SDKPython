@@ -827,7 +827,7 @@ class LabellerrClient:
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
     def create_local_export(self,project_id,client_id,export_config):
-
+        unique_id = str(uuid.uuid4())
         required_params = ['export_name', 'export_description', 'export_format','statuses']
 
         if project_id is None:
@@ -885,6 +885,108 @@ class LabellerrClient:
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to create local export: {str(e)}")
             raise LabellerrError(f"Failed to create local export: {str(e)}")
+
+
+    def fetch_download_url(self, api_key, api_secret, project_id, uuid, export_id, client_id):
+        try:
+            headers = {
+                'api_key': api_key,
+                'api_secret': api_secret,
+                'client_id': client_id,
+                'origin': 'https://dev.labellerr.com',
+                'source': 'sdk',
+                'Content-Type': 'application/json'
+            }
+
+            response = requests.get(
+                url="https://api.labellerr.com/exports/download",
+                params={
+                    "client_id": client_id,
+                    "project_id": project_id,
+                    "uuid": uuid,
+                    "report_id": export_id
+                },
+                headers=headers
+            )
+
+            if response.ok:
+                return json.dumps(response.json().get("response"), indent=2)
+            else:
+                raise LabellerrError(f" Download request failed: {response.status_code} - {response.text}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to download export: {str(e)}")
+            raise LabellerrError(f"Failed to download export: {str(e)}")
+        except Exception as e:
+            logging.error(f"Unexpected error in download_function: {str(e)}")
+            raise LabellerrError(f"Unexpected error in download_function: {str(e)}")
+
+
+
+
+
+    def check_export_status(self, api_key, api_secret, project_id, report_ids, client_id):
+        request_uuid = str(uuid.uuid4())
+        try:
+            if not project_id:
+                raise LabellerrError("project_id cannot be null")
+            if not report_ids or not isinstance(report_ids, list):
+                raise LabellerrError("report_ids must be a non-empty list")
+
+            # Construct URL
+            url = f"https://api.labellerr.com/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
+
+            # Headers
+            headers = {
+                'client_id': client_id,
+                'api_key': api_key,
+                'api_secret': api_secret,
+                'origin': 'https://dev.labellerr.com',
+                'source': 'sdk',
+                'Content-Type': 'application/json'
+            }
+
+            payload = json.dumps({
+                "report_ids": report_ids
+            })
+
+            response = requests.post(url, headers=headers, data=payload)
+
+            if response.status_code not in [200, 201]:
+                if 400 <= response.status_code < 500:
+                    raise LabellerrError({'error': response.json(), 'code': response.status_code})
+                elif response.status_code >= 500:
+                    raise LabellerrError({
+                        'status': 'internal server error',
+                        'message': 'Please contact support with the request tracking id',
+                        'request_id': request_uuid
+                    })
+
+            result = response.json()
+
+            # Now process each report_id
+            for status_item in result.get("status", []):
+                if status_item.get("is_completed"):
+                    # Download URL if job completed
+                    download_url = self.fetch_download_url(
+                        api_key=api_key,
+                        api_secret=api_secret,
+                        project_id=project_id,
+                        uuid=request_uuid,
+                        export_id=status_item["report_id"],
+                        client_id=client_id
+                    )
+                    # Add download URL to response
+                    status_item["response"] = download_url
+
+            return json.dumps(result, indent=2)
+
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to check export status: {str(e)}")
+            raise LabellerrError(f"Failed to check export status: {str(e)}")
+        except Exception as e:
+            logging.error(f"Unexpected error checking export status: {str(e)}")
+            raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
+
 
     def create_project(self, project_name, data_type, client_id, dataset_id, annotation_template_id, rotation_config, created_by=None):
         """

@@ -77,7 +77,7 @@ class LabellerrClient:
             tracking_id = str(uuid.uuid4())
             logging.exception(f"Error getting direct upload url: {response.text}")
             raise LabellerrError({
-                'status': 'internal server error',
+                'status': 'Internal server error',
                 'message': 'Please contact support with the request tracking id',
                 'request_id': tracking_id
             })
@@ -899,7 +899,7 @@ class LabellerrClient:
             }
 
             response = requests.get(
-                url="https://api.labellerr.com/exports/download",
+                url=f"{constants.BASE_URL}/exports/download",
                 params={
                     "client_id": client_id,
                     "project_id": project_id,
@@ -933,7 +933,7 @@ class LabellerrClient:
                 raise LabellerrError("report_ids must be a non-empty list")
 
             # Construct URL
-            url = f"https://api.labellerr.com/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
+            url = f"{constants.BASE_URL}/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
 
             # Headers
             headers = {
@@ -956,7 +956,7 @@ class LabellerrClient:
                     raise LabellerrError({'error': response.json(), 'code': response.status_code})
                 elif response.status_code >= 500:
                     raise LabellerrError({
-                        'status': 'internal server error',
+                        'status': 'Internal server error',
                         'message': 'Please contact support with the request tracking id',
                         'request_id': request_uuid
                     })
@@ -965,7 +965,7 @@ class LabellerrClient:
 
             # Now process each report_id
             for status_item in result.get("status", []):
-                if status_item.get("is_completed"):
+                if status_item.get("is_completed") and status_item.get("export_status") == "Created":
                     # Download URL if job completed
                     download_url = self.fetch_download_url(
                         api_key=api_key,
@@ -975,8 +975,9 @@ class LabellerrClient:
                         export_id=status_item["report_id"],
                         client_id=client_id
                     )
+        
                     # Add download URL to response
-                    status_item["response"] = download_url
+                    status_item["url"] = download_url
 
             return json.dumps(result, indent=2)
 
@@ -1028,7 +1029,7 @@ class LabellerrClient:
         """
         
         try:
-            result={}
+            result = {}
             # validate all the parameters
             required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type', 'created_by', 'project_name','annotation_guide','autolabel']
             for param in required_params:
@@ -1263,3 +1264,4 @@ class LabellerrClient:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
+

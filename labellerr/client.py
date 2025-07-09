@@ -78,6 +78,7 @@ class LabellerrClient:
             logging.exception(f"Error getting direct upload url: {response.text}")
             raise LabellerrError({
                 'status': 'Internal server error',
+                'status': 'Internal server error',
                 'message': 'Please contact support with the request tracking id',
                 'request_id': tracking_id
             })

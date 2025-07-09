@@ -975,9 +975,6 @@ class LabellerrClient:
                         export_id=status_item["report_id"],
                         client_id=client_id
                     )
-        
-                    # Add download URL to response
-                    status_item["url"] = download_url
 
             return json.dumps(result, indent=2)
 

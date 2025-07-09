@@ -22,7 +22,7 @@ ANNOTATION_FORMAT=['json', 'coco_json', 'csv', 'png']
 LOCAL_EXPORT_FORMAT=['json', 'coco_json', 'csv', 'png']
 LOCAL_EXPORT_STATUS=['review', 'r_assigned','client_review', 'cr_assigned','accepted']
 
-## DATA TYPES: image, video, audio, document, text
+# DATA TYPES: image, video, audio, document, text
 DATA_TYPES=('image', 'video', 'audio', 'document', 'text')
 DATA_TYPE_FILE_EXT = {
     'image': ['.jpg','.jpeg', '.png', '.tiff'],
@@ -440,7 +440,7 @@ class LabellerrClient:
                         'request_id': unique_id
                     })
 
-            print(response.text)
+            # print(response.text)
             return response.json()
         except Exception as e:
             logging.error(f"Failed to retrieve projects: {str(e)}")
@@ -991,41 +991,49 @@ class LabellerrClient:
 
     def create_project(self, project_name, data_type, client_id, dataset_id, annotation_template_id, rotation_config, created_by=None):
         """
-        Creates a project.
-
-        :param project_name: The name of the project.
-        :param data_type: The type of data.
-        :param client_id: The ID of the client.
-        :param created_by: The ID of the user who created the project.
-        :param rotation_config: The rotation configuration for the project.
-        :return: A dictionary containing the dataset ID, project ID, and project configuration.
+        Creates a project with the given configuration.
         """
         url = f"{constants.BASE_URL}/projects/create?client_id={client_id}"
+        
+        
         payload = json.dumps({
             "project_name": project_name,
-            "dataset_id": dataset_id,
+            "attached_datasets": [dataset_id],
             "data_type": data_type,
             "annotation_template_id": annotation_template_id,
             "rotations": rotation_config,
             "created_by": created_by
         })
+        
         headers = {
             'api_key': self.api_key,
             'api_secret': self.api_secret,
             'Origin': 'https://pro.labellerr.com',
             'Content-Type': 'application/json'
         }
+        
+        # print(f"{payload}")
+        
         response = requests.post(url, headers=headers, data=payload)
-        return response.json()
+        response_data = response.json()
+        
+        # print(f"{response_data}")  
+        
+        
+        if 'error' in response_data and response_data['error']:
+            error_details = response_data['error']
+            error_msg = f"Validation Error: {response_data.get('message', 'Unknown error')}"
+            for error in error_details:
+                error_msg += f"\n- Field '{error['field']}': {error['message']}"
+            raise LabellerrError(error_msg)
+        
+        return response_data
+
 
     def initiate_create_project(self, payload):
-
-        # Creating an empty dataset by function call
         """
-        Creates an empty project.
-
-        :param payload: A dictionary containing the configuration for the project.
-        :return: A dictionary containing the dataset ID, project ID, and project configuration.
+        Orchestrates project creation by handling dataset creation, annotation guidelines,
+        and final project setup.
         """
         
         try:
@@ -1035,119 +1043,113 @@ class LabellerrClient:
             for param in required_params:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")
-                if(param == 'client_id'):
-                    # it should be an instance of string
-                    if not isinstance(payload[param], str) or not payload[param].strip():
-                        raise LabellerrError(f"client_id must be a string")
-                if(param=='annotation_guide'):
-                    annotation_guides=payload['annotation_guide']
-
-                    # annotation_guides is an array and iterate 
-                    for annotation_guide in annotation_guides:
-
-                        if 'option_type' not in annotation_guide:
-                            raise LabellerrError(f"option_type is required in annotation_guide")
-                        else:
-                            if annotation_guide['option_type'] not in OPTION_TYPE_LIST:
-                                raise LabellerrError(f"option_type must be one of {OPTION_TYPE_LIST}")
-
-
                 
-            if  'folder_to_upload' in payload or 'files_to_upload' in payload:
-                if 'folder_to_upload' in payload:
-                    # make sure the folder path exist
-                    if not os.path.exists(payload['folder_to_upload']):
-                        raise LabellerrError(f"Folder {payload['folder_to_upload']} does not exist")
-                    if not os.path.isdir(payload['folder_to_upload']):
-                        raise LabellerrError(f"Folder {payload['folder_to_upload']} is not a directory")
-                elif 'files_to_upload' in payload:
-                    # make sure the files exist in the array payload['files_to_upload']
-                    for file in payload['files_to_upload']:
-                        if not os.path.exists(file):
-                            raise LabellerrError(f"File {file} does not exist")
-                        if not os.path.isfile(file):
-                            raise LabellerrError(f"File {file} is not a file")
-
-            if 'rotation_config' in payload:
-                self.validate_rotation_config(payload['rotation_config'])
-                print("Rotation configuration validated . . .")
-            else:
+                
+                if param == 'client_id' and not isinstance(payload[param], str):
+                    raise LabellerrError("client_id must be a non-empty string")
+                
+                if param == 'annotation_guide':
+                    for guide in payload['annotation_guide']:
+                        if 'option_type' not in guide:
+                            raise LabellerrError("option_type is required in annotation_guide")
+                        if guide['option_type'] not in OPTION_TYPE_LIST:
+                            raise LabellerrError(f"option_type must be one of {OPTION_TYPE_LIST}")
+            
+            
+            if 'folder_to_upload' in payload and 'files_to_upload' in payload:
+                raise LabellerrError("Cannot provide both files_to_upload and folder_to_upload")
+            
+            if 'folder_to_upload' not in payload and 'files_to_upload' not in payload:
+                raise LabellerrError("Either files_to_upload or folder_to_upload must be provided")
+            
+            
+            if 'rotation_config' not in payload:
                 payload['rotation_config'] = {
-                    'annotation_rotation_count':1,
-                    'review_rotation_count':1,
-                    'client_review_rotation_count':1
+                    'annotation_rotation_count': 1,
+                    'review_rotation_count': 1,
+                    'client_review_rotation_count': 1
                 }
+            self.validate_rotation_config(payload['rotation_config'])
+            
             
             if payload['data_type'] not in DATA_TYPES:
                 raise LabellerrError(f"Invalid data_type. Must be one of {DATA_TYPES}")
-
-            if 'files_to_upload' in payload and 'folder_to_upload' in payload:
-                raise LabellerrError("Both files_to_upload and folder_to_upload cannot be provided at the same time.")
-            elif 'files_to_upload' not in payload and 'folder_to_upload' not in payload:
-                raise LabellerrError("Either files_to_upload or folder_to_upload must be provided.")
-            else:
-                if 'files_to_upload' in payload:
-                    if payload['files_to_upload'] is None and len(payload['files_to_upload'])==0:
-                        raise LabellerrError("files_to_upload must be a non-empty string.")
-                elif 'folder_to_upload' in payload:
-                    if not isinstance(payload['folder_to_upload'], str) or not payload['folder_to_upload'].strip():
-                        raise LabellerrError("folder_to_upload must be a non-empty string.")
-                
-
-            try:
-                print("creating dataset . . .")
-                response = self.create_dataset({
-                    'client_id': payload['client_id'],
-                    'dataset_name': payload['project_name'],
-                    'data_type': payload['data_type'],
-                    'dataset_description': payload['dataset_description'],
-                }, files_to_upload=payload.get('files_to_upload', None), folder_to_upload=payload.get('folder_to_upload', None))
-                dataset_id = response['dataset_id']
-                gd = lambda: self.get_dataset(payload['client_id'], dataset_id)
-                utils.poll(gd, lambda x: x['response']['status_code'] == 300, interval=5, timeout=300)
-                
-            except KeyError as e:
-                # Preserve the original traceback while providing context
-                raise LabellerrError(f"Missing required field in payload: {str(e)}") from e
-            except Exception as e:
-                # Log the original exception with traceback but preserve it in the raised exception
-                logging.exception("Failed to create dataset during project creation")
-                raise LabellerrError(f"Failed to create dataset: {str(e)}") from e
-
-            try:
-                annotation_template_id = self.create_annotation_guideline(
-                    payload['client_id'], 
-                    payload['annotation_guide'], 
-                    payload['project_name'],
-                    payload['data_type']
-                )
-            except Exception as e:
-                # Log the original exception with traceback but preserve it in the raised exception
-                logging.exception("Failed to create annotation guideline during project creation")
-                raise LabellerrError(f"Failed to create annotation guideline: {str(e)}") from e
-                
-            try:
-                return self.create_project(
-                    payload['project_name'], 
-                    payload['data_type'], 
-                    payload['client_id'], 
-                    dataset_id, 
-                    annotation_template_id, 
-                    payload['rotation_config'], 
-                    created_by=payload['created_by']
-                )
-            except Exception as e:
-                # Log the original exception with traceback but preserve it in the raised exception
-                logging.exception("Failed to create project after dataset and annotation template creation")
-                raise LabellerrError(f"Failed to create project: {str(e)}") from e
-
-        except LabellerrError:
-            # Re-raise LabellerrError directly to preserve its context
+            
+            print("Rotation configuration validated . . .")
+            
+            
+            print("Creating dataset . . .")
+            dataset_response = self.create_dataset({
+                'client_id': payload['client_id'],
+                'dataset_name': payload['dataset_name'],
+                'data_type': payload['data_type'],
+                'dataset_description': payload['dataset_description'],
+            }, 
+            files_to_upload=payload.get('files_to_upload'),
+            folder_to_upload=payload.get('folder_to_upload'))
+            
+            dataset_id = dataset_response['dataset_id']
+            
+            
+            def dataset_ready():
+                try:
+                    dataset_status = self.get_dataset(payload['client_id'], dataset_id)
+                    
+                    if isinstance(dataset_status, dict):
+                        
+                        if 'response' in dataset_status:
+                            return dataset_status['response'].get('status_code', 200) == 300
+                        else:
+                            
+                            return True
+                    return False
+                except Exception as e:
+                    print(f"Error checking dataset status: {e}")
+                    return False
+            
+            
+            utils.poll(
+                function=dataset_ready,
+                condition=lambda x: x is True,
+                interval=5,
+                timeout=60  
+            )
+            
+            print("Dataset created and ready for use")
+            
+            
+            annotation_template_id = self.create_annotation_guideline(
+                payload['client_id'],
+                payload['annotation_guide'],
+                payload['project_name'],
+                payload['data_type']
+            )
+            print("Annotation guidelines created")
+            
+            
+            project_response = self.create_project(
+                project_name=payload['project_name'],
+                data_type=payload['data_type'],
+                client_id=payload['client_id'],
+                dataset_id=dataset_id,
+                annotation_template_id=annotation_template_id,
+                rotation_config=payload['rotation_config'],
+                created_by=payload['created_by']
+            )
+            
+            
+            return {
+                'status': 'success',
+                'message': 'Project created successfully',
+                'project_id': project_response
+            }
+            
+        except LabellerrError as e:
+            logging.error(f"Project creation failed: {str(e)}")
             raise
         except Exception as e:
-            # For other exceptions, wrap with more context but preserve the original
-            logging.exception("Unexpected error in initiate_create_project")
-            raise LabellerrError(f"Failed to create project due to unexpected error: {str(e)}") from e
+            logging.exception("Unexpected error in project creation")
+            raise LabellerrError(f"Project creation failed: {str(e)}") from e
 
     def upload_folder_files_to_dataset(self, data_config):
         """

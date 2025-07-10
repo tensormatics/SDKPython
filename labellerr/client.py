@@ -1037,21 +1037,22 @@ class LabellerrClient:
         try:
             result = {}
             # validate all the parameters
-            required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type', 'created_by', 'project_name','annotation_guide','autolabel']
+            required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type', 'created_by', 'project_name','autolabel']
             for param in required_params:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")
-                
-                
                 if param == 'client_id' and not isinstance(payload[param], str):
                     raise LabellerrError("client_id must be a non-empty string")
-                
-                if param == 'annotation_guide':
-                    for guide in payload['annotation_guide']:
-                        if 'option_type' not in guide:
-                            raise LabellerrError("option_type is required in annotation_guide")
-                        if guide['option_type'] not in OPTION_TYPE_LIST:
-                            raise LabellerrError(f"option_type must be one of {OPTION_TYPE_LIST}")
+
+            # annotation_guide is only required if annotation_template_id is not provided
+            if not payload.get('annotation_template_id'):
+                if 'annotation_guide' not in payload:
+                    raise LabellerrError("Required parameter annotation_guide is missing")
+                for guide in payload['annotation_guide']:
+                    if 'option_type' not in guide:
+                        raise LabellerrError("option_type is required in annotation_guide")
+                    if guide['option_type'] not in OPTION_TYPE_LIST:
+                        raise LabellerrError(f"option_type must be one of {OPTION_TYPE_LIST}")
             
             
             if 'folder_to_upload' in payload and 'files_to_upload' in payload:
@@ -1115,15 +1116,17 @@ class LabellerrClient:
             
             print("Dataset created and ready for use")
             
-            
-            annotation_template_id = self.create_annotation_guideline(
-                payload['client_id'],
-                payload['annotation_guide'],
-                payload['project_name'],
-                payload['data_type']
-            )
-            print("Annotation guidelines created")
-            
+            # Use annotation_template_id from payload if provided, else create a new one
+            if 'annotation_template_id' in payload and payload['annotation_template_id']:
+                annotation_template_id = payload['annotation_template_id']
+            else:
+                annotation_template_id = self.create_annotation_guideline(
+                    payload['client_id'],
+                    payload['annotation_guide'],
+                    payload['project_name'],
+                    payload['data_type']
+                )
+                print("Annotation guidelines created")
             
             project_response = self.create_project(
                 project_name=payload['project_name'],

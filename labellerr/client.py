@@ -1047,7 +1047,7 @@ class LabellerrClient:
             # annotation_guide is only required if annotation_template_id is not provided
             if not payload.get('annotation_template_id'):
                 if 'annotation_guide' not in payload:
-                    raise LabellerrError("Required parameter annotation_guide is missing")
+                    raise LabellerrError("Please provide either annotation guide or annotation template id")
                 for guide in payload['annotation_guide']:
                     if 'option_type' not in guide:
                         raise LabellerrError("option_type is required in annotation_guide")

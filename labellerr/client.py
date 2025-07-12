@@ -1038,6 +1038,7 @@ class LabellerrClient:
             result = {}
             # validate all the parameters
             required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type', 'created_by', 'project_name','autolabel']
+            required_params = ['client_id', 'dataset_name', 'dataset_description', 'data_type', 'created_by', 'project_name','autolabel']
             for param in required_params:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")

@@ -1,1 +1,1 @@
-cdn_server_address = 'cdn-951134552678.us-central1.run.app:443'
+cdn_server_address = "cdn-951134552678.us-central1.run.app:443"

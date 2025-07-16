@@ -1,9 +1,9 @@
-import time
 import logging
-from typing import Callable, Any, Optional, TypeVar, Union
-import requests
+import time
+from typing import Any, Callable, Optional, TypeVar, Union
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 def poll(
     function: Callable[..., T],
@@ -15,11 +15,11 @@ def poll(
     kwargs: dict = None,
     on_success: Optional[Callable[[T], Any]] = None,
     on_timeout: Optional[Callable[[int, Optional[T]], Any]] = None,
-    on_exception: Optional[Callable[[Exception], Any]] = None
+    on_exception: Optional[Callable[[Exception], Any]] = None,
 ) -> Union[T, None]:
     """
     Poll a function at specified intervals until a condition is met.
-    
+
     Args:
         function: The function to call
         condition: Function that takes the return value of `function` and returns True when polling should stop
@@ -31,10 +31,10 @@ def poll(
         on_success: Callback function to call with the successful result
         on_timeout: Callback function to call on timeout with the number of attempts and last result
         on_exception: Callback function to call when an exception occurs in `function`
-    
+
     Returns:
         The last return value from `function` or None if timeout/max_retries was reached
-    
+
     Examples:
         ```python
         # Poll until a job is complete
@@ -45,7 +45,7 @@ def poll(
             timeout=300,
             args=(job_id,)
         )
-        
+
         # Poll with a custom breaking condition
         result = poll(
             function=get_task_result,
@@ -57,40 +57,42 @@ def poll(
     """
     if kwargs is None:
         kwargs = {}
-    
+
     start_time = time.time()
     attempts = 0
     last_result = None
-    
+
     while True:
         try:
             attempts += 1
             last_result = function(*args, **kwargs)
-            
+
             # Check if condition is satisfied
             if condition(last_result):
                 if on_success:
                     on_success(last_result)
                 return last_result
-                
+
         except Exception as e:
             if on_exception:
                 on_exception(e)
             logging.error(f"Exception in poll function: {str(e)}")
-            
+
         # Check if we've reached timeout
         if timeout is not None and time.time() - start_time > timeout:
             if on_timeout:
                 on_timeout(attempts, last_result)
-            logging.warning(f"Polling timed out after {timeout} seconds ({attempts} attempts)")
+            logging.warning(
+                f"Polling timed out after {timeout} seconds ({attempts} attempts)"
+            )
             return last_result
-            
+
         # Check if we've reached max retries
         if max_retries is not None and attempts >= max_retries:
             if on_timeout:
                 on_timeout(attempts, last_result)
             logging.warning(f"Polling reached max retries: {max_retries}")
             return last_result
-            
+
         # Wait before next attempt
         time.sleep(interval)

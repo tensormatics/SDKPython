@@ -10,8 +10,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import cpu_count
 
 import requests
-
-from . import constants, gcs, utils
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
+from . import constants, gcs, utils, client_utils
 from .exceptions import LabellerrError
 
 # python -m unittest discover -s tests --run
@@ -56,14 +57,6 @@ class LabellerrClient:
         """
         Set up requests session with connection pooling for better performance.
         """
-        try:
-            from requests.adapters import HTTPAdapter
-            from urllib3.util.retry import Retry
-        except ImportError:
-            # Fallback if urllib3 is not available
-            HTTPAdapter = None
-            Retry = None
-
         self._session = requests.Session()
 
         if HTTPAdapter and Retry:
@@ -129,20 +122,13 @@ class LabellerrClient:
         :param extra_headers: Optional dictionary of additional headers
         :return: Dictionary of headers
         """
-        headers = {
-            "api_key": self.api_key,
-            "api_secret": self.api_secret,
-            "source": "sdk",
-            "origin": constants.ALLOWED_ORIGINS,
-        }
-
-        if client_id:
-            headers["client_id"] = str(client_id)
-
-        if extra_headers:
-            headers.update(extra_headers)
-
-        return headers
+        return client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            source="sdk",
+            client_id=client_id,
+            extra_headers=extra_headers
+        )
 
     def _handle_response(self, response, request_id=None, success_codes=None):
         """
@@ -360,11 +346,11 @@ class LabellerrClient:
             )
 
             payload = json.dumps(self.rotation_config)
-            print(f"Update Rotation Count Payload: {payload}")
+            logging.info(f"Update Rotation Count Payload: {payload}")
 
             response = requests.request("POST", url, headers=headers, data=payload)
 
-            print("Rotation configuration updated successfully.")
+            logging.info("Rotation configuration updated successfully.")
             self._handle_response(response, unique_id)
 
             return {"msg": "project rotation configuration updated"}
@@ -509,12 +495,12 @@ class LabellerrClient:
                                 total_file_count += 1
                                 total_file_size += file_size
                             except OSError as e:
-                                print(f"Error reading {file_path}: {str(e)}")
+                                logging.error(f"Error reading {file_path}: {str(e)}")
                         elif entry.is_dir():
                             # Recursively scan subdirectories
                             scan_directory(entry.path)
             except OSError as e:
-                print(f"Error scanning directory {directory}: {str(e)}")
+                logging.error(f"Error scanning directory {directory}: {str(e)}")
 
         scan_directory(folder_path)
         return total_file_count, total_file_size, files_list
@@ -544,9 +530,9 @@ class LabellerrClient:
                 total_file_count += 1
                 total_file_size += file_size
             except OSError as e:
-                print(f"Error reading {file_path}: {str(e)}")
+                logging.error(f"Error reading {file_path}: {str(e)}")
             except Exception as e:
-                print(f"Unexpected error reading {file_path}: {str(e)}")
+                logging.error(f"Unexpected error reading {file_path}: {str(e)}")
 
         return total_file_count, total_file_size, files_list
 
@@ -613,32 +599,7 @@ class LabellerrClient:
         :param rotation_config: A dictionary containing the configuration for the rotations.
         :raises LabellerrError: If the configuration is invalid.
         """
-        annotation_rotation_count = rotation_config.get("annotation_rotation_count")
-        review_rotation_count = rotation_config.get("review_rotation_count")
-        client_review_rotation_count = rotation_config.get(
-            "client_review_rotation_count"
-        )
-
-        # Validate review_rotation_count
-        if review_rotation_count != 1:
-            raise LabellerrError("review_rotation_count must be 1")
-
-        # Validate client_review_rotation_count based on annotation_rotation_count
-        if annotation_rotation_count == 0 and client_review_rotation_count != 0:
-            raise LabellerrError(
-                "client_review_rotation_count must be 0 when annotation_rotation_count is 0"
-            )
-        elif annotation_rotation_count == 1 and client_review_rotation_count not in [
-            0,
-            1,
-        ]:
-            raise LabellerrError(
-                "client_review_rotation_count can only be 0 or 1 when annotation_rotation_count is 1"
-            )
-        elif annotation_rotation_count > 1 and client_review_rotation_count != 0:
-            raise LabellerrError(
-                "client_review_rotation_count must be 0 when annotation_rotation_count is greater than 1"
-            )
+        client_utils.validate_rotation_config(rotation_config)
 
     def _upload_preannotation_sync(
         self, project_id, client_id, annotation_format, annotation_file
@@ -655,39 +616,20 @@ class LabellerrClient:
         """
         try:
             # validate all the parameters
-            required_params = [
-                "project_id",
-                "client_id",
-                "annotation_format",
-                "annotation_file",
-            ]
-            for param in required_params:
-                if param not in locals():
-                    raise LabellerrError(f"Required parameter {param} is missing")
-
-            if annotation_format not in constants.ANNOTATION_FORMAT:
-                raise LabellerrError(
-                    f"Invalid annotation_format. Must be one of {constants.ANNOTATION_FORMAT}"
-                )
-
+            required_params = {
+                "project_id": project_id,
+                "client_id": client_id,
+                "annotation_format": annotation_format,
+                "annotation_file": annotation_file,
+            }
+            client_utils.validate_required_params(required_params, list(required_params.keys()))
+            client_utils.validate_annotation_format(annotation_format, annotation_file)
+            
             url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
-
-            # validate if the file exist then extract file name from the path
-            if os.path.exists(annotation_file):
-                file_name = os.path.basename(annotation_file)
-            else:
-                raise LabellerrError("File not found")
-
-            # Check if the file extension is .json when annotation_format is coco_json
-            if annotation_format == "coco_json":
-                file_extension = os.path.splitext(annotation_file)[1].lower()
-                if file_extension != ".json":
-                    raise LabellerrError(
-                        "For coco_json annotation format, the file must have a .json extension"
-                    )
+            file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url
             gcs_path = f"{project_id}/{annotation_format}-{file_name}"
-            print("Uploading your file to Labellerr. Please wait...")
+            logging.info("Uploading your file to Labellerr. Please wait...")
             direct_upload_url = self.get_direct_upload_url(gcs_path, client_id)
             # Now let's wait for the file to be uploaded to the gcs
             gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
@@ -717,7 +659,7 @@ class LabellerrClient:
             self.job_id = job_id
             self.project_id = project_id
 
-            print(f"Preannotation upload successful. Job ID: {job_id}")
+            logging.info(f"Preannotation upload successful. Job ID: {job_id}")
             return self.preannotation_job_status()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
@@ -772,7 +714,7 @@ class LabellerrClient:
                         )
                 # get the direct upload url
                 gcs_path = f"{project_id}/{annotation_format}-{file_name}"
-                print("Uploading your file to Labellerr. Please wait...")
+                logging.info("Uploading your file to Labellerr. Please wait...")
                 direct_upload_url = self.get_direct_upload_url(gcs_path, client_id)
                 # Now let's wait for the file to be uploaded to the gcs
                 gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
@@ -802,7 +744,7 @@ class LabellerrClient:
                 self.job_id = job_id
                 self.project_id = project_id
 
-                print(f"Preannotation upload successful. Job ID: {job_id}")
+                logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
                 # Now monitor the status
                 headers = self._build_headers(
@@ -817,13 +759,13 @@ class LabellerrClient:
                         )
                         status_data = response.json()
 
-                        print(" >>> ", status_data)
+                        logging.debug(f"Status data: {status_data}")
 
                         # Check if job is completed
                         if status_data.get("response", {}).get("status") == "completed":
                             return status_data
 
-                        print("Syncing status after 5 seconds . . .")
+                        logging.info("Syncing status after 5 seconds . . .")
                         time.sleep(5)
 
                     except Exception as e:
@@ -867,7 +809,7 @@ class LabellerrClient:
                     if response_data.get("response", {}).get("status") == "completed":
                         return response_data
 
-                    print("retrying after 5 seconds . . .")
+                    logging.info("retrying after 5 seconds . . .")
                     time.sleep(5)
 
                 except Exception as e:
@@ -927,7 +869,7 @@ class LabellerrClient:
                     "POST", url, headers=headers, data=payload, files=files
                 )
             response_data = self._handle_upload_response(response)
-            print("response_data -- ", response_data)
+            logging.debug(f"response_data: {response_data}")
 
             # read job_id from the response
             job_id = response_data["response"]["job_id"]
@@ -935,7 +877,7 @@ class LabellerrClient:
             self.job_id = job_id
             self.project_id = project_id
 
-            print(f"Preannotation upload successful. Job ID: {job_id}")
+            logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
             future = self.preannotation_job_status_async()
             return future.result()
@@ -944,13 +886,7 @@ class LabellerrClient:
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
     def create_local_export(self, project_id, client_id, export_config):
-        unique_id = str(uuid.uuid4())
-        required_params = [
-            "export_name",
-            "export_description",
-            "export_format",
-            "statuses",
-        ]
+        unique_id = client_utils.generate_request_id()
 
         if project_id is None:
             raise LabellerrError("project_id cannot be null")
@@ -961,22 +897,7 @@ class LabellerrClient:
         if export_config is None:
             raise LabellerrError("export_config cannot be null")
 
-        for param in required_params:
-            if param not in export_config:
-                raise LabellerrError(f"Required parameter {param} is missing")
-            if param == "export_format":
-                if export_config[param] not in constants.LOCAL_EXPORT_FORMAT:
-                    raise LabellerrError(
-                        f"Invalid export_format. Must be one of {constants.LOCAL_EXPORT_FORMAT}"
-                    )
-            if param == "statuses":
-                if not isinstance(export_config[param], list):
-                    raise LabellerrError(f"Invalid statuses. Must be an array {param}")
-                for status in export_config[param]:
-                    if status not in constants.LOCAL_EXPORT_STATUS:
-                        raise LabellerrError(
-                            f"Invalid status. Must be one of {constants.LOCAL_EXPORT_STATUS}"
-                        )
+        client_utils.validate_export_config(export_config)
 
         try:
             export_config.update(
@@ -1002,7 +923,7 @@ class LabellerrClient:
             raise LabellerrError(f"Failed to create local export: {str(e)}")
 
     def fetch_download_url(
-        self, api_key, api_secret, project_id, uuid, export_id, client_id
+        self, project_id, uuid, export_id, client_id
     ):
         try:
             headers = self._build_headers(
@@ -1034,9 +955,9 @@ class LabellerrClient:
             raise LabellerrError(f"Unexpected error in download_function: {str(e)}")
 
     def check_export_status(
-        self, api_key, api_secret, project_id, report_ids, client_id
+        self, project_id, report_ids, client_id
     ):
-        request_uuid = str(uuid.uuid4())
+        request_uuid = client_utils.generate_request_id()
         try:
             if not project_id:
                 raise LabellerrError("project_id cannot be null")
@@ -1065,8 +986,6 @@ class LabellerrClient:
                     # Download URL if job completed
                     download_url = (  # noqa E999 todo check use of that
                         self.fetch_download_url(
-                            api_key=api_key,
-                            api_secret=api_secret,
                             project_id=project_id,
                             uuid=request_uuid,
                             export_id=status_item["report_id"],
@@ -1193,9 +1112,9 @@ class LabellerrClient:
                     f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
                 )
 
-            print("Rotation configuration validated . . .")
+            logging.info("Rotation configuration validated . . .")
 
-            print("Creating dataset . . .")
+            logging.info("Creating dataset . . .")
             dataset_response = self.create_dataset(
                 {
                     "client_id": payload["client_id"],
@@ -1225,7 +1144,7 @@ class LabellerrClient:
                             return True
                     return False
                 except Exception as e:
-                    print(f"Error checking dataset status: {e}")
+                    logging.error(f"Error checking dataset status: {e}")
                     return False
 
             utils.poll(
@@ -1235,7 +1154,7 @@ class LabellerrClient:
                 timeout=60,
             )
 
-            print("Dataset created and ready for use")
+            logging.info("Dataset created and ready for use")
 
             annotation_template_id = self.create_annotation_guideline(
                 payload["client_id"],
@@ -1243,7 +1162,7 @@ class LabellerrClient:
                 payload["project_name"],
                 payload["data_type"],
             )
-            print("Annotation guidelines created")
+            logging.info("Annotation guidelines created")
 
             project_response = self.create_project(
                 project_name=payload["project_name"],
@@ -1324,8 +1243,8 @@ class LabellerrClient:
                     f"Total file size: {total_file_volumn/1024/1024:.1f}MB exceeds limit of {constants.TOTAL_FILES_SIZE_LIMIT_PER_DATASET/1024/1024:.1f}MB"
                 )
 
-            print(f"Total file count: {total_file_count}")
-            print(f"Total file size: {total_file_volumn/1024/1024:.1f} MB")
+            logging.info(f"Total file count: {total_file_count}")
+            logging.info(f"Total file size: {total_file_volumn/1024/1024:.1f} MB")
 
             # Use generator for memory-efficient batch creation
             def create_batches():
@@ -1347,10 +1266,12 @@ class LabellerrClient:
                             current_batch.append(file_path)
                             current_batch_size += file_size
                     except OSError as e:
-                        print(f"Error accessing file {file_path}: {str(e)}")
+                        logging.error(f"Error accessing file {file_path}: {str(e)}")
                         fail_queue.append(file_path)
                     except Exception as e:
-                        print(f"Unexpected error processing {file_path}: {str(e)}")
+                        logging.error(
+                            f"Unexpected error processing {file_path}: {str(e)}"
+                        )
                         fail_queue.append(file_path)
 
                 if current_batch:
@@ -1364,7 +1285,7 @@ class LabellerrClient:
                     "No valid files found to upload in the specified folder"
                 )
 
-            print("CPU count", cpu_count(), " Batch Count", len(batches))
+            logging.info(f"CPU count: {cpu_count()}, Batch Count: {len(batches)}")
 
             # Calculate optimal number of workers based on CPU count and batch count
             max_workers = min(
@@ -1398,7 +1319,7 @@ class LabellerrClient:
                             fail_queue.extend(batch)
                     except Exception as e:
                         logging.exception(e)
-                        print(f"Batch upload failed: {str(e)}")
+                        logging.error(f"Batch upload failed: {str(e)}")
                         fail_queue.extend(batch)
 
             if not success_queue and fail_queue:

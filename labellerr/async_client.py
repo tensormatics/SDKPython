@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import aiofiles
 import aiohttp
 
-from . import constants
+from . import constants, client_utils
 from .exceptions import LabellerrError
 
 
@@ -74,20 +74,13 @@ class AsyncLabellerrClient:
         :param extra_headers: Optional dictionary of additional headers
         :return: Dictionary of headers
         """
-        headers = {
-            "api_key": self.api_key,
-            "api_secret": self.api_secret,
-            "source": "sdk-async",
-            "origin": constants.ALLOWED_ORIGINS,
-        }
-
-        if client_id:
-            headers["client_id"] = str(client_id)
-
-        if extra_headers:
-            headers.update(extra_headers)
-
-        return headers
+        return client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            source="sdk-async",
+            client_id=client_id,
+            extra_headers=extra_headers
+        )
 
     async def _handle_response(
         self, response: aiohttp.ClientResponse, request_id: Optional[str] = None

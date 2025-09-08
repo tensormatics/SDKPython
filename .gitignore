@@ -4,15 +4,11 @@ build/
 dist/
 *.egg-info/
 *.pyc
-<<<<<<< Updated upstream
-.DS_Store
-.claude
-.idea
-tests/test_data
-=======
 */*.pyc
 .idea
 .env
+.DS_Store
+.claude
+tests/test_data
                 if file == '.DS_Store':
                     continue
->>>>>>> Stashed changes

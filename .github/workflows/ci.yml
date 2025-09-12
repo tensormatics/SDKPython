@@ -40,3 +40,32 @@ jobs:
     - name: Run tests
       run: |
         make test
+
+  integration-test:
+    name: Integration Tests
+    runs-on: ubuntu-20.04
+    needs: test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        
+    - name: Run integration tests
+      env:
+        LABELLERR_API_KEY: ${{ secrets.LABELLERR_API_KEY }}
+        LABELLERR_API_SECRET: ${{ secrets.LABELLERR_API_SECRET }}
+        LABELLERR_CLIENT_ID: ${{ secrets.LABELLERR_CLIENT_ID }}
+        LABELLERR_TEST_EMAIL: ${{ secrets.LABELLERR_TEST_EMAIL }}
+      run: |
+        python -m pytest labellerr_use_case_tests.py -v

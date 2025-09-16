@@ -362,21 +362,80 @@ class LabellerrClient:
             raise
 
     def create_dataset(
-        self, dataset_config, files_to_upload=None, folder_to_upload=None
+        self, dataset_config, files_to_upload=None, folder_to_upload=None, connector_config=None
     ):
         """
-        Creates an empty dataset.
+        Creates a dataset with support for multiple data types and connectors.
 
         :param dataset_config: A dictionary containing the configuration for the dataset.
+                              Required fields: client_id, dataset_name, data_type
+                              Optional fields: dataset_description, connector_type
+        :param files_to_upload: List of file paths to upload (for local connector)
+        :param folder_to_upload: Path to folder to upload (for local connector)
+        :param connector_config: Configuration for cloud connectors (GCP/AWS)
         :return: A dictionary containing the response status and the ID of the created dataset.
         """
 
         try:
+            # Validate required fields
+            required_fields = ["client_id", "dataset_name", "data_type"]
+            for field in required_fields:
+                if field not in dataset_config:
+                    raise LabellerrError(f"Required field '{field}' missing in dataset_config")
+
             # Validate data_type
             if dataset_config.get("data_type") not in constants.DATA_TYPES:
                 raise LabellerrError(
                     f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
                 )
+
+            connector_type = dataset_config.get("connector_type", "local")
+            connection_id = None
+            path = connector_type
+
+            # Handle different connector types
+            if connector_type == "local":
+                if files_to_upload is not None:
+                    try:
+                        connection_id = self.upload_files(
+                            client_id=dataset_config["client_id"],
+                            files_list=files_to_upload,
+                        )
+                    except Exception as e:
+                        raise LabellerrError(f"Failed to upload files to dataset: {str(e)}")
+
+                elif folder_to_upload is not None:
+                    try:
+                        result = self.upload_folder_files_to_dataset(
+                            {
+                                "client_id": dataset_config["client_id"],
+                                "folder_path": folder_to_upload,
+                                "data_type": dataset_config["data_type"],
+                            }
+                        )
+                        connection_id = result["connection_id"]
+                    except Exception as e:
+                        raise LabellerrError(
+                            f"Failed to upload folder files to dataset: {str(e)}"
+                        )
+                elif connector_config is None:
+                    # Create empty dataset for local connector
+                    connection_id = None
+
+            elif connector_type in ["gcp", "aws"]:
+                if connector_config is None:
+                    raise LabellerrError(f"connector_config is required for {connector_type} connector")
+
+                try:
+                    connection_id = self._setup_cloud_connector(
+                        connector_type,
+                        dataset_config["client_id"],
+                        connector_config
+                    )
+                except Exception as e:
+                    raise LabellerrError(f"Failed to setup {connector_type} connector: {str(e)}")
+            else:
+                raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config['client_id']}&uuid={unique_id}"
@@ -384,29 +443,7 @@ class LabellerrClient:
                 client_id=dataset_config["client_id"],
                 extra_headers={"content-type": "application/json"},
             )
-            if files_to_upload is not None:
-                try:
-                    connection_id = self.upload_files(
-                        client_id=dataset_config["client_id"],
-                        files_list=files_to_upload,
-                    )
-                except Exception as e:
-                    raise LabellerrError(f"Failed to upload files to dataset: {str(e)}")
 
-            elif folder_to_upload is not None:
-                try:
-                    result = self.upload_folder_files_to_dataset(
-                        {
-                            "client_id": dataset_config["client_id"],
-                            "folder_path": folder_to_upload,
-                            "data_type": dataset_config["data_type"],
-                        }
-                    )
-                    connection_id = result["connection_id"]
-                except Exception as e:
-                    raise LabellerrError(
-                        f"Failed to upload folder files to dataset: {str(e)}"
-                    )
             payload = json.dumps(
                 {
                     "dataset_name": dataset_config["dataset_name"],
@@ -415,11 +452,12 @@ class LabellerrClient:
                     ),
                     "data_type": dataset_config["data_type"],
                     "connection_id": connection_id,
-                    "path": "local",
+                    "path": path,
                     "client_id": dataset_config["client_id"],
+                    "connector_type": connector_type,
                 }
             )
-            response = requests.request("POST", url, headers=headers, data=payload)
+            response = self._make_request("POST", url, headers=headers, data=payload)
             response_data = self._handle_response(response, unique_id)
             dataset_id = response_data["response"]["dataset_id"]
 
@@ -428,6 +466,111 @@ class LabellerrClient:
         except LabellerrError as e:
             logging.error(f"Failed to create dataset: {e}")
             raise
+
+    @validate_required(['client_id', 'dataset_id'])
+    @validate_client_id('client_id')
+    @validate_uuid_format('dataset_id')
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def delete_dataset(self, client_id, dataset_id):
+        """
+        Deletes a dataset from the system.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset to delete
+        :return: Dictionary containing deletion status
+        :raises LabellerrError: If the deletion fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"}
+        )
+
+        response = self._make_request("DELETE", url, headers=headers)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(['client_id', 'dataset_id', 'indexing_config'])
+    @validate_client_id('client_id')
+    @validate_uuid_format('dataset_id')
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def enable_multimodal_indexing(self, client_id, dataset_id, indexing_config):
+        """
+        Enables multimodal indexing for an existing dataset.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset
+        :param indexing_config: Configuration for multimodal indexing
+                               Example: {"enabled": True, "modalities": ["text", "image"]}
+        :return: Dictionary containing indexing status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}/indexing?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps(indexing_config)
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(['client_id', 'project_id', 'dataset_id'])
+    @validate_client_id('client_id')
+    @validate_uuid_format('project_id')
+    @validate_uuid_format('dataset_id')
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def attach_dataset_to_project(self, client_id, project_id, dataset_id):
+        """
+        Attaches a dataset to an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to attach
+        :return: Dictionary containing attachment status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/attach?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({"dataset_id": dataset_id})
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(['client_id', 'project_id', 'dataset_id'])
+    @validate_client_id('client_id')
+    @validate_uuid_format('project_id')
+    @validate_uuid_format('dataset_id')
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def detach_dataset_from_project(self, client_id, project_id, dataset_id):
+        """
+        Detaches a dataset from an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to detach
+        :return: Dictionary containing detachment status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/detach?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({"dataset_id": dataset_id})
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
 
     @validate_required(['client_id', 'datatype', 'project_id', 'scope'])
     @validate_string_type('client_id')

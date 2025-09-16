@@ -14,6 +14,29 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 from . import constants, gcs, utils, client_utils
 from .exceptions import LabellerrError
+from .validators import (
+    validate_required,
+    validate_data_type,
+    validate_list_not_empty,
+    validate_client_id,
+    validate_questions_structure,
+    validate_rotations_structure,
+    validate_dataset_ids,
+    validate_uuid_format,
+    validate_string_type,
+    validate_not_none,
+    validate_file_exists,
+    validate_directory_exists,
+    validate_file_list_or_string,
+    validate_annotation_format,
+    validate_export_format,
+    validate_export_statuses,
+    validate_scope,
+    validate_upload_method_exclusive,
+    validate_business_logic_rotation_config,
+    log_method_call,
+    handle_api_errors
+)
 
 # python -m unittest discover -s tests --run
 # python setup.py sdist bdist_wheel -- build
@@ -275,43 +298,23 @@ class LabellerrClient:
 
         return response
 
+    @validate_required(['client_id', 'files_list'])
+    @validate_client_id('client_id')
+    @validate_file_list_or_string(['files_list'])
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def upload_files(self, client_id, files_list):
         """
         Uploads files to the API.
 
         :param client_id: The ID of the client.
-        :param dataset_id: The ID of the dataset.
-        :param data_type: The type of data.
         :param files_list: The list of files to upload or a comma-separated string of file paths.
-        :return: The response from the API.
+        :return: The connection ID from the API.
         :raises LabellerrError: If the upload fails.
         """
-        try:
-            # Convert string input to list if necessary
-            if isinstance(files_list, str):
-                files_list = files_list.split(",")
-            elif not isinstance(files_list, list):
-                raise LabellerrError(
-                    "files_list must be either a list or a comma-separated string"
-                )
-
-            if len(files_list) == 0:
-                raise LabellerrError("No files to upload")
-
-            # Validate files exist
-            for file_path in files_list:
-                if not os.path.exists(file_path):
-                    raise LabellerrError(f"File does not exist: {file_path}")
-                if not os.path.isfile(file_path):
-                    raise LabellerrError(f"Path is not a file: {file_path}")
-
-            response = self.__process_batch(client_id, files_list)
-            connection_id = response["response"]["temporary_connection_id"]
-            return connection_id
-
-        except Exception as e:
-            logging.error(f"Failed to upload files : {str(e)}")
-            raise LabellerrError(f"Failed to upload files : {str(e)}")
+        response = self.__process_batch(client_id, files_list)
+        connection_id = response["response"]["temporary_connection_id"]
+        return connection_id
 
     def get_dataset(self, workspace_id, dataset_id):
         """
@@ -426,42 +429,31 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
+    @validate_required(['client_id', 'datatype', 'project_id', 'scope'])
+    @validate_string_type('client_id')
+    @validate_string_type('datatype')
+    @validate_string_type('project_id')
+    @validate_scope('scope')
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def get_all_dataset(self, client_id, datatype, project_id, scope):
         """
-        Retrieves a dataset by its ID.
+        Retrieves datasets by parameters.
 
         :param client_id: The ID of the client.
         :param datatype: The type of data for the dataset.
-        :return: The dataset as JSON.
+        :param project_id: The ID of the project.
+        :param scope: The permission scope for the dataset.
+        :return: The dataset list as JSON.
         """
-        # validate parameters
-        if not isinstance(client_id, str):
-            raise LabellerrError("client_id must be a string")
-        if not isinstance(datatype, str):
-            raise LabellerrError("datatype must be a string")
-        if not isinstance(project_id, str):
-            raise LabellerrError("project_id must be a string")
-        if not isinstance(scope, str):
-            raise LabellerrError("scope must be a string")
-        # scope value should on in the list SCOPE_LIST
-        if scope not in constants.SCOPE_LIST:
-            raise LabellerrError(
-                f"scope must be one of {', '.join(constants.SCOPE_LIST)}"
-            )
+        unique_id = str(uuid.uuid4())
+        url = f"{self.base_url}/datasets/list?client_id={client_id}&data_type={datatype}&permission_level={scope}&project_id={project_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
 
-        # get dataset
-        try:
-            unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/datasets/list?client_id={client_id}&data_type={datatype}&permission_level={scope}&project_id={project_id}&uuid={unique_id}"
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"content-type": "application/json"}
-            )
-
-            response = requests.request("GET", url, headers=headers)
-            return self._handle_response(response, unique_id)
-        except LabellerrError as e:
-            logging.error(f"Failed to retrieve dataset: {e}")
-            raise
+        response = self._make_request("GET", url, headers=headers)
+        return self._handle_response(response, unique_id)
 
     def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
         """
@@ -885,42 +877,46 @@ class LabellerrClient:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
+    @validate_required(['project_id', 'client_id', 'export_config'])
+    @validate_not_none(['project_id', 'client_id', 'export_config'])
+    @validate_string_type('project_id')
+    @validate_client_id('client_id')
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_local_export(self, project_id, client_id, export_config):
-        unique_id = client_utils.generate_request_id()
+        """
+        Creates a local export with the given configuration.
 
-        if project_id is None:
-            raise LabellerrError("project_id cannot be null")
-
-        if client_id is None:
-            raise LabellerrError("client_id cannot be null")
-
-        if export_config is None:
-            raise LabellerrError("export_config cannot be null")
-
+        :param project_id: The ID of the project.
+        :param client_id: The ID of the client.
+        :param export_config: Export configuration dictionary.
+        :return: The response from the API.
+        :raises LabellerrError: If the export creation fails.
+        """
+        # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 
-        try:
-            export_config.update(
-                {"export_destination": "local", "question_ids": ["all"]}
-            )
-            payload = json.dumps(export_config)
-            headers = self._build_headers(
-                extra_headers={
-                    "Origin": constants.ALLOWED_ORIGINS,
-                    "Content-Type": "application/json",
-                }
-            )
+        unique_id = client_utils.generate_request_id()
+        export_config.update(
+            {"export_destination": "local", "question_ids": ["all"]}
+        )
 
-            response = requests.post(
-                f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
-                headers=headers,
-                data=payload,
-            )
+        payload = json.dumps(export_config)
+        headers = self._build_headers(
+            extra_headers={
+                "Origin": constants.ALLOWED_ORIGINS,
+                "Content-Type": "application/json",
+            }
+        )
 
-            return self._handle_response(response, unique_id)
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Failed to create local export: {str(e)}")
-            raise LabellerrError(f"Failed to create local export: {str(e)}")
+        response = self._make_request(
+            "POST",
+            f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
+            headers=headers,
+            data=payload,
+        )
+
+        return self._handle_response(response, unique_id)
 
     def fetch_download_url(
         self, project_id, uuid, export_id, client_id
@@ -1002,56 +998,62 @@ class LabellerrClient:
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
 
+    @validate_required(['project_name', 'data_type', 'client_id', 'attached_datasets', 'annotation_template_id', 'rotations'])
+    @validate_client_id('client_id')
+    @validate_data_type('data_type')
+    @validate_dataset_ids('attached_datasets')
+    @validate_uuid_format('annotation_template_id')
+    @validate_rotations_structure('rotations')
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_project(
         self,
         project_name,
         data_type,
         client_id,
-        dataset_id,
+        attached_datasets,
         annotation_template_id,
-        rotation_config,
+        rotations,
+        use_ai=False,
         created_by=None,
     ):
         """
         Creates a project with the given configuration.
-        """
-        url = f"{constants.BASE_URL}/projects/create?client_id={client_id}"
 
-        payload = json.dumps(
-            {
-                "project_name": project_name,
-                "attached_datasets": [dataset_id],
-                "data_type": data_type,
-                "annotation_template_id": annotation_template_id,
-                "rotations": rotation_config,
-                "created_by": created_by,
-            }
-        )
+        :param project_name: Name of the project
+        :param data_type: Type of data (image, video, etc.)
+        :param client_id: ID of the client
+        :param attached_datasets: List of dataset IDs to attach to the project
+        :param annotation_template_id: ID of the annotation template
+        :param rotations: Dictionary containing rotation configuration
+        :param use_ai: Boolean flag for AI usage (default: False)
+        :param created_by: Optional creator information
+        :return: Project creation response
+        :raises LabellerrError: If the creation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/create?client_id={client_id}&uuid={unique_id}"
+
+        payload = json.dumps({
+            "project_name": project_name,
+            "attached_datasets": attached_datasets,
+            "data_type": data_type,
+            "annotation_template_id": annotation_template_id,
+            "rotations": rotations,
+            "use_ai": use_ai,
+            "created_by": created_by,
+        })
 
         headers = self._build_headers(
+            client_id=client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
             }
         )
 
-        # print(f"{payload}")
-
-        response = requests.post(url, headers=headers, data=payload)
-        response_data = response.json()
-
-        # print(f"{response_data}")
-
-        if "error" in response_data and response_data["error"]:
-            error_details = response_data["error"]
-            error_msg = (
-                f"Validation Error: {response_data.get('message', 'Unknown error')}"
-            )
-            for error in error_details:
-                error_msg += f"\n- Field '{error['field']}': {error['message']}"
-            raise LabellerrError(error_msg)
-
-        return response_data
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
 
     def initiate_create_project(self, payload):
         """
@@ -1075,8 +1077,9 @@ class LabellerrClient:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")
 
-                if param == "client_id" and not isinstance(payload[param], str):
-                    raise LabellerrError("client_id must be a non-empty string")
+                if param == "client_id":
+                    if not isinstance(payload[param], str) or not payload[param].strip():
+                        raise LabellerrError("client_id must be a non-empty string")
 
                 if param == "annotation_guide":
                     for guide in payload["annotation_guide"]:
@@ -1168,9 +1171,10 @@ class LabellerrClient:
                 project_name=payload["project_name"],
                 data_type=payload["data_type"],
                 client_id=payload["client_id"],
-                dataset_id=dataset_id,
+                attached_datasets=[dataset_id],
                 annotation_template_id=annotation_template_id,
-                rotation_config=payload["rotation_config"],
+                rotations=payload["rotation_config"],
+                use_ai=payload.get("use_ai", False),
                 created_by=payload["created_by"],
             )
 
@@ -1337,3 +1341,37 @@ class LabellerrClient:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
+
+    @validate_required(['client_id', 'data_type', 'template_name', 'questions'])
+    @validate_client_id('client_id')
+    @validate_data_type('data_type')
+    @validate_list_not_empty('questions')
+    @validate_questions_structure()
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def create_template(self, client_id, data_type, template_name, questions):
+        """
+        Creates an annotation template with the given configuration.
+
+        :param client_id: The ID of the client.
+        :param data_type: The type of data for the template (image, video, etc.).
+        :param template_name: The name of the template.
+        :param questions: List of questions/annotations for the template.
+        :return: The response from the API containing template details.
+        :raises LabellerrError: If the creation fails.
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/annotations/create_template?client_id={client_id}&data_type={data_type}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({
+            "templateName": template_name,
+            "questions": questions
+        })
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)

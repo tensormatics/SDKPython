@@ -7,7 +7,10 @@ import os
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
+from functools import wraps
 from multiprocessing import cpu_count
+from typing import List, Optional, Union
 
 import requests
 from requests.adapters import HTTPAdapter
@@ -18,6 +21,65 @@ from .exceptions import LabellerrError
 # python -m unittest discover -s tests --run
 # python setup.py sdist bdist_wheel -- build
 create_dataset_parameters = {}
+
+
+@dataclass
+class KeyFrame:
+    """
+    Represents a key frame with validation.
+    """
+    frame_number: int
+    is_manual: bool = True
+    method: str = "manual"
+    source: str = "manual"
+
+    def __post_init__(self):
+        if not isinstance(self.frame_number, int):
+            raise ValueError("frame_number must be an integer")
+        if self.frame_number < 0:
+            raise ValueError("frame_number must be non-negative")
+        if not isinstance(self.is_manual, bool):
+            raise ValueError("is_manual must be a boolean")
+        if not isinstance(self.method, str):
+            raise ValueError("method must be a string")
+        if not isinstance(self.source, str):
+            raise ValueError("source must be a string")
+
+
+def validate_params(**validations):
+    """
+    Decorator to validate method parameters based on type specifications.
+
+    Usage:
+    @validate_params(project_id=str, file_id=str, keyFrames=list)
+    def some_method(self, project_id, file_id, keyFrames):
+        ...
+    """
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # Get function signature to map args to parameter names
+            import inspect
+            sig = inspect.signature(func)
+            bound = sig.bind(*args, **kwargs)
+            bound.apply_defaults()
+
+            # Validate each parameter
+            for param_name, expected_type in validations.items():
+                if param_name in bound.arguments:
+                    value = bound.arguments[param_name]
+                    if not isinstance(value, expected_type):
+                        from .exceptions import LabellerrError
+                        type_name = (
+                            " or ".join(t.__name__ for t in expected_type)
+                            if isinstance(expected_type, tuple)
+                            else expected_type.__name__
+                        )
+                        raise LabellerrError(f"{param_name} must be a {type_name}")
+
+            return func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class LabellerrClient:
@@ -275,13 +337,12 @@ class LabellerrClient:
 
         return response
 
-    def upload_files(self, client_id, files_list):
+    @validate_params(client_id=str, files_list=(str, list))
+    def upload_files(self, client_id: str, files_list: Union[str, List[str]]):
         """
         Uploads files to the API.
 
         :param client_id: The ID of the client.
-        :param dataset_id: The ID of the dataset.
-        :param data_type: The type of data.
         :param files_list: The list of files to upload or a comma-separated string of file paths.
         :return: The response from the API.
         :raises LabellerrError: If the upload fails.
@@ -290,10 +351,6 @@ class LabellerrClient:
             # Convert string input to list if necessary
             if isinstance(files_list, str):
                 files_list = files_list.split(",")
-            elif not isinstance(files_list, list):
-                raise LabellerrError(
-                    "files_list must be either a list or a comma-separated string"
-                )
 
             if len(files_list) == 0:
                 raise LabellerrError("No files to upload")
@@ -426,24 +483,18 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
-    def get_all_dataset(self, client_id, datatype, project_id, scope):
+    @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
+    def get_all_dataset(self, client_id: str, datatype: str, project_id: str, scope: str):
         """
         Retrieves a dataset by its ID.
 
         :param client_id: The ID of the client.
         :param datatype: The type of data for the dataset.
+        :param project_id: The ID of the project.
+        :param scope: The scope of the dataset.
         :return: The dataset as JSON.
         """
-        # validate parameters
-        if not isinstance(client_id, str):
-            raise LabellerrError("client_id must be a string")
-        if not isinstance(datatype, str):
-            raise LabellerrError("datatype must be a string")
-        if not isinstance(project_id, str):
-            raise LabellerrError("project_id must be a string")
-        if not isinstance(scope, str):
-            raise LabellerrError("scope must be a string")
-        # scope value should on in the list SCOPE_LIST
+        # scope value should be in the list SCOPE_LIST
         if scope not in constants.SCOPE_LIST:
             raise LabellerrError(
                 f"scope must be one of {', '.join(constants.SCOPE_LIST)}"
@@ -954,15 +1005,16 @@ class LabellerrClient:
             logging.error(f"Unexpected error in download_function: {str(e)}")
             raise LabellerrError(f"Unexpected error in download_function: {str(e)}")
 
+    @validate_params(project_id=str, report_ids=list, client_id=str)
     def check_export_status(
-        self, project_id, report_ids, client_id
+        self, project_id: str, report_ids: List[str], client_id: str
     ):
         request_uuid = client_utils.generate_request_id()
         try:
             if not project_id:
                 raise LabellerrError("project_id cannot be null")
-            if not report_ids or not isinstance(report_ids, list):
-                raise LabellerrError("report_ids must be a non-empty list")
+            if not report_ids:
+                raise LabellerrError("report_ids cannot be empty")
 
             # Construct URL
             url = f"{constants.BASE_URL}/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
@@ -1337,3 +1389,65 @@ class LabellerrClient:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
+
+
+    @validate_params(client_id=str, project_id=str, file_id=str, key_frames=list)
+    def link_key_frame(self, client_id: str, project_id: str, file_id: str, key_frames: List[KeyFrame]):
+        """
+        Links key frames to a file in a project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param file_id: The ID of the file
+        :param key_frames: List of KeyFrame objects to link
+        :return: Response from the API
+        """
+        try:
+            unique_id = str(uuid.uuid4())
+            url = f"{self.base_url}/actions/add_update_keyframes?client_id={client_id}&uuid={unique_id}"
+            headers = self._build_headers(
+                client_id=client_id,
+                extra_headers={"content-type": "application/json"}
+            )
+
+            body = {
+                "project_id": project_id,
+                "file_id": file_id,
+                "keyframes": [
+                    kf.__dict__ if isinstance(kf, KeyFrame) else kf
+                    for kf in key_frames
+                ]
+            }
+
+            response = self._make_request("POST", url, headers=headers, json=body)
+            return self._handle_response(response, unique_id)
+
+        except LabellerrError as e:
+            raise e
+        except Exception as e:
+            raise LabellerrError(f"Failed to link key frames: {str(e)}")
+
+    @validate_params(client_id=str, project_id=str)
+    def delete_key_frames(self, client_id: str, project_id: str):
+        """
+        Deletes key frames from a project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :return: Response from the API
+        """
+        try:
+            unique_id = str(uuid.uuid4())
+            url = f"{self.base_url}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
+            headers = self._build_headers(
+                client_id=client_id,
+                extra_headers={"content-type": "application/json"}
+            )
+
+            response = self._make_request("POST", url, headers=headers)
+            return self._handle_response(response, unique_id)
+
+        except LabellerrError as e:
+            raise e
+        except Exception as e:
+            raise LabellerrError(f"Failed to delete key frames: {str(e)}")

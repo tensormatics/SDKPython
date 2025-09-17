@@ -300,7 +300,6 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             json.dump(annotation_data, temp_annotation_file)
             temp_annotation_file.close()
 
-            test_project_id = "test-project-id"
             annotation_format = "coco_json"
 
             if hasattr(self, "created_project_id") and self.created_project_id:

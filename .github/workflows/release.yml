@@ -90,7 +90,7 @@ jobs:
           LABELLERR_CLIENT_ID: ${{ secrets.LABELLERR_CLIENT_ID }}
           LABELLERR_TEST_EMAIL: ${{ secrets.LABELLERR_TEST_EMAIL }}
         run: |
-          python -m pytest labellerr_use_case_tests.py -v
+          make run-integration-test
 
   release:
     name: Create Release

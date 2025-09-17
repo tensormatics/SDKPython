@@ -154,41 +154,53 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             },
         ]
 
-        # Base valid payload
-        base_payload = {
-            "client_id": self.client_id,
-            "dataset_name": "test_dataset",
-            "dataset_description": "test description",
-            "data_type": "image",
-            "created_by": "test@example.com",
-            "project_name": "test_project",
-            "autolabel": False,
-            "files_to_upload": [],
-            "annotation_guide": self.annotation_guide,
-        }
+        temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+        temp_file.write(b"fake_image_data")
+        temp_file.close()
 
-        for i, test_case in enumerate(validation_test_cases, 1):
-            with self.subTest(test_name=test_case["test_name"]):
+        try:
+            # Base valid payload
+            base_payload = {
+                "client_id": self.client_id,
+                "dataset_name": "test_dataset",
+                "dataset_description": "test description",
+                "data_type": "image",
+                "created_by": "test@example.com",
+                "project_name": "test_project",
+                "autolabel": False,
+                "files_to_upload": [temp_file.name],
+                "annotation_guide": self.annotation_guide,
+            }
 
-                # Create test payload by modifying base payload
-                test_payload = base_payload.copy()
-                test_payload.update(test_case["payload_overrides"])
+            for i, test_case in enumerate(validation_test_cases, 1):
+                with self.subTest(test_name=test_case["test_name"]):
 
-                # Remove keys if specified
-                for key in test_case["remove_keys"]:
-                    test_payload.pop(key, None)
+                    # Create test payload by modifying base payload
+                    test_payload = base_payload.copy()
+                    test_payload.update(test_case["payload_overrides"])
 
-                # Execute test and verify expected error
-                with self.assertRaises(LabellerrError) as context:
-                    self.client.initiate_create_project(test_payload)
+                    # Remove keys if specified
+                    for key in test_case["remove_keys"]:
+                        test_payload.pop(key, None)
 
-                # Verify error message contains expected substring
-                error_message = str(context.exception)
-                self.assertIn(
-                    test_case["expected_error"],
-                    error_message,
-                    f"Expected error '{test_case['expected_error']}' not found in '{error_message}'",
-                )
+                    # Execute test and verify expected error
+                    with self.assertRaises(LabellerrError) as context:
+                        self.client.initiate_create_project(test_payload)
+
+                    # Verify error message contains expected substring
+                    error_message = str(context.exception)
+                    self.assertIn(
+                        test_case["expected_error"],
+                        error_message,
+                        f"Expected error '{test_case['expected_error']}' not found in '{error_message}'",
+                    )
+
+        finally:
+            # Clean up temporary file
+            try:
+                os.unlink(temp_file.name)
+            except OSError:
+                pass
 
     def test_use_case_1_multiple_data_types_table_driven(self):
 
@@ -294,36 +306,70 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             if hasattr(self, "created_project_id") and self.created_project_id:
                 actual_project_id = self.created_project_id
             else:
-                actual_project_id = test_project_id
-
-                print(
-                    "Calling actual Labellerr pre-annotation API with real credentials..."
-                )
-
+                test_files = []
                 try:
-                    with patch.object(
-                        self.client, "preannotation_job_status", create=True
-                    ) as mock_status:
-                        mock_status.return_value = {
-                            "response": {"status": "completed", "job_id": "real-job-id"}
-                        }
+                    # Create a small test file
+                    temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                    temp_file.write(b"fake_image_data_for_preannotation_test")
+                    temp_file.close()
+                    test_files.append(temp_file.name)
 
-                        result = self.client._upload_preannotation_sync(
-                            project_id=actual_project_id,
-                            client_id=self.client_id,
-                            annotation_format=annotation_format,
-                            annotation_file=temp_annotation_file.name,
-                        )
+                    # Create project for preannotation testing
+                    project_payload = {
+                        "client_id": self.client_id,
+                        "dataset_name": f"SDK_Preannotation_Test_{int(time.time())}",
+                        "dataset_description": "Test dataset for preannotation integration testing",
+                        "data_type": "image",
+                        "created_by": self.test_email,
+                        "project_name": f"SDK_Preannotation_Project_{int(time.time())}",
+                        "autolabel": False,
+                        "files_to_upload": test_files,
+                        "annotation_guide": self.annotation_guide,
+                        "rotation_config": self.rotation_config,
+                    }
 
-                        self.assertIsInstance(
-                            result, dict, "Upload should return a dictionary"
-                        )
-                        self.assertIn(
-                            "response", result, "Result should contain response"
-                        )
+                    result = self.client.initiate_create_project(project_payload)
+                    actual_project_id = result.get("project_id")
 
-                except Exception as api_error:
-                    raise api_error
+                    if not actual_project_id:
+                        self.fail("Failed to create project for preannotation testing")
+
+                finally:
+                    # Clean up test files
+                    for file_path in test_files:
+                        try:
+                            os.unlink(file_path)
+                        except OSError:
+                            pass
+
+            print(
+                "Calling actual Labellerr pre-annotation API with real credentials..."
+            )
+
+            try:
+                with patch.object(
+                    self.client, "preannotation_job_status", create=True
+                ) as mock_status:
+                    mock_status.return_value = {
+                        "response": {"status": "completed", "job_id": "real-job-id"}
+                    }
+
+                    result = self.client._upload_preannotation_sync(
+                        project_id=actual_project_id,
+                        client_id=self.client_id,
+                        annotation_format=annotation_format,
+                        annotation_file=temp_annotation_file.name,
+                    )
+
+                    self.assertIsInstance(
+                        result, dict, "Upload should return a dictionary"
+                    )
+                    self.assertIn(
+                        "response", result, "Result should contain response"
+                    )
+
+            except Exception as api_error:
+                raise api_error
 
         except LabellerrError as e:
             self.fail(f"Pre-annotation upload failed with LabellerrError: {e}")
@@ -460,10 +506,46 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             json.dump(test_scenario["sample_data"], temp_annotation_file)
             temp_annotation_file.close()
 
-            # Use project ID from previous tests if available
-            test_project_id = getattr(
-                self, "created_project_id", "test-project-id-table-driven"
-            )
+            # Use project ID from previous tests if available, or create a new project
+            test_project_id = getattr(self, "created_project_id", None)
+
+            if not test_project_id:
+                # Create a minimal project for preannotation testing
+                test_files = []
+                try:
+                    # Create a small test file
+                    temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                    temp_file.write(b"fake_image_data_for_preannotation_test")
+                    temp_file.close()
+                    test_files.append(temp_file.name)
+
+                    # Create project for preannotation testing
+                    project_payload = {
+                        "client_id": self.client_id,
+                        "dataset_name": f"SDK_Preannotation_Test_{int(time.time())}",
+                        "dataset_description": "Test dataset for preannotation integration testing",
+                        "data_type": "image",
+                        "created_by": self.test_email,
+                        "project_name": f"SDK_Preannotation_Project_{int(time.time())}",
+                        "autolabel": False,
+                        "files_to_upload": test_files,
+                        "annotation_guide": self.annotation_guide,
+                        "rotation_config": self.rotation_config,
+                    }
+
+                    result = self.client.initiate_create_project(project_payload)
+                    test_project_id = result.get("project_id")
+
+                    if not test_project_id:
+                        self.fail("Failed to create project for preannotation testing")
+
+                finally:
+                    # Clean up test files
+                    for file_path in test_files:
+                        try:
+                            os.unlink(file_path)
+                        except OSError:
+                            pass
 
             try:
                 # Only patch the missing method, let everything else be real

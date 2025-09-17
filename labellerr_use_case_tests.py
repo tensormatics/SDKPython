@@ -16,10 +16,10 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
     def setUp(self):
 
-        self.api_key = os.getenv("API_KEY", "test-api-key")
-        self.api_secret = os.getenv("API_SECRET", "test-api-secret")
-        self.client_id = os.getenv("CLIENT_ID", "test-client-id")
-        self.test_email = os.getenv("CLIENT_EMAIL", "test@example.com")
+        self.api_key = os.getenv("LABELLERR_API_KEY", "test-api-key")
+        self.api_secret = os.getenv("LABELLERR_API_SECRET", "test-api-secret")
+        self.client_id = os.getenv("LABELLERR_CLIENT_ID", "test-client-id")
+        self.test_email = os.getenv("LABELLERR_TEST_EMAIL", "test@example.com")
 
         if (
             self.api_key == "test-api-key"
@@ -527,16 +527,16 @@ if __name__ == "__main__":
     Main execution block for running use case integration tests.
 
     Environment Variables Required:
-    - API_KEY: Your Labellerr API key
-    - API_SECRET: Your Labellerr API secret
-    - CLIENT_ID: Your Labellerr client ID
-    - TEST_EMAIL: Valid email address for testing
+    - LABELLERR_API_KEY: Your Labellerr API key
+    - LABELLERR_API_SECRET: Your Labellerr API secret
+    - LABELLERR_CLIENT_ID: Your Labellerr client ID
+    - LABELLERR_TEST_EMAIL: Valid email address for testing
 
     Run with:
     python use_case_tests.py
     """
     # Check for required environment variables
-    required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL"]
+    required_env_vars = ["LABELLERR_API_KEY", "LABELLERR_API_SECRET", "LABELLERR_CLIENT_ID", "LABELLERR_TEST_EMAIL"]
 
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 

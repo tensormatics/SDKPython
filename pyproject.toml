@@ -46,6 +46,7 @@ dev = [
     "mypy>=0.800",
     "isort>=5.0.0",
     "build>=0.3.0",
+    "python-dotenv>=0.19.0",
 ]
 docs = [
     "sphinx>=4.0.0",

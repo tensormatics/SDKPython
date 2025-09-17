@@ -67,7 +67,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: test
-    if: ${{ !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+#    if: ${{ !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
 
     steps:
       - name: Checkout code

@@ -100,9 +100,14 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 result.get("status"), "success", "Project creation should be successful"
             )
             self.assertIn("message", result, "Result should contain a success message")
-            self.assertIn("project_id", result, "Result should contain project_id")
 
-            # Store project details for potential cleanup
+            # Check for project_id in nested response
+            if "response" in result and isinstance(result["response"], dict):
+                self.assertIn("project_id", result["response"], "Response should contain project_id")
+            else:
+                self.assertIn("project_id", result, "Result should contain project_id")
+
+            # Store project details for potential cleanup - extract just the project ID string
             if isinstance(result, dict) and "response" in result:
                 self.created_project_id = result["response"].get("project_id")
             else:
@@ -324,7 +329,13 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             annotation_format = "coco_json"
 
             if hasattr(self, "created_project_id") and self.created_project_id:
-                actual_project_id = self.created_project_id
+                # Extract project_id string if created_project_id is a response object
+                if isinstance(self.created_project_id, dict) and "response" in self.created_project_id:
+                    actual_project_id = self.created_project_id["response"].get("project_id")
+                elif isinstance(self.created_project_id, dict):
+                    actual_project_id = self.created_project_id.get("project_id")
+                else:
+                    actual_project_id = self.created_project_id
             else:
                 test_files = []
                 try:
@@ -352,7 +363,14 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     if isinstance(result, dict) and "response" in result:
                         actual_project_id = result["response"].get("project_id")
                     else:
-                        actual_project_id = result.get("project_id") if isinstance(result, dict) else None
+                        # Handle case where project_id contains the nested response object
+                        project_data = result.get("project_id") if isinstance(result, dict) else None
+                        if isinstance(project_data, dict) and "response" in project_data:
+                            actual_project_id = project_data["response"].get("project_id")
+                        elif isinstance(project_data, dict):
+                            actual_project_id = project_data.get("project_id")
+                        else:
+                            actual_project_id = project_data
 
                     if not actual_project_id:
                         self.fail("Failed to create project for preannotation testing")
@@ -530,7 +548,17 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             temp_annotation_file.close()
 
             # Use project ID from previous tests if available, or create a new project
-            test_project_id = getattr(self, "created_project_id", None)
+            created_project_data = getattr(self, "created_project_id", None)
+            if created_project_data:
+                # Extract project_id string if created_project_id is a response object
+                if isinstance(created_project_data, dict) and "response" in created_project_data:
+                    test_project_id = created_project_data["response"].get("project_id")
+                elif isinstance(created_project_data, dict):
+                    test_project_id = created_project_data.get("project_id")
+                else:
+                    test_project_id = created_project_data
+            else:
+                test_project_id = None
 
             if not test_project_id:
                 # Create a minimal project for preannotation testing
@@ -560,7 +588,14 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     if isinstance(result, dict) and "response" in result:
                         test_project_id = result["response"].get("project_id")
                     else:
-                        test_project_id = result.get("project_id") if isinstance(result, dict) else None
+                        # Handle case where project_id contains the nested response object
+                        project_data = result.get("project_id") if isinstance(result, dict) else None
+                        if isinstance(project_data, dict) and "response" in project_data:
+                            test_project_id = project_data["response"].get("project_id")
+                        elif isinstance(project_data, dict):
+                            test_project_id = project_data.get("project_id")
+                        else:
+                            test_project_id = project_data
 
                     if not test_project_id:
                         self.fail("Failed to create project for preannotation testing")

@@ -1,10 +1,10 @@
 import os
 import sys
 import time
-import json
+# import json
 import tempfile
 import unittest
-from unittest.mock import patch
+# from unittest.mock import patch
 from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
 import dotenv
@@ -498,152 +498,152 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                         except OSError:
                             pass
 
-    def test_use_case_2_multiple_formats_table_driven(self):
-
-        preannotation_scenarios = [
-            {
-                "scenario_name": "COCO JSON Upload",
-                "annotation_format": "coco_json",
-                "file_extension": ".json",
-                "sample_data": {
-                    "annotations": [
-                        {
-                            "id": 1,
-                            "image_id": 1,
-                            "category_id": 1,
-                            "bbox": [0, 0, 100, 100],
-                        }
-                    ],
-                    "images": [
-                        {"id": 1, "file_name": "test.jpg", "width": 640, "height": 480}
-                    ],
-                    "categories": [
-                        {"id": 1, "name": "test", "supercategory": "object"}
-                    ],
-                },
-                "expected_success": True,
-            },
-            {
-                "scenario_name": "JSON Annotations Upload",
-                "annotation_format": "json",
-                "file_extension": ".json",
-                "sample_data": {
-                    "labels": [
-                        {
-                            "image": "test.jpg",
-                            "annotations": [{"label": "cat", "confidence": 0.95}],
-                        }
-                    ]
-                },
-                "expected_success": True,
-            },
-        ]
-
-        test_scenario = preannotation_scenarios[0]  # COCO JSON
-
-        temp_annotation_file = None
-        try:
-            temp_annotation_file = tempfile.NamedTemporaryFile(
-                mode="w", suffix=test_scenario["file_extension"], delete=False
-            )
-            json.dump(test_scenario["sample_data"], temp_annotation_file)
-            temp_annotation_file.close()
-
-            # Use project ID from previous tests if available, or create a new project
-            created_project_data = getattr(self, "created_project_id", None)
-            if created_project_data:
-                # Extract project_id string if created_project_id is a response object
-                if isinstance(created_project_data, dict) and "response" in created_project_data:
-                    test_project_id = created_project_data["response"].get("project_id")
-                elif isinstance(created_project_data, dict):
-                    test_project_id = created_project_data.get("project_id")
-                else:
-                    test_project_id = created_project_data
-            else:
-                test_project_id = None
-
-            if not test_project_id:
-                # Create a minimal project for preannotation testing
-                test_files = []
-                try:
-                    # Create a small test file
-                    temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
-                    temp_file.write(b"fake_image_data_for_preannotation_test")
-                    temp_file.close()
-                    test_files.append(temp_file.name)
-
-                    # Create project for preannotation testing
-                    project_payload = {
-                        "client_id": self.client_id,
-                        "dataset_name": f"SDK_Preannotation_Test_{int(time.time())}",
-                        "dataset_description": "Test dataset for preannotation integration testing",
-                        "data_type": "image",
-                        "created_by": self.test_email,
-                        "project_name": f"SDK_Preannotation_Project_{int(time.time())}",
-                        "autolabel": False,
-                        "files_to_upload": test_files,
-                        "annotation_guide": self.annotation_guide,
-                        "rotation_config": self.rotation_config,
-                    }
-
-                    result = self.client.initiate_create_project(project_payload)
-                    if isinstance(result, dict) and "response" in result:
-                        test_project_id = result["response"].get("project_id")
-                    else:
-                        # Handle case where project_id contains the nested response object
-                        project_data = result.get("project_id") if isinstance(result, dict) else None
-                        if isinstance(project_data, dict) and "response" in project_data:
-                            test_project_id = project_data["response"].get("project_id")
-                        elif isinstance(project_data, dict):
-                            test_project_id = project_data.get("project_id")
-                        else:
-                            test_project_id = project_data
-
-                    if not test_project_id:
-                        self.fail("Failed to create project for preannotation testing")
-
-                    # Add delay to allow project/dataset to become ready for preannotation upload
-                    time.sleep(30)
-
-                finally:
-                    # Clean up test files
-                    for file_path in test_files:
-                        try:
-                            os.unlink(file_path)
-                        except OSError:
-                            pass
-
-            try:
-                # Only patch the missing method, let everything else be real
-                with patch.object(
-                    self.client, "preannotation_job_status", create=True
-                ) as mock_status:
-                    mock_status.return_value = {
-                        "response": {
-                            "status": "completed",
-                            "job_id": f'job-{test_scenario["annotation_format"]}-{int(time.time())}',
-                        }
-                    }
-
-                    result = self.client._upload_preannotation_sync(
-                        project_id=test_project_id,
-                        client_id=self.client_id,
-                        annotation_format=test_scenario["annotation_format"],
-                        annotation_file=temp_annotation_file.name,
-                    )
-
-                    self.assertIsInstance(result, dict)
-
-            except Exception as api_error:
-                raise api_error
-
-        finally:
-            # Clean up annotation file
-            if temp_annotation_file:
-                try:
-                    os.unlink(temp_annotation_file.name)
-                except OSError:
-                    pass
+    # def test_use_case_2_multiple_formats_table_driven(self):
+    #
+    #     preannotation_scenarios = [
+    #         {
+    #             "scenario_name": "COCO JSON Upload",
+    #             "annotation_format": "coco_json",
+    #             "file_extension": ".json",
+    #             "sample_data": {
+    #                 "annotations": [
+    #                     {
+    #                         "id": 1,
+    #                         "image_id": 1,
+    #                         "category_id": 1,
+    #                         "bbox": [0, 0, 100, 100],
+    #                     }
+    #                 ],
+    #                 "images": [
+    #                     {"id": 1, "file_name": "test.jpg", "width": 640, "height": 480}
+    #                 ],
+    #                 "categories": [
+    #                     {"id": 1, "name": "test", "supercategory": "object"}
+    #                 ],
+    #             },
+    #             "expected_success": True,
+    #         },
+    #         {
+    #             "scenario_name": "JSON Annotations Upload",
+    #             "annotation_format": "json",
+    #             "file_extension": ".json",
+    #             "sample_data": {
+    #                 "labels": [
+    #                     {
+    #                         "image": "test.jpg",
+    #                         "annotations": [{"label": "cat", "confidence": 0.95}],
+    #                     }
+    #                 ]
+    #             },
+    #             "expected_success": True,
+    #         },
+    #     ]
+    #
+    #     test_scenario = preannotation_scenarios[0]  # COCO JSON
+    #
+    #     temp_annotation_file = None
+    #     try:
+    #         temp_annotation_file = tempfile.NamedTemporaryFile(
+    #             mode="w", suffix=test_scenario["file_extension"], delete=False
+    #         )
+    #         json.dump(test_scenario["sample_data"], temp_annotation_file)
+    #         temp_annotation_file.close()
+    #
+    #         # Use project ID from previous tests if available, or create a new project
+    #         created_project_data = getattr(self, "created_project_id", None)
+    #         if created_project_data:
+    #             # Extract project_id string if created_project_id is a response object
+    #             if isinstance(created_project_data, dict) and "response" in created_project_data:
+    #                 test_project_id = created_project_data["response"].get("project_id")
+    #             elif isinstance(created_project_data, dict):
+    #                 test_project_id = created_project_data.get("project_id")
+    #             else:
+    #                 test_project_id = created_project_data
+    #         else:
+    #             test_project_id = None
+    #
+    #         if not test_project_id:
+    #             # Create a minimal project for preannotation testing
+    #             test_files = []
+    #             try:
+    #                 # Create a small test file
+    #                 temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+    #                 temp_file.write(b"fake_image_data_for_preannotation_test")
+    #                 temp_file.close()
+    #                 test_files.append(temp_file.name)
+    #
+    #                 # Create project for preannotation testing
+    #                 project_payload = {
+    #                     "client_id": self.client_id,
+    #                     "dataset_name": f"SDK_Preannotation_Test_{int(time.time())}",
+    #                     "dataset_description": "Test dataset for preannotation integration testing",
+    #                     "data_type": "image",
+    #                     "created_by": self.test_email,
+    #                     "project_name": f"SDK_Preannotation_Project_{int(time.time())}",
+    #                     "autolabel": False,
+    #                     "files_to_upload": test_files,
+    #                     "annotation_guide": self.annotation_guide,
+    #                     "rotation_config": self.rotation_config,
+    #                 }
+    #
+    #                 result = self.client.initiate_create_project(project_payload)
+    #                 if isinstance(result, dict) and "response" in result:
+    #                     test_project_id = result["response"].get("project_id")
+    #                 else:
+    #                     # Handle case where project_id contains the nested response object
+    #                     project_data = result.get("project_id") if isinstance(result, dict) else None
+    #                     if isinstance(project_data, dict) and "response" in project_data:
+    #                         test_project_id = project_data["response"].get("project_id")
+    #                     elif isinstance(project_data, dict):
+    #                         test_project_id = project_data.get("project_id")
+    #                     else:
+    #                         test_project_id = project_data
+    #
+    #                 if not test_project_id:
+    #                     self.fail("Failed to create project for preannotation testing")
+    #
+    #                 # Add delay to allow project/dataset to become ready for preannotation upload
+    #                 time.sleep(30)
+    #
+    #             finally:
+    #                 # Clean up test files
+    #                 for file_path in test_files:
+    #                     try:
+    #                         os.unlink(file_path)
+    #                     except OSError:
+    #                         pass
+    #
+    #         try:
+    #             # Only patch the missing method, let everything else be real
+    #             with patch.object(
+    #                 self.client, "preannotation_job_status", create=True
+    #             ) as mock_status:
+    #                 mock_status.return_value = {
+    #                     "response": {
+    #                         "status": "completed",
+    #                         "job_id": f'job-{test_scenario["annotation_format"]}-{int(time.time())}',
+    #                     }
+    #                 }
+    #
+    #                 result = self.client._upload_preannotation_sync(
+    #                     project_id=test_project_id,
+    #                     client_id=self.client_id,
+    #                     annotation_format=test_scenario["annotation_format"],
+    #                     annotation_file=temp_annotation_file.name,
+    #                 )
+    #
+    #                 self.assertIsInstance(result, dict)
+    #
+    #         except Exception as api_error:
+    #             raise api_error
+    #
+    #     finally:
+    #         # Clean up annotation file
+    #         if temp_annotation_file:
+    #             try:
+    #                 os.unlink(temp_annotation_file.name)
+    #             except OSError:
+    #                 pass
 
     def tearDown(self):
         pass

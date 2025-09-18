@@ -55,3 +55,6 @@ check-release: ## Check if everything is ready for release
 	@echo "2. Update version in pyproject.toml"
 	@echo "3. Commit: git commit -m '[LABIMP-XXXX] Prepare release vX.X.X'"
 	@echo "4. Push and create PR to main (patch) or develop (minor)"
+
+run-integration-test:
+	python -m pytest labellerr_integration_tests.py -v

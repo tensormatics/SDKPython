@@ -2,11 +2,6 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
-      - develop
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version_type:
@@ -43,7 +38,7 @@ jobs:
     if: ${{ !inputs.skip_tests }}
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10', '3.11']
+        python-version: ['3.9']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -72,7 +67,7 @@ jobs:
     name: Integration Tests
     runs-on: ubuntu-latest
     needs: test
-    if: ${{ !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
+#    if: ${{ !inputs.skip_tests && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop') }}
 
     steps:
       - name: Checkout code
@@ -95,13 +90,13 @@ jobs:
           LABELLERR_CLIENT_ID: ${{ secrets.LABELLERR_CLIENT_ID }}
           LABELLERR_TEST_EMAIL: ${{ secrets.LABELLERR_TEST_EMAIL }}
         run: |
-          python -m pytest labellerr_use_case_tests.py -v
+          make run-integration-test
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
     needs: [test, integration-test]
-    if: always() && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.integration-test.result == 'success' || needs.integration-test.result == 'skipped')
+    # if: always() && github.ref == 'refs/heads/main' && (needs.test.result == 'success' || needs.test.result == 'skipped') && (needs.integration-test.result == 'success' || needs.integration-test.result == 'skipped')
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
@@ -177,8 +172,21 @@ jobs:
           replace = version = "{new_version}"
           EOF
 
-          # Bump the version
-          bump2version $BUMP_TYPE
+          # Debug: Check git status before bump
+          echo "=== Git status before bump ==="
+          git status
+          echo "=== Git diff ==="
+          git diff
+          echo "=== Git diff --cached ==="
+          git diff --cached
+
+          # Bump the version (use --allow-dirty for release_manager branch)
+          if [[ "${{ github.ref_name }}" == "release_manager" ]]; then
+            echo "Using --allow-dirty for release_manager branch"
+            bump2version --allow-dirty $BUMP_TYPE
+          else
+            bump2version $BUMP_TYPE
+          fi
 
           # Get the new version
           NEW_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)

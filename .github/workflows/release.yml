@@ -117,8 +117,8 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install bump2version
-        run: pip install bump2version
+      - name: Install dependencies
+        run: pip install packaging
 
       - name: Configure git
         run: |
@@ -137,17 +137,29 @@ jobs:
           echo "ticket=$TICKET" >> $GITHUB_OUTPUT
           echo "Found ticket: $TICKET"
 
-      - name: Determine version bump type
+      - name: Determine semantic version bump
         id: bump_type
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "type=${{ inputs.version_type }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "type=patch" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          COMMITS=$(git log $LAST_TAG..HEAD --oneline --pretty=format:"%s")
+
+          # Check for breaking changes
+          if echo "$COMMITS" | grep -qi "BREAKING CHANGE\|!:"; then
+            echo "type=major" >> $GITHUB_OUTPUT
+            echo "reason=breaking change detected" >> $GITHUB_OUTPUT
+          # Check for features
+          elif echo "$COMMITS" | grep -qi "^feat"; then
             echo "type=minor" >> $GITHUB_OUTPUT
+            echo "reason=new feature detected" >> $GITHUB_OUTPUT
+          # Check for fixes
+          elif echo "$COMMITS" | grep -qi "^fix"; then
+            echo "type=patch" >> $GITHUB_OUTPUT
+            echo "reason=bug fix detected" >> $GITHUB_OUTPUT
+          # Default to patch for other commits
           else
             echo "type=patch" >> $GITHUB_OUTPUT
+            echo "reason=default patch increment" >> $GITHUB_OUTPUT
           fi
 
       - name: Get current version
@@ -156,30 +168,43 @@ jobs:
           VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
           echo "current=$VERSION" >> $GITHUB_OUTPUT
 
-      - name: Bump version
+      - name: Calculate new version
         id: version
         run: |
           BUMP_TYPE=${{ steps.bump_type.outputs.type }}
+          CURRENT_VERSION=${{ steps.current_version.outputs.current }}
 
-          # Create .bumpversion.cfg with LABIMP commit message format
-          cat > .bumpversion.cfg << EOF
-          [bumpversion]
-          current_version = ${{ steps.current_version.outputs.current }}
-          commit = True
-          tag = True
-          tag_name = v{new_version}
-          message = [${{ steps.ticket.outputs.ticket }}] Bump version: {current_version} → {new_version}
+          # Parse current version
+          IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
 
-          [bumpversion:file:pyproject.toml]
-          search = version = "{current_version}"
-          replace = version = "{new_version}"
-          EOF
+          # Calculate new version based on semantic rules
+          case $BUMP_TYPE in
+            major)
+              NEW_VERSION="$((major + 1)).0.0"
+              ;;
+            minor)
+              NEW_VERSION="$major.$((minor + 1)).0"
+              ;;
+            patch)
+              NEW_VERSION="$major.$minor.$((patch + 1))"
+              ;;
+          esac
 
-          # Bump the version
-          bump2version $BUMP_TYPE
+          echo "Bumping from $CURRENT_VERSION to $NEW_VERSION ($BUMP_TYPE: ${{ steps.bump_type.outputs.reason }})"
 
-          # Get the new version
-          NEW_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          # Update pyproject.toml
+          sed -i "s/version = \"$CURRENT_VERSION\"/version = \"$NEW_VERSION\"/" pyproject.toml
+
+          # Commit and tag
+          git add pyproject.toml
+          git commit -m "[${{ steps.ticket.outputs.ticket }}] Release v$NEW_VERSION
+
+          Semantic version bump: $BUMP_TYPE
+          Reason: ${{ steps.bump_type.outputs.reason }}
+          Previous version: $CURRENT_VERSION"
+
+          git tag -a "v$NEW_VERSION" -m "[${{ steps.ticket.outputs.ticket }}] Release v$NEW_VERSION"
+
           echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$NEW_VERSION" >> $GITHUB_OUTPUT
 

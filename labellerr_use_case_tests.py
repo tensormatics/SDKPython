@@ -1,5 +1,3 @@
-
-
 import os
 import sys
 import time
@@ -10,54 +8,58 @@ from unittest.mock import patch
 from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
 import dotenv
+
 dotenv.load_dotenv()
+
 
 class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
     def setUp(self):
 
-        self.api_key = os.getenv('API_KEY', 'test-api-key')
-        self.api_secret = os.getenv('API_SECRET', 'test-api-secret')
-        self.client_id = os.getenv('CLIENT_ID', 'test-client-id')
-        self.test_email = os.getenv('CLIENT_EMAIL', 'test@example.com')
-        
-        if (self.api_key == 'test-api-key' or
-            self.api_secret == 'test-api-secret' or 
-            self.client_id == 'test-client-id' or 
-            self.test_email == 'test@example.com'):
-            
+        self.api_key = os.getenv("API_KEY", "test-api-key")
+        self.api_secret = os.getenv("API_SECRET", "test-api-secret")
+        self.client_id = os.getenv("CLIENT_ID", "test-client-id")
+        self.test_email = os.getenv("CLIENT_EMAIL", "test@example.com")
+
+        if (
+            self.api_key == "test-api-key"
+            or self.api_secret == "test-api-secret"
+            or self.client_id == "test-client-id"
+            or self.test_email == "test@example.com"
+        ):
+
             raise ValueError(
                 "Real Labellerr credentials are required for integration testing. "
                 "Please set environment variables: "
                 "LABELLERR_API_KEY, LABELLERR_API_SECRET, LABELLERR_CLIENT_ID, LABELLERR_TEST_EMAIL"
             )
-        
+
         # Initialize the client
         self.client = LabellerrClient(self.api_key, self.api_secret)
-        
+
         # Common test data
         self.test_project_name = f"SDK_Test_Project_{int(time.time())}"
         self.test_dataset_name = f"SDK_Test_Dataset_{int(time.time())}"
-        
+
         # Sample annotation guide as per documentation requirements
         self.annotation_guide = [
             {
                 "question": "What objects do you see?",
                 "option_type": "select",
-                "options": ["cat", "dog", "car", "person", "other"]
+                "options": ["cat", "dog", "car", "person", "other"],
             },
             {
                 "question": "Image quality rating",
                 "option_type": "radio",
-                "options": ["excellent", "good", "fair", "poor"]
-            }
+                "options": ["excellent", "good", "fair", "poor"],
+            },
         ]
-        
+
         # Valid rotation configuration
         self.rotation_config = {
-            'annotation_rotation_count': 1,
-            'review_rotation_count': 1,
-            'client_review_rotation_count': 1
+            "annotation_rotation_count": 1,
+            "review_rotation_count": 1,
+            "client_review_rotation_count": 1,
         }
 
     def test_use_case_1_complete_project_creation_workflow(self):
@@ -67,38 +69,41 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
         try:
             # Create sample image files for testing
             for i in range(3):
-                temp_file = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
-                temp_file.write(b'fake_image_data_' + str(i).encode())
+                temp_file = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+                temp_file.write(b"fake_image_data_" + str(i).encode())
                 temp_file.close()
                 test_files.append(temp_file.name)
-            
+
             # Step 1: Prepare project payload with all required parameters
             project_payload = {
-                'client_id': self.client_id,
-                'dataset_name': self.test_dataset_name,
-                'dataset_description': 'Test dataset for SDK integration testing',
-                'data_type': 'image',
-                'created_by': self.test_email,
-                'project_name': self.test_project_name,
-                'autolabel': False,
-                'files_to_upload': test_files,
-                'annotation_guide': self.annotation_guide,
-                'rotation_config': self.rotation_config
+                "client_id": self.client_id,
+                "dataset_name": self.test_dataset_name,
+                "dataset_description": "Test dataset for SDK integration testing",
+                "data_type": "image",
+                "created_by": self.test_email,
+                "project_name": self.test_project_name,
+                "autolabel": False,
+                "files_to_upload": test_files,
+                "annotation_guide": self.annotation_guide,
+                "rotation_config": self.rotation_config,
             }
-            
+
             # Step 2: Execute complete project creation workflow
 
             result = self.client.initiate_create_project(project_payload)
-                
-                # Step 3: Validate the workflow execution
-            self.assertIsInstance(result, dict, "Project creation should return a dictionary")
-            self.assertEqual(result.get('status'), 'success', "Project creation should be successful")
-            self.assertIn('message', result, "Result should contain a success message")
-            self.assertIn('project_id', result, "Result should contain project_id")
-                
-                
-                # Store project details for potential cleanup
-            self.created_project_id = result.get('project_id')
+
+            # Step 3: Validate the workflow execution
+            self.assertIsInstance(
+                result, dict, "Project creation should return a dictionary"
+            )
+            self.assertEqual(
+                result.get("status"), "success", "Project creation should be successful"
+            )
+            self.assertIn("message", result, "Result should contain a success message")
+            self.assertIn("project_id", result, "Result should contain project_id")
+
+            # Store project details for potential cleanup
+            self.created_project_id = result.get("project_id")
             self.created_dataset_name = self.test_dataset_name
 
         except LabellerrError as e:
@@ -115,133 +120,140 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
     def test_use_case_1_validation_requirements(self):
         """Table-driven test for project creation validation requirements"""
-        
+
         validation_test_cases = [
             {
-                'test_name': 'Missing client_id',
-                'payload_overrides': {'client_id': None},
-                'remove_keys': ['client_id'],
-                'expected_error': 'Required parameter client_id is missing'
+                "test_name": "Missing client_id",
+                "payload_overrides": {"client_id": None},
+                "remove_keys": ["client_id"],
+                "expected_error": "Required parameter client_id is missing",
             },
             {
-                'test_name': 'Invalid email format', 
-                'payload_overrides': {'created_by': 'invalid-email'},
-                'remove_keys': [],
-                'expected_error': 'Please enter email id in created_by'
+                "test_name": "Invalid email format",
+                "payload_overrides": {"created_by": "invalid-email"},
+                "remove_keys": [],
+                "expected_error": "Please enter email id in created_by",
             },
             {
-                'test_name': 'Invalid data type',
-                'payload_overrides': {'data_type': 'invalid_type'},
-                'remove_keys': [],
-                'expected_error': 'Invalid data_type'
+                "test_name": "Invalid data type",
+                "payload_overrides": {"data_type": "invalid_type"},
+                "remove_keys": [],
+                "expected_error": "Invalid data_type",
             },
             {
-                'test_name': 'Missing dataset_name',
-                'payload_overrides': {},
-                'remove_keys': ['dataset_name'],
-                'expected_error': 'Required parameter dataset_name is missing'
+                "test_name": "Missing dataset_name",
+                "payload_overrides": {},
+                "remove_keys": ["dataset_name"],
+                "expected_error": "Required parameter dataset_name is missing",
             },
             {
-                'test_name': 'Missing annotation guide and template ID',
-                'payload_overrides': {},
-                'remove_keys': ['annotation_guide'],
-                'expected_error': 'Please provide either annotation guide or annotation template id'
-            }
+                "test_name": "Missing annotation guide and template ID",
+                "payload_overrides": {},
+                "remove_keys": ["annotation_guide"],
+                "expected_error": "Please provide either annotation guide or annotation template id",
+            },
         ]
-        
+
         # Base valid payload
         base_payload = {
-            'client_id': self.client_id,
-            'dataset_name': 'test_dataset',
-            'dataset_description': 'test description',
-            'data_type': 'image',
-            'created_by': 'test@example.com',
-            'project_name': 'test_project',
-            'autolabel': False,
-            'files_to_upload': [],
-            'annotation_guide': self.annotation_guide
+            "client_id": self.client_id,
+            "dataset_name": "test_dataset",
+            "dataset_description": "test description",
+            "data_type": "image",
+            "created_by": "test@example.com",
+            "project_name": "test_project",
+            "autolabel": False,
+            "files_to_upload": [],
+            "annotation_guide": self.annotation_guide,
         }
-        
+
         for i, test_case in enumerate(validation_test_cases, 1):
-            with self.subTest(test_name=test_case['test_name']):
-                
+            with self.subTest(test_name=test_case["test_name"]):
+
                 # Create test payload by modifying base payload
                 test_payload = base_payload.copy()
-                test_payload.update(test_case['payload_overrides'])
-                
+                test_payload.update(test_case["payload_overrides"])
+
                 # Remove keys if specified
-                for key in test_case['remove_keys']:
+                for key in test_case["remove_keys"]:
                     test_payload.pop(key, None)
-                
+
                 # Execute test and verify expected error
                 with self.assertRaises(LabellerrError) as context:
                     self.client.initiate_create_project(test_payload)
-                
+
                 # Verify error message contains expected substring
                 error_message = str(context.exception)
-                self.assertIn(test_case['expected_error'], error_message, 
-                            f"Expected error '{test_case['expected_error']}' not found in '{error_message}'")
+                self.assertIn(
+                    test_case["expected_error"],
+                    error_message,
+                    f"Expected error '{test_case['expected_error']}' not found in '{error_message}'",
+                )
 
     def test_use_case_1_multiple_data_types_table_driven(self):
 
         project_test_scenarios = [
             {
-                'scenario_name': 'Image Classification Project',
-                'data_type': 'image',
-                'file_extensions': ['.jpg', '.png'],
-                'annotation_types': ['select', 'radio'],
-                'expected_success': True
+                "scenario_name": "Image Classification Project",
+                "data_type": "image",
+                "file_extensions": [".jpg", ".png"],
+                "annotation_types": ["select", "radio"],
+                "expected_success": True,
             },
             {
-                'scenario_name': 'Document Processing Project',
-                'data_type': 'document', 
-                'file_extensions': ['.pdf'],
-                'annotation_types': ['input', 'boolean'],
-                'expected_success': True
-            }
+                "scenario_name": "Document Processing Project",
+                "data_type": "document",
+                "file_extensions": [".pdf"],
+                "annotation_types": ["input", "boolean"],
+                "expected_success": True,
+            },
         ]
-        
+
         test_scenario = project_test_scenarios[0]  # Image classification
-        
-        
+
         test_files = []
         try:
-            for ext in test_scenario['file_extensions'][:2]:  # Limit to 2 files
+            for ext in test_scenario["file_extensions"][:2]:  # Limit to 2 files
                 temp_file = tempfile.NamedTemporaryFile(suffix=ext, delete=False)
                 temp_file.write(f'fake_{test_scenario["data_type"]}_data'.encode())
                 temp_file.close()
                 test_files.append(temp_file.name)
-            
+
             annotation_guide = []
-            for i, annotation_type in enumerate(test_scenario['annotation_types']):
-                annotation_guide.append({
-                    "question": f"Test question {i+1}",
-                    "option_type": annotation_type,
-                    "options": ["option1", "option2", "option3"] if annotation_type in ['select', 'radio'] else []
-                })
-            
+            for i, annotation_type in enumerate(test_scenario["annotation_types"]):
+                annotation_guide.append(
+                    {
+                        "question": f"Test question {i+1}",
+                        "option_type": annotation_type,
+                        "options": (
+                            ["option1", "option2", "option3"]
+                            if annotation_type in ["select", "radio"]
+                            else []
+                        ),
+                    }
+                )
+
             # Build project payload
             project_payload = {
-                'client_id': self.client_id,
-                'dataset_name': f"SDK_Test_{test_scenario['data_type']}_{int(time.time())}",
-                'dataset_description': f"Test dataset for {test_scenario['scenario_name']}",
-                'data_type': test_scenario['data_type'],
-                'created_by': self.test_email,
-                'project_name': f"SDK_Test_Project_{test_scenario['data_type']}_{int(time.time())}",
-                'autolabel': False,
-                'files_to_upload': test_files,
-                'annotation_guide': annotation_guide,
-                'rotation_config': self.rotation_config
+                "client_id": self.client_id,
+                "dataset_name": f"SDK_Test_{test_scenario['data_type']}_{int(time.time())}",
+                "dataset_description": f"Test dataset for {test_scenario['scenario_name']}",
+                "data_type": test_scenario["data_type"],
+                "created_by": self.test_email,
+                "project_name": f"SDK_Test_Project_{test_scenario['data_type']}_{int(time.time())}",
+                "autolabel": False,
+                "files_to_upload": test_files,
+                "annotation_guide": annotation_guide,
+                "rotation_config": self.rotation_config,
             }
-            
+
             # Execute test based on credentials
             result = self.client.initiate_create_project(project_payload)
-                
+
             self.assertIsInstance(result, dict)
-            self.assertEqual(result.get('status'), 'success')
+            self.assertEqual(result.get("status"), "success")
             print(f"✓ {test_scenario['scenario_name']} project created successfully")
 
-                
         finally:
             # Clean up test files
             for file_path in test_files:
@@ -259,70 +271,60 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     "category_id": 1,
                     "bbox": [100, 100, 200, 200],
                     "area": 40000,
-                    "iscrowd": 0
+                    "iscrowd": 0,
                 }
             ],
             "images": [
-                {
-                    "id": 1,
-                    "width": 640,
-                    "height": 480,
-                    "file_name": "test_image.jpg"
-                }
+                {"id": 1, "width": 640, "height": 480, "file_name": "test_image.jpg"}
             ],
-            "categories": [
-                {
-                    "id": 1,
-                    "name": "person",
-                    "supercategory": "human"
-                }
-            ]
+            "categories": [{"id": 1, "name": "person", "supercategory": "human"}],
         }
-        
+
         temp_annotation_file = None
         try:
-            temp_annotation_file = tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False)
+            temp_annotation_file = tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False
+            )
             json.dump(annotation_data, temp_annotation_file)
             temp_annotation_file.close()
-            
-            
-            test_project_id = 'test-project-id'
-            annotation_format = 'coco_json'
-            
-            
-            if hasattr(self, 'created_project_id') and self.created_project_id:
+
+            test_project_id = "test-project-id"
+            annotation_format = "coco_json"
+
+            if hasattr(self, "created_project_id") and self.created_project_id:
                 actual_project_id = self.created_project_id
             else:
                 actual_project_id = test_project_id
-            
 
-                print("Calling actual Labellerr pre-annotation API with real credentials...")
-                
+                print(
+                    "Calling actual Labellerr pre-annotation API with real credentials..."
+                )
+
                 try:
-                    with patch.object(self.client, 'preannotation_job_status', create=True) as mock_status:
+                    with patch.object(
+                        self.client, "preannotation_job_status", create=True
+                    ) as mock_status:
                         mock_status.return_value = {
-                            'response': {
-                                'status': 'completed',
-                                'job_id': 'real-job-id'
-                            }
+                            "response": {"status": "completed", "job_id": "real-job-id"}
                         }
-                        
+
                         result = self.client._upload_preannotation_sync(
                             project_id=actual_project_id,
                             client_id=self.client_id,
                             annotation_format=annotation_format,
-                            annotation_file=temp_annotation_file.name
+                            annotation_file=temp_annotation_file.name,
                         )
-                        
-                        self.assertIsInstance(result, dict, "Upload should return a dictionary")
-                        self.assertIn('response', result, "Result should contain response")
-                        
-                        
+
+                        self.assertIsInstance(
+                            result, dict, "Upload should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, "Result should contain response"
+                        )
+
                 except Exception as api_error:
                     raise api_error
-                    
 
-                    
         except LabellerrError as e:
             self.fail(f"Pre-annotation upload failed with LabellerrError: {e}")
         except Exception as e:
@@ -338,65 +340,67 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
         format_test_cases = [
             {
-                'test_name': 'Invalid annotation format',
-                'project_id': 'test-project',
-                'annotation_format': 'invalid_format',
-                'annotation_file': 'test.json',
-                'expected_error': 'Invalid annotation_format',
-                'create_temp_file': False,
-                'temp_suffix': None
+                "test_name": "Invalid annotation format",
+                "project_id": "test-project",
+                "annotation_format": "invalid_format",
+                "annotation_file": "test.json",
+                "expected_error": "Invalid annotation_format",
+                "create_temp_file": False,
+                "temp_suffix": None,
             },
             {
-                'test_name': 'File not found',
-                'project_id': 'test-project', 
-                'annotation_format': 'json',
-                'annotation_file': 'non_existent_file.json',
-                'expected_error': 'File not found',
-                'create_temp_file': False,
-                'temp_suffix': None
+                "test_name": "File not found",
+                "project_id": "test-project",
+                "annotation_format": "json",
+                "annotation_file": "non_existent_file.json",
+                "expected_error": "File not found",
+                "create_temp_file": False,
+                "temp_suffix": None,
             },
             {
-                'test_name': 'Wrong file extension for COCO format',
-                'project_id': 'test-project',
-                'annotation_format': 'coco_json',
-                'annotation_file': None,  # Will be set to temp file
-                'expected_error': 'For coco_json annotation format, the file must have a .json extension',
-                'create_temp_file': True,
-                'temp_suffix': '.txt'
-            }
+                "test_name": "Wrong file extension for COCO format",
+                "project_id": "test-project",
+                "annotation_format": "coco_json",
+                "annotation_file": None,  # Will be set to temp file
+                "expected_error": "For coco_json annotation format, the file must have a .json extension",
+                "create_temp_file": True,
+                "temp_suffix": ".txt",
+            },
         ]
-        
+
         for i, test_case in enumerate(format_test_cases, 1):
-            with self.subTest(test_name=test_case['test_name']):
-                
+            with self.subTest(test_name=test_case["test_name"]):
+
                 temp_file = None
                 try:
                     # Create temporary file if needed
-                    if test_case['create_temp_file']:
+                    if test_case["create_temp_file"]:
                         temp_file = tempfile.NamedTemporaryFile(
-                            suffix=test_case['temp_suffix'], 
-                            delete=False
+                            suffix=test_case["temp_suffix"], delete=False
                         )
-                        temp_file.write(b'test content')
+                        temp_file.write(b"test content")
                         temp_file.close()
                         annotation_file = temp_file.name
                     else:
-                        annotation_file = test_case['annotation_file']
-                    
+                        annotation_file = test_case["annotation_file"]
+
                     # Execute test and verify expected error
                     with self.assertRaises(LabellerrError) as context:
                         self.client._upload_preannotation_sync(
-                            project_id=test_case['project_id'],
+                            project_id=test_case["project_id"],
                             client_id=self.client_id,
-                            annotation_format=test_case['annotation_format'],
-                            annotation_file=annotation_file
+                            annotation_format=test_case["annotation_format"],
+                            annotation_file=annotation_file,
                         )
-                    
+
                     # Verify error message contains expected substring
                     error_message = str(context.exception)
-                    self.assertIn(test_case['expected_error'], error_message,
-                                f"Expected error '{test_case['expected_error']}' not found in '{error_message}'")
-                    
+                    self.assertIn(
+                        test_case["expected_error"],
+                        error_message,
+                        f"Expected error '{test_case['expected_error']}' not found in '{error_message}'",
+                    )
+
                 finally:
                     # Clean up temporary file
                     if temp_file:
@@ -409,68 +413,82 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
         preannotation_scenarios = [
             {
-                'scenario_name': 'COCO JSON Upload',
-                'annotation_format': 'coco_json',
-                'file_extension': '.json',
-                'sample_data': {
-                    "annotations": [{"id": 1, "image_id": 1, "category_id": 1, "bbox": [0, 0, 100, 100]}],
-                    "images": [{"id": 1, "file_name": "test.jpg", "width": 640, "height": 480}],
-                    "categories": [{"id": 1, "name": "test", "supercategory": "object"}]
+                "scenario_name": "COCO JSON Upload",
+                "annotation_format": "coco_json",
+                "file_extension": ".json",
+                "sample_data": {
+                    "annotations": [
+                        {
+                            "id": 1,
+                            "image_id": 1,
+                            "category_id": 1,
+                            "bbox": [0, 0, 100, 100],
+                        }
+                    ],
+                    "images": [
+                        {"id": 1, "file_name": "test.jpg", "width": 640, "height": 480}
+                    ],
+                    "categories": [
+                        {"id": 1, "name": "test", "supercategory": "object"}
+                    ],
                 },
-                'expected_success': True
+                "expected_success": True,
             },
             {
-                'scenario_name': 'JSON Annotations Upload',
-                'annotation_format': 'json',
-                'file_extension': '.json',
-                'sample_data': {
-                    "labels": [{"image": "test.jpg", "annotations": [{"label": "cat", "confidence": 0.95}]}]
+                "scenario_name": "JSON Annotations Upload",
+                "annotation_format": "json",
+                "file_extension": ".json",
+                "sample_data": {
+                    "labels": [
+                        {
+                            "image": "test.jpg",
+                            "annotations": [{"label": "cat", "confidence": 0.95}],
+                        }
+                    ]
                 },
-                'expected_success': True
-            }
+                "expected_success": True,
+            },
         ]
-        
+
         test_scenario = preannotation_scenarios[0]  # COCO JSON
-        
-        
+
         temp_annotation_file = None
         try:
             temp_annotation_file = tempfile.NamedTemporaryFile(
-                mode='w', 
-                suffix=test_scenario['file_extension'], 
-                delete=False
+                mode="w", suffix=test_scenario["file_extension"], delete=False
             )
-            json.dump(test_scenario['sample_data'], temp_annotation_file)
+            json.dump(test_scenario["sample_data"], temp_annotation_file)
             temp_annotation_file.close()
-            
-            
+
             # Use project ID from previous tests if available
-            test_project_id = getattr(self, 'created_project_id', 'test-project-id-table-driven')
-            
+            test_project_id = getattr(
+                self, "created_project_id", "test-project-id-table-driven"
+            )
 
             try:
-                    # Only patch the missing method, let everything else be real
-                    with patch.object(self.client, 'preannotation_job_status', create=True) as mock_status:
-                        mock_status.return_value = {
-                            'response': {
-                                'status': 'completed',
-                                'job_id': f'job-{test_scenario["annotation_format"]}-{int(time.time())}'
-                            }
+                # Only patch the missing method, let everything else be real
+                with patch.object(
+                    self.client, "preannotation_job_status", create=True
+                ) as mock_status:
+                    mock_status.return_value = {
+                        "response": {
+                            "status": "completed",
+                            "job_id": f'job-{test_scenario["annotation_format"]}-{int(time.time())}',
                         }
-                        
-                        result = self.client._upload_preannotation_sync(
-                            project_id=test_project_id,
-                            client_id=self.client_id,
-                            annotation_format=test_scenario['annotation_format'],
-                            annotation_file=temp_annotation_file.name
-                        )
-                        
-                        self.assertIsInstance(result, dict)
-                        
-            except Exception as api_error:
-                    raise  api_error
+                    }
 
-                
+                    result = self.client._upload_preannotation_sync(
+                        project_id=test_project_id,
+                        client_id=self.client_id,
+                        annotation_format=test_scenario["annotation_format"],
+                        annotation_file=temp_annotation_file.name,
+                    )
+
+                    self.assertIsInstance(result, dict)
+
+            except Exception as api_error:
+                raise api_error
+
         finally:
             # Clean up annotation file
             if temp_annotation_file:
@@ -485,7 +503,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         """Set up test suite."""
-        
+
     @classmethod
     def tearDownClass(cls):
         """Tear down test suite."""
@@ -495,41 +513,35 @@ def run_use_case_tests():
 
     # Create test suite
     suite = unittest.TestLoader().loadTestsFromTestCase(LabelerUseCaseIntegrationTests)
-    
+
     # Run tests with verbose output
     runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout)
     result = runner.run(suite)
-    
+
     # Return success status
     return result.wasSuccessful()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     """
     Main execution block for running use case integration tests.
-    
+
     Environment Variables Required:
     - API_KEY: Your Labellerr API key
     - API_SECRET: Your Labellerr API secret
     - CLIENT_ID: Your Labellerr client ID
     - TEST_EMAIL: Valid email address for testing
-    
+
     Run with:
     python use_case_tests.py
     """
     # Check for required environment variables
-    required_env_vars = [
-        'API_KEY',
-        'API_SECRET',
-        'CLIENT_ID',
-        'TEST_EMAIL'
-    ]
-    
+    required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL"]
+
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
-    
 
     # Run the tests
     success = run_use_case_tests()
-    
+
     # Exit with appropriate code
     sys.exit(0 if success else 1)

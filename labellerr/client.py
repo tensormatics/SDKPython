@@ -351,6 +351,11 @@ class LabellerrClient:
             # Convert string input to list if necessary
             if isinstance(files_list, str):
                 files_list = files_list.split(",")
+                files_list = files_list.split(",")
+            elif not isinstance(files_list, list):
+                raise LabellerrError(
+                    "files_list must be either a list or a comma-separated string"
+                )
 
             if len(files_list) == 0:
                 raise LabellerrError("No files to upload")
@@ -675,7 +680,7 @@ class LabellerrClient:
             }
             client_utils.validate_required_params(required_params, list(required_params.keys()))
             client_utils.validate_annotation_format(annotation_format, annotation_file)
-            
+
             url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
             file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url

@@ -1,7 +1,23 @@
+# Python
 .venv
 __pycache__
+*.pyc
+*/*.pyc
+*.pyo
+*.pyd
+.Python
 build/
+develop-eggs/
 dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
 *.pyc
 */*.pyc
@@ -10,5 +26,3 @@ dist/
 .DS_Store
 .claude
 tests/test_data
-                if file == '.DS_Store':
-                    continue

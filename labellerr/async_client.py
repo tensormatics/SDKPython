@@ -79,7 +79,7 @@ class AsyncLabellerrClient:
             api_secret=self.api_secret,
             source="sdk-async",
             client_id=client_id,
-            extra_headers=extra_headers
+            extra_headers=extra_headers,
         )
 
     async def _handle_response(

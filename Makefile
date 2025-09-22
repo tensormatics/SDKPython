@@ -37,8 +37,21 @@ build: ## Build package
 version: 
 	@grep '^version = ' pyproject.toml | cut -d'"' -f2 | sed 's/^/Current version: /' || echo "Version not found"
 
-info: 
+info:
 	@echo "Python: $(shell $(PYTHON) --version)"
 	@echo "Working directory: $(shell pwd)"
 	@echo "Git branch: $(shell git branch --show-current 2>/dev/null || echo 'Not a git repository')"
 	@make version
+
+check-release: ## Check if everything is ready for release
+	@echo "Checking release readiness..."
+	@git status --porcelain | grep -q . && echo "❌ Git working directory is not clean" || echo "✅ Git working directory is clean"
+	@git branch --show-current | grep -q "main\|develop" && echo "✅ On main or develop branch" || echo "⚠️  Not on main or develop branch"
+	@make version
+	@echo "✅ Release check complete"
+	@echo ""
+	@echo "To create a release:"
+	@echo "1. Create feature branch: git checkout -b feature/LABIMP-XXXX-release-vX.X.X"
+	@echo "2. Update version in pyproject.toml"
+	@echo "3. Commit: git commit -m '[LABIMP-XXXX] Prepare release vX.X.X'"
+	@echo "4. Push and create PR to main (patch) or develop (minor)"

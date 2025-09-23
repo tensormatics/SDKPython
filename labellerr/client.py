@@ -150,7 +150,7 @@ class LabellerrClient:
             api_secret=self.api_secret,
             source="sdk",
             client_id=client_id,
-            extra_headers=extra_headers
+            extra_headers=extra_headers,
         )
 
     def _handle_response(self, response, request_id=None, success_codes=None):
@@ -757,9 +757,11 @@ class LabellerrClient:
                 "annotation_format": annotation_format,
                 "annotation_file": annotation_file,
             }
-            client_utils.validate_required_params(required_params, list(required_params.keys()))
+            client_utils.validate_required_params(
+                required_params, list(required_params.keys())
+            )
             client_utils.validate_annotation_format(annotation_format, annotation_file)
-            
+
             url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
             file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url
@@ -1061,9 +1063,7 @@ class LabellerrClient:
 
         return self._handle_response(response, unique_id)
 
-    def fetch_download_url(
-        self, project_id, uuid, export_id, client_id
-    ):
+    def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:
             headers = self._build_headers(
                 client_id=client_id, extra_headers={"Content-Type": "application/json"}
@@ -1093,9 +1093,7 @@ class LabellerrClient:
             logging.error(f"Unexpected error in download_function: {str(e)}")
             raise LabellerrError(f"Unexpected error in download_function: {str(e)}")
 
-    def check_export_status(
-        self, project_id, report_ids, client_id
-    ):
+    def check_export_status(self, project_id, report_ids, client_id):
         request_uuid = client_utils.generate_request_id()
         try:
             if not project_id:

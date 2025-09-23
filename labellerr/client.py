@@ -259,6 +259,113 @@ class LabellerrClient:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
 
+    def create_gcs_connection(
+        self,
+        client_id: str,
+        gcs_cred_file: str,
+        gcs_path: str,
+        data_type: str,
+        name: str,
+        description: str,
+        connection_type: str = "import",
+        credentials: str = "svc_account_json",
+    ):
+        """
+        Create/test a GCS connector connection (multipart/form-data)
+        :param client_id: The ID of the client.
+        :param gcs_cred_file: Path to the GCS service account JSON file.
+        :param gcs_path: GCS path like gs://bucket/path
+        :param data_type: Data type, e.g. "image", "video".
+        :param connection_type: "import" or "export" (default: import)
+        :param credentials: Credential type (default: svc_account_json)
+        :return: Parsed JSON response
+        """
+        if not os.path.exists(gcs_cred_file):
+            raise LabellerrError(f"GCS credential file not found: {gcs_cred_file}")
+
+        request_uuid = str(uuid.uuid4())
+        test_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        test_request = {
+            "credentials": credentials,
+            "connector": "gcs",
+            "path": gcs_path,
+            "connection_type": connection_type,
+            "data_type": data_type,
+        }
+
+        with open(gcs_cred_file, "rb") as fp:
+            test_files = {
+                "attachment_files": (
+                    os.path.basename(gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+            test_resp = self._make_request(
+                "POST", test_url, headers=headers, data=test_request, files=test_files
+            )
+        self._handle_response(test_resp, request_uuid)
+
+        # If test passed, create/save the connection
+        # use same uuid to track request
+        create_url = (
+            f"{constants.BASE_URL}/connectors/connections/create"
+            f"?uuid={request_uuid}&client_id={client_id}"
+        )
+
+        create_request= {
+            "client_id": client_id,
+            "connector": "gcs",
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
+            "data_type": data_type,
+            "credentials": credentials,
+        }
+
+        with open(gcs_cred_file, "rb") as fp:
+            create_files = {
+                "attachment_files": (
+                    os.path.basename(gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+            create_resp = self._make_request(
+                "POST", create_url, headers=headers, data=create_request, files=create_files
+            )
+
+        return self._handle_response(create_resp, request_uuid)
+
+
+    def list_connection(self, client_id: str, connection_type: str ):
+        request_uuid =  str(uuid.uuid4())
+        list_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/list"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        list_connection_response = self._make_request(
+            "GET", list_connection_url, headers=headers
+        )
+
+        return self._handle_response(list_connection_response, request_uuid)
+
+
     def connect_local_files(self, client_id, file_names, connection_id=None):
         """
         Connects local files to the API.

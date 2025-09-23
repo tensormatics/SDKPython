@@ -44,11 +44,13 @@ def _setup_gcp_connector(self, client_id, gcp_config):
         extra_headers={"content-type": "application/json"},
     )
 
-    payload = json.dumps({
-        "bucket_name": gcp_config["bucket_name"],
-        "folder_path": gcp_config.get("folder_path", ""),
-        "service_account_key": gcp_config.get("service_account_key"),
-    })
+    payload = json.dumps(
+        {
+            "bucket_name": gcp_config["bucket_name"],
+            "folder_path": gcp_config.get("folder_path", ""),
+            "service_account_key": gcp_config.get("service_account_key"),
+        }
+    )
 
     response = self._make_request("POST", url, headers=headers, data=payload)
     response_data = self._handle_response(response, unique_id)
@@ -75,13 +77,15 @@ def _setup_aws_connector(self, client_id, aws_config):
         extra_headers={"content-type": "application/json"},
     )
 
-    payload = json.dumps({
-        "bucket_name": aws_config["bucket_name"],
-        "folder_path": aws_config.get("folder_path", ""),
-        "access_key_id": aws_config.get("access_key_id"),
-        "secret_access_key": aws_config.get("secret_access_key"),
-        "region": aws_config.get("region", "us-east-1"),
-    })
+    payload = json.dumps(
+        {
+            "bucket_name": aws_config["bucket_name"],
+            "folder_path": aws_config.get("folder_path", ""),
+            "access_key_id": aws_config.get("access_key_id"),
+            "secret_access_key": aws_config.get("secret_access_key"),
+            "region": aws_config.get("region", "us-east-1"),
+        }
+    )
 
     response = self._make_request("POST", url, headers=headers, data=payload)
     response_data = self._handle_response(response, unique_id)

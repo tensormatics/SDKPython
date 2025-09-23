@@ -9,38 +9,34 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import cpu_count
 
+# python -m unittest discover -s tests --run
+# python setup.py sdist bdist_wheel -- build
+from typing import Any, Dict
+
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from . import constants, gcs, utils, client_utils
+
+from . import client_utils, constants, gcs, utils
 from .exceptions import LabellerrError
 from .validators import (
-    validate_required,
-    validate_data_type,
-    validate_list_not_empty,
-    validate_client_id,
-    validate_questions_structure,
-    validate_rotations_structure,
-    validate_dataset_ids,
-    validate_uuid_format,
-    validate_string_type,
-    validate_not_none,
-    validate_file_exists,
-    validate_directory_exists,
-    validate_file_list_or_string,
-    validate_annotation_format,
-    validate_export_format,
-    validate_export_statuses,
-    validate_scope,
-    validate_upload_method_exclusive,
-    validate_business_logic_rotation_config,
+    handle_api_errors,
     log_method_call,
-    handle_api_errors
+    validate_client_id,
+    validate_data_type,
+    validate_dataset_ids,
+    validate_file_list_or_string,
+    validate_list_not_empty,
+    validate_not_none,
+    validate_questions_structure,
+    validate_required,
+    validate_rotations_structure,
+    validate_scope,
+    validate_string_type,
+    validate_uuid_format,
 )
 
-# python -m unittest discover -s tests --run
-# python setup.py sdist bdist_wheel -- build
-create_dataset_parameters = {}
+create_dataset_parameters: Dict[str, Any] = {}
 
 
 class LabellerrClient:
@@ -82,7 +78,7 @@ class LabellerrClient:
         """
         self._session = requests.Session()
 
-        if HTTPAdapter and Retry:
+        if HTTPAdapter is not None and Retry is not None:
             # Configure retry strategy
             retry_strategy = Retry(
                 total=3,
@@ -258,17 +254,27 @@ class LabellerrClient:
         except Exception as e:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
-    @validate_required(['client_id','aws_access_key', 'aws_secrets_key', 's3_path', 'data_type', 'name'])
+
+    @validate_required(
+        [
+            "client_id",
+            "aws_access_key",
+            "aws_secrets_key",
+            "s3_path",
+            "data_type",
+            "name",
+        ]
+    )
     def create_aws_connection(
-            self,
-            client_id: str,
-            aws_access_key: str,
-            aws_secrets_key: str,
-            s3_path: str,
-            data_type: str,
-            name: str,
-            description: str,
-            connection_type: str = "import",
+        self,
+        client_id: str,
+        aws_access_key: str,
+        aws_secrets_key: str,
+        s3_path: str,
+        data_type: str,
+        name: str,
+        description: str,
+        connection_type: str = "import",
     ):
         """
         AWS S3 connector and, if valid, save the connection.
@@ -294,10 +300,12 @@ class LabellerrClient:
             extra_headers={"email_id": self.api_key},
         )
 
-        aws_credentials_json = json.dumps({
-            "access_key_id": aws_access_key,
-            "secret_access_key": aws_secrets_key,
-        })
+        aws_credentials_json = json.dumps(
+            {
+                "access_key_id": aws_access_key,
+                "secret_access_key": aws_secrets_key,
+            }
+        )
 
         test_request = {
             "credentials": aws_credentials_json,
@@ -333,7 +341,7 @@ class LabellerrClient:
 
         return self._handle_response(create_resp, request_uuid)
 
-    @validate_required(['client_id', 'gcs_cred_file', 'gcs_path', 'data_type', 'name'])
+    @validate_required(["client_id", "gcs_cred_file", "gcs_path", "data_type", "name"])
     def create_gcs_connection(
         self,
         client_id: str,
@@ -399,7 +407,7 @@ class LabellerrClient:
             f"?uuid={request_uuid}&client_id={client_id}"
         )
 
-        create_request= {
+        create_request = {
             "client_id": client_id,
             "connector": "gcs",
             "name": name,
@@ -418,14 +426,17 @@ class LabellerrClient:
                 )
             }
             create_resp = self._make_request(
-                "POST", create_url, headers=headers, data=create_request, files=create_files
+                "POST",
+                create_url,
+                headers=headers,
+                data=create_request,
+                files=create_files,
             )
 
         return self._handle_response(create_resp, request_uuid)
 
-
-    def list_connection(self, client_id: str, connection_type: str ):
-        request_uuid =  str(uuid.uuid4())
+    def list_connection(self, client_id: str, connection_type: str):
+        request_uuid = str(uuid.uuid4())
         list_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/list"
             f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
@@ -441,7 +452,6 @@ class LabellerrClient:
         )
 
         return self._handle_response(list_connection_response, request_uuid)
-
 
     def connect_local_files(self, client_id, file_names, connection_id=None):
         """
@@ -482,9 +492,9 @@ class LabellerrClient:
 
         return response
 
-    @validate_required(['client_id', 'files_list'])
-    @validate_client_id('client_id')
-    @validate_file_list_or_string(['files_list'])
+    @validate_required(["client_id", "files_list"])
+    @validate_client_id("client_id")
+    @validate_file_list_or_string(["files_list"])
     @log_method_call(include_params=False)
     @handle_api_errors
     def upload_files(self, client_id, files_list):
@@ -546,7 +556,11 @@ class LabellerrClient:
             raise
 
     def create_dataset(
-        self, dataset_config, files_to_upload=None, folder_to_upload=None, connector_config=None
+        self,
+        dataset_config,
+        files_to_upload=None,
+        folder_to_upload=None,
+        connector_config=None,
     ):
         """
         Creates a dataset with support for multiple data types and connectors.
@@ -565,7 +579,9 @@ class LabellerrClient:
             required_fields = ["client_id", "dataset_name", "data_type"]
             for field in required_fields:
                 if field not in dataset_config:
-                    raise LabellerrError(f"Required field '{field}' missing in dataset_config")
+                    raise LabellerrError(
+                        f"Required field '{field}' missing in dataset_config"
+                    )
 
             # Validate data_type
             if dataset_config.get("data_type") not in constants.DATA_TYPES:
@@ -586,7 +602,9 @@ class LabellerrClient:
                             files_list=files_to_upload,
                         )
                     except Exception as e:
-                        raise LabellerrError(f"Failed to upload files to dataset: {str(e)}")
+                        raise LabellerrError(
+                            f"Failed to upload files to dataset: {str(e)}"
+                        )
 
                 elif folder_to_upload is not None:
                     try:
@@ -608,16 +626,18 @@ class LabellerrClient:
 
             elif connector_type in ["gcp", "aws"]:
                 if connector_config is None:
-                    raise LabellerrError(f"connector_config is required for {connector_type} connector")
+                    raise LabellerrError(
+                        f"connector_config is required for {connector_type} connector"
+                    )
 
                 try:
                     connection_id = self._setup_cloud_connector(
-                        connector_type,
-                        dataset_config["client_id"],
-                        connector_config
+                        connector_type, dataset_config["client_id"], connector_config
                     )
                 except Exception as e:
-                    raise LabellerrError(f"Failed to setup {connector_type} connector: {str(e)}")
+                    raise LabellerrError(
+                        f"Failed to setup {connector_type} connector: {str(e)}"
+                    )
             else:
                 raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
@@ -651,9 +671,9 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
-    @validate_required(['client_id', 'dataset_id'])
-    @validate_client_id('client_id')
-    @validate_uuid_format('dataset_id')
+    @validate_required(["client_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def delete_dataset(self, client_id, dataset_id):
@@ -668,16 +688,15 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={client_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"}
+            client_id=client_id, extra_headers={"content-type": "application/json"}
         )
 
         response = self._make_request("DELETE", url, headers=headers)
         return self._handle_response(response, unique_id)
 
-    @validate_required(['client_id', 'dataset_id', 'indexing_config'])
-    @validate_client_id('client_id')
-    @validate_uuid_format('dataset_id')
+    @validate_required(["client_id", "dataset_id", "indexing_config"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def enable_multimodal_indexing(self, client_id, dataset_id, indexing_config):
@@ -694,18 +713,17 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{dataset_id}/indexing?client_id={client_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"}
+            client_id=client_id, extra_headers={"content-type": "application/json"}
         )
 
         payload = json.dumps(indexing_config)
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(['client_id', 'project_id', 'dataset_id'])
-    @validate_client_id('client_id')
-    @validate_uuid_format('project_id')
-    @validate_uuid_format('dataset_id')
+    @validate_required(["client_id", "project_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("project_id")
+    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def attach_dataset_to_project(self, client_id, project_id, dataset_id):
@@ -721,18 +739,17 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/projects/{project_id}/datasets/attach?client_id={client_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"}
+            client_id=client_id, extra_headers={"content-type": "application/json"}
         )
 
         payload = json.dumps({"dataset_id": dataset_id})
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(['client_id', 'project_id', 'dataset_id'])
-    @validate_client_id('client_id')
-    @validate_uuid_format('project_id')
-    @validate_uuid_format('dataset_id')
+    @validate_required(["client_id", "project_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("project_id")
+    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def detach_dataset_from_project(self, client_id, project_id, dataset_id):
@@ -748,19 +765,18 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/projects/{project_id}/datasets/detach?client_id={client_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"}
+            client_id=client_id, extra_headers={"content-type": "application/json"}
         )
 
         payload = json.dumps({"dataset_id": dataset_id})
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(['client_id', 'datatype', 'project_id', 'scope'])
-    @validate_string_type('client_id')
-    @validate_string_type('datatype')
-    @validate_string_type('project_id')
-    @validate_scope('scope')
+    @validate_required(["client_id", "datatype", "project_id", "scope"])
+    @validate_string_type("client_id")
+    @validate_string_type("datatype")
+    @validate_string_type("project_id")
+    @validate_scope("scope")
     @log_method_call(include_params=False)
     @handle_api_errors
     def get_all_dataset(self, client_id, datatype, project_id, scope):
@@ -1206,10 +1222,10 @@ class LabellerrClient:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
-    @validate_required(['project_id', 'client_id', 'export_config'])
-    @validate_not_none(['project_id', 'client_id', 'export_config'])
-    @validate_string_type('project_id')
-    @validate_client_id('client_id')
+    @validate_required(["project_id", "client_id", "export_config"])
+    @validate_not_none(["project_id", "client_id", "export_config"])
+    @validate_string_type("project_id")
+    @validate_client_id("client_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_local_export(self, project_id, client_id, export_config):
@@ -1226,9 +1242,7 @@ class LabellerrClient:
         client_utils.validate_export_config(export_config)
 
         unique_id = client_utils.generate_request_id()
-        export_config.update(
-            {"export_destination": "local", "question_ids": ["all"]}
-        )
+        export_config.update({"export_destination": "local", "question_ids": ["all"]})
 
         payload = json.dumps(export_config)
         headers = self._build_headers(
@@ -1323,12 +1337,21 @@ class LabellerrClient:
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
 
-    @validate_required(['project_name', 'data_type', 'client_id', 'attached_datasets', 'annotation_template_id', 'rotations'])
-    @validate_client_id('client_id')
-    @validate_data_type('data_type')
-    @validate_dataset_ids('attached_datasets')
-    @validate_uuid_format('annotation_template_id')
-    @validate_rotations_structure('rotations')
+    @validate_required(
+        [
+            "project_name",
+            "data_type",
+            "client_id",
+            "attached_datasets",
+            "annotation_template_id",
+            "rotations",
+        ]
+    )
+    @validate_client_id("client_id")
+    @validate_data_type("data_type")
+    @validate_dataset_ids("attached_datasets")
+    @validate_uuid_format("annotation_template_id")
+    @validate_rotations_structure("rotations")
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_project(
@@ -1359,22 +1382,24 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/projects/create?client_id={client_id}&uuid={unique_id}"
 
-        payload = json.dumps({
-            "project_name": project_name,
-            "attached_datasets": attached_datasets,
-            "data_type": data_type,
-            "annotation_template_id": annotation_template_id,
-            "rotations": rotations,
-            "use_ai": use_ai,
-            "created_by": created_by,
-        })
+        payload = json.dumps(
+            {
+                "project_name": project_name,
+                "attached_datasets": attached_datasets,
+                "data_type": data_type,
+                "annotation_template_id": annotation_template_id,
+                "rotations": rotations,
+                "use_ai": use_ai,
+                "created_by": created_by,
+            }
+        )
 
         headers = self._build_headers(
             client_id=client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
-            }
+            },
         )
 
         response = self._make_request("POST", url, headers=headers, data=payload)
@@ -1403,7 +1428,10 @@ class LabellerrClient:
                     raise LabellerrError(f"Required parameter {param} is missing")
 
                 if param == "client_id":
-                    if not isinstance(payload[param], str) or not payload[param].strip():
+                    if (
+                        not isinstance(payload[param], str)
+                        or not payload[param].strip()
+                    ):
                         raise LabellerrError("client_id must be a non-empty string")
 
                 if param == "annotation_guide":
@@ -1667,10 +1695,10 @@ class LabellerrClient:
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
 
-    @validate_required(['client_id', 'data_type', 'template_name', 'questions'])
-    @validate_client_id('client_id')
-    @validate_data_type('data_type')
-    @validate_list_not_empty('questions')
+    @validate_required(["client_id", "data_type", "template_name", "questions"])
+    @validate_client_id("client_id")
+    @validate_data_type("data_type")
+    @validate_list_not_empty("questions")
     @validate_questions_structure()
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -1689,14 +1717,10 @@ class LabellerrClient:
         url = f"{constants.BASE_URL}/annotations/create_template?client_id={client_id}&data_type={data_type}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"}
+            client_id=client_id, extra_headers={"content-type": "application/json"}
         )
 
-        payload = json.dumps({
-            "templateName": template_name,
-            "questions": questions
-        })
+        payload = json.dumps({"templateName": template_name, "questions": questions})
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)

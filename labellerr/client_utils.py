@@ -3,7 +3,8 @@ Shared utilities for both sync and async Labellerr clients.
 """
 
 import uuid
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
+
 from . import constants
 
 
@@ -54,19 +55,27 @@ def validate_rotation_config(rotation_config: Dict[str, Any]) -> None:
     client_review_rotation_count = rotation_config.get("client_review_rotation_count")
 
     # Validate review_rotation_count
-    if review_rotation_count != 1:
+    if int(review_rotation_count or 0) != 1:
         raise LabellerrError("review_rotation_count must be 1")
 
     # Validate client_review_rotation_count based on annotation_rotation_count
-    if annotation_rotation_count == 0 and client_review_rotation_count != 0:
+    if (
+        int(annotation_rotation_count or 0) == 0
+        and int(client_review_rotation_count or 0) != 0
+    ):
         raise LabellerrError(
             "client_review_rotation_count must be 0 when annotation_rotation_count is 0"
         )
-    elif annotation_rotation_count == 1 and client_review_rotation_count not in [0, 1]:
+    elif int(annotation_rotation_count or 0) == 1 and int(
+        client_review_rotation_count or 0
+    ) not in [0, 1]:
         raise LabellerrError(
             "client_review_rotation_count can only be 0 or 1 when annotation_rotation_count is 1"
         )
-    elif annotation_rotation_count > 1 and client_review_rotation_count != 0:
+    elif (
+        int(annotation_rotation_count or 0) > 1
+        and int(client_review_rotation_count or 0) != 0
+    ):
         raise LabellerrError(
             "client_review_rotation_count must be 0 when annotation_rotation_count is greater than 1"
         )
@@ -96,6 +105,7 @@ def validate_file_exists(file_path: str) -> str:
     :raises LabellerrError: If file doesn't exist
     """
     import os
+
     from .exceptions import LabellerrError
 
     if os.path.exists(file_path):
@@ -113,6 +123,7 @@ def validate_annotation_format(annotation_format: str, annotation_file: str) -> 
     :raises LabellerrError: If format/extension mismatch
     """
     import os
+
     from .exceptions import LabellerrError
 
     if annotation_format not in constants.ANNOTATION_FORMAT:

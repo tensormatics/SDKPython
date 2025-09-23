@@ -34,7 +34,7 @@ format:
 build: ## Build package
 	$(PYTHON) -m build
 
-version: 
+version:
 	@grep '^version = ' pyproject.toml | cut -d'"' -f2 | sed 's/^/Current version: /' || echo "Version not found"
 
 info:
@@ -58,3 +58,7 @@ check-release: ## Check if everything is ready for release
 
 integration-test:
 	$(PYTHON) -m pytest  -v labellerr_use_case_tests.py
+
+pre-commit-install:
+	pip install pre-commit
+	pre-commit install

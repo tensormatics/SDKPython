@@ -4,7 +4,7 @@ Validation decorators for LabellerrClient methods
 
 import functools
 import logging
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Callable, List
 
 from . import constants
 from .exceptions import LabellerrError
@@ -16,11 +16,13 @@ def validate_required(params: List[str]):
 
     :param params: List of parameter names that are required
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -32,24 +34,30 @@ def validate_required(params: List[str]):
 
                 value = bound_args.arguments[param]
                 if value is None or (isinstance(value, str) and not value.strip()):
-                    raise LabellerrError(f"Required parameter {param} cannot be null or empty")
+                    raise LabellerrError(
+                        f"Required parameter {param} cannot be null or empty"
+                    )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_data_type(param_name: str = 'data_type'):
+def validate_data_type(param_name: str = "data_type"):
     """
     Decorator to validate data_type parameter against allowed types.
 
     :param param_name: Name of the parameter to validate (default: 'data_type')
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -62,7 +70,9 @@ def validate_data_type(param_name: str = 'data_type'):
                     )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -72,11 +82,13 @@ def validate_list_not_empty(param_name: str):
 
     :param param_name: Name of the parameter to validate
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -89,21 +101,25 @@ def validate_list_not_empty(param_name: str):
                     raise LabellerrError(f"{param_name} must be a non-empty list")
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_client_id(param_name: str = 'client_id'):
+def validate_client_id(param_name: str = "client_id"):
     """
     Decorator to validate client_id parameter.
 
     :param param_name: Name of the parameter to validate (default: 'client_id')
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -116,7 +132,9 @@ def validate_client_id(param_name: str = 'client_id'):
                     raise LabellerrError(f"{param_name} must be a non-empty string")
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -124,31 +142,35 @@ def validate_questions_structure():
     """
     Decorator to validate questions structure for template creation.
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
 
-            if 'questions' in bound_args.arguments:
-                questions = bound_args.arguments['questions']
+            if "questions" in bound_args.arguments:
+                questions = bound_args.arguments["questions"]
                 for i, question in enumerate(questions):
                     if not isinstance(question, dict):
                         raise LabellerrError(f"Question {i+1} must be a dictionary")
 
-                    if 'option_type' not in question:
+                    if "option_type" not in question:
                         raise LabellerrError(f"Question {i+1}: option_type is required")
 
-                    if question['option_type'] not in constants.OPTION_TYPE_LIST:
+                    if question["option_type"] not in constants.OPTION_TYPE_LIST:
                         raise LabellerrError(
                             f"Question {i+1}: option_type must be one of {constants.OPTION_TYPE_LIST}"
                         )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -158,6 +180,7 @@ def log_method_call(include_params: bool = True):
 
     :param include_params: Whether to include parameter values in logs
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -165,14 +188,18 @@ def log_method_call(include_params: bool = True):
             if include_params:
                 # Get function signature to map args to parameter names
                 import inspect
+
                 sig = inspect.signature(func)
                 bound_args = sig.bind(self, *args, **kwargs)
                 bound_args.apply_defaults()
 
                 # Filter out 'self' and sensitive parameters
                 filtered_params = {
-                    k: v for k, v in bound_args.arguments.items()
-                    if k != 'self' and 'secret' not in k.lower() and 'key' not in k.lower()
+                    k: v
+                    for k, v in bound_args.arguments.items()
+                    if k != "self"
+                    and "secret" not in k.lower()
+                    and "key" not in k.lower()
                 }
                 logging.debug(f"Calling {method_name} with params: {filtered_params}")
             else:
@@ -185,21 +212,25 @@ def log_method_call(include_params: bool = True):
             except Exception as e:
                 logging.error(f"{method_name} failed: {str(e)}")
                 raise
+
         return wrapper
+
     return decorator
 
 
-def validate_rotations_structure(param_name: str = 'rotations'):
+def validate_rotations_structure(param_name: str = "rotations"):
     """
     Decorator to validate rotation configuration structure.
 
     :param param_name: Name of the parameter to validate (default: 'rotations')
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -210,9 +241,9 @@ def validate_rotations_structure(param_name: str = 'rotations'):
                     raise LabellerrError(f"{param_name} must be a dictionary")
 
                 required_keys = [
-                    'annotation_rotation_count',
-                    'review_rotation_count',
-                    'client_review_rotation_count'
+                    "annotation_rotation_count",
+                    "review_rotation_count",
+                    "client_review_rotation_count",
                 ]
 
                 for key in required_keys:
@@ -221,24 +252,30 @@ def validate_rotations_structure(param_name: str = 'rotations'):
 
                     value = rotation_config[key]
                     if not isinstance(value, int) or value < 1:
-                        raise LabellerrError(f"{param_name}.{key} must be a positive integer")
+                        raise LabellerrError(
+                            f"{param_name}.{key} must be a positive integer"
+                        )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_dataset_ids(param_name: str = 'attached_datasets'):
+def validate_dataset_ids(param_name: str = "attached_datasets"):
     """
     Decorator to validate dataset IDs list.
 
     :param param_name: Name of the parameter to validate (default: 'attached_datasets')
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -248,14 +285,20 @@ def validate_dataset_ids(param_name: str = 'attached_datasets'):
                 if not isinstance(dataset_ids, list):
                     raise LabellerrError(f"{param_name} must be a list")
                 if len(dataset_ids) == 0:
-                    raise LabellerrError(f"{param_name} must contain at least one dataset ID")
+                    raise LabellerrError(
+                        f"{param_name} must contain at least one dataset ID"
+                    )
 
                 for i, dataset_id in enumerate(dataset_ids):
                     if not isinstance(dataset_id, str) or not dataset_id.strip():
-                        raise LabellerrError(f"{param_name}[{i}] must be a non-empty string")
+                        raise LabellerrError(
+                            f"{param_name}[{i}] must be a non-empty string"
+                        )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -265,11 +308,13 @@ def validate_uuid_format(param_name: str):
 
     :param param_name: Name of the parameter to validate
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             # Get function signature to map args to parameter names
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -278,13 +323,18 @@ def validate_uuid_format(param_name: str):
                 value = bound_args.arguments[param_name]
                 if value is not None:  # Allow None for optional parameters
                     import uuid as uuid_module
+
                     try:
                         uuid_module.UUID(str(value))
                     except (ValueError, TypeError):
-                        raise LabellerrError(f"{param_name} must be a valid UUID format")
+                        raise LabellerrError(
+                            f"{param_name} must be a valid UUID format"
+                        )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -295,10 +345,12 @@ def validate_string_type(param_name: str, allow_empty: bool = False):
     :param param_name: Name of the parameter to validate
     :param allow_empty: Whether empty strings are allowed (default: False)
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -312,7 +364,9 @@ def validate_string_type(param_name: str, allow_empty: bool = False):
                         raise LabellerrError(f"{param_name} must be a non-empty string")
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -322,10 +376,12 @@ def validate_not_none(param_names: List[str]):
 
     :param param_names: List of parameter names that cannot be None
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -337,7 +393,9 @@ def validate_not_none(param_names: List[str]):
                         raise LabellerrError(f"{param_name} cannot be null")
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -347,11 +405,13 @@ def validate_file_exists(param_names: List[str]):
 
     :param param_names: List of parameter names that should be valid file paths
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
             import os
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -366,7 +426,9 @@ def validate_file_exists(param_names: List[str]):
                             raise LabellerrError(f"Path is not a file: {file_path}")
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -376,11 +438,13 @@ def validate_directory_exists(param_names: List[str]):
 
     :param param_names: List of parameter names that should be valid directory paths
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
             import os
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -390,14 +454,20 @@ def validate_directory_exists(param_names: List[str]):
                     dir_path = bound_args.arguments[param_name]
                     if dir_path is not None:
                         if not os.path.exists(dir_path):
-                            raise LabellerrError(f"Folder path does not exist: {dir_path}")
+                            raise LabellerrError(
+                                f"Folder path does not exist: {dir_path}"
+                            )
                         if not os.path.isdir(dir_path):
                             raise LabellerrError(f"Path is not a directory: {dir_path}")
                         if not os.access(dir_path, os.R_OK):
-                            raise LabellerrError(f"No read permission for folder: {dir_path}")
+                            raise LabellerrError(
+                                f"No read permission for folder: {dir_path}"
+                            )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -407,11 +477,13 @@ def validate_file_list_or_string(param_names: List[str]):
 
     :param param_names: List of parameter names that should be file lists
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
             import os
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -426,7 +498,9 @@ def validate_file_list_or_string(param_names: List[str]):
                             # Update the bound args for the actual function
                             bound_args.arguments[param_name] = files_list
                         elif not isinstance(files_list, list):
-                            raise LabellerrError(f"{param_name} must be either a list or a comma-separated string")
+                            raise LabellerrError(
+                                f"{param_name} must be either a list or a comma-separated string"
+                            )
 
                         if len(files_list) == 0:
                             raise LabellerrError(f"No files to upload in {param_name}")
@@ -434,13 +508,15 @@ def validate_file_list_or_string(param_names: List[str]):
                         # Validate each file exists
                         for file_path in files_list:
                             if not os.path.exists(file_path):
-                                raise LabellerrError(f"File does not exist: {file_path}")
+                                raise LabellerrError(
+                                    f"File does not exist: {file_path}"
+                                )
                             if not os.path.isfile(file_path):
                                 raise LabellerrError(f"Path is not a file: {file_path}")
 
             # Update kwargs with potentially modified arguments
             for k, v in bound_args.arguments.items():
-                if k != 'self' and k in sig.parameters:
+                if k != "self" and k in sig.parameters:
                     idx = list(sig.parameters.keys()).index(k) - 1  # -1 for self
                     if idx < len(args):
                         args = list(args)
@@ -449,22 +525,28 @@ def validate_file_list_or_string(param_names: List[str]):
                         kwargs[k] = v
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_annotation_format(param_name: str = 'annotation_format', file_param: str = None):
+def validate_annotation_format(
+    param_name: str = "annotation_format", file_param: str = None
+):
     """
     Decorator to validate annotation format and optionally check file extension compatibility.
 
     :param param_name: Name of the annotation format parameter
     :param file_param: Optional name of the file parameter to check extension compatibility
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
             import os
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -480,28 +562,37 @@ def validate_annotation_format(param_name: str = 'annotation_format', file_param
                     # Check file extension compatibility if file parameter is provided
                     if file_param and file_param in bound_args.arguments:
                         annotation_file = bound_args.arguments[file_param]
-                        if annotation_file is not None and annotation_format == "coco_json":
-                            file_extension = os.path.splitext(annotation_file)[1].lower()
+                        if (
+                            annotation_file is not None
+                            and annotation_format == "coco_json"
+                        ):
+                            file_extension = os.path.splitext(annotation_file)[
+                                1
+                            ].lower()
                             if file_extension != ".json":
                                 raise LabellerrError(
                                     "For coco_json annotation format, the file must have a .json extension"
                                 )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_export_format(param_name: str = 'export_format'):
+def validate_export_format(param_name: str = "export_format"):
     """
     Decorator to validate export format against allowed formats.
 
     :param param_name: Name of the parameter to validate
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -515,20 +606,24 @@ def validate_export_format(param_name: str = 'export_format'):
                         )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_export_statuses(param_name: str = 'statuses'):
+def validate_export_statuses(param_name: str = "statuses"):
     """
     Decorator to validate export statuses list.
 
     :param param_name: Name of the parameter to validate
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -545,20 +640,24 @@ def validate_export_statuses(param_name: str = 'statuses'):
                             )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_scope(param_name: str = 'scope'):
+def validate_scope(param_name: str = "scope"):
     """
     Decorator to validate scope parameter against allowed scopes.
 
     :param param_name: Name of the parameter to validate
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
@@ -567,39 +666,59 @@ def validate_scope(param_name: str = 'scope'):
                 scope = bound_args.arguments[param_name]
                 if scope is not None:
                     if scope not in constants.SCOPE_LIST:
-                        raise LabellerrError(f"scope must be one of {', '.join(constants.SCOPE_LIST)}")
+                        raise LabellerrError(
+                            f"scope must be one of {', '.join(constants.SCOPE_LIST)}"
+                        )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
-def validate_upload_method_exclusive(file_param: str = 'files_to_upload', folder_param: str = 'folder_to_upload'):
+def validate_upload_method_exclusive(
+    file_param: str = "files_to_upload", folder_param: str = "folder_to_upload"
+):
     """
     Decorator to validate that only one upload method is specified.
 
     :param file_param: Name of the files parameter
     :param folder_param: Name of the folder parameter
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
 
-            has_files = file_param in bound_args.arguments and bound_args.arguments[file_param] is not None
-            has_folder = folder_param in bound_args.arguments and bound_args.arguments[folder_param] is not None
+            has_files = (
+                file_param in bound_args.arguments
+                and bound_args.arguments[file_param] is not None
+            )
+            has_folder = (
+                folder_param in bound_args.arguments
+                and bound_args.arguments[folder_param] is not None
+            )
 
             if has_files and has_folder:
-                raise LabellerrError(f"Cannot provide both {file_param} and {folder_param}")
+                raise LabellerrError(
+                    f"Cannot provide both {file_param} and {folder_param}"
+                )
 
             if not has_files and not has_folder:
-                raise LabellerrError(f"Either {file_param} or {folder_param} must be provided")
+                raise LabellerrError(
+                    f"Either {file_param} or {folder_param} must be provided"
+                )
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -610,6 +729,7 @@ def validate_file_limits(total_count_limit: int = None, total_size_limit: int = 
     :param total_count_limit: Maximum number of files allowed
     :param total_size_limit: Maximum total size in bytes
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
@@ -617,7 +737,9 @@ def validate_file_limits(total_count_limit: int = None, total_size_limit: int = 
             # For now, we'll delegate to the method to perform the actual counting
             # The validation will be done within the method itself
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -626,27 +748,32 @@ def validate_business_logic_rotation_config():
     Decorator to validate rotation config business rules.
     This uses the existing client_utils validation.
     """
+
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(self, *args, **kwargs):
             import inspect
+
             sig = inspect.signature(func)
             bound_args = sig.bind(self, *args, **kwargs)
             bound_args.apply_defaults()
 
             # Look for rotation config in various possible parameter names
             rotation_config = None
-            for param_name in ['rotation_config', 'rotations']:
+            for param_name in ["rotation_config", "rotations"]:
                 if param_name in bound_args.arguments:
                     rotation_config = bound_args.arguments[param_name]
                     break
 
             if rotation_config is not None:
                 from . import client_utils
+
                 client_utils.validate_rotation_config(rotation_config)
 
             return func(self, *args, **kwargs)
+
         return wrapper
+
     return decorator
 
 
@@ -654,6 +781,7 @@ def handle_api_errors(func: Callable) -> Callable:
     """
     Decorator to standardize API error handling.
     """
+
     @functools.wraps(func)
     def wrapper(self, *args, **kwargs):
         try:
@@ -665,4 +793,5 @@ def handle_api_errors(func: Callable) -> Callable:
             method_name = func.__name__
             logging.error(f"Unexpected error in {method_name}: {str(e)}")
             raise LabellerrError(f"Failed to {method_name.replace('_', ' ')}: {str(e)}")
+
     return wrapper

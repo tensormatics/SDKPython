@@ -4,12 +4,12 @@ import asyncio
 import logging
 import os
 import uuid
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import aiofiles
 import aiohttp
 
-from . import constants, client_utils
+from . import client_utils, constants
 from .exceptions import LabellerrError
 
 
@@ -130,6 +130,7 @@ class AsyncLabellerrClient:
         headers = self._build_headers(client_id=client_id)
 
         try:
+            assert self._session is not None
             async with self._session.get(
                 url, params=params, headers=headers
             ) as response:
@@ -151,10 +152,11 @@ class AsyncLabellerrClient:
         params = {"client_id": client_id}
         headers = self._build_headers(client_id=client_id)
 
-        body = {"file_names": file_names}
+        body: Dict[str, Any] = {"file_names": file_names}
         if connection_id is not None:
             body["temporary_connection_id"] = connection_id
 
+        assert self._session is not None
         async with self._session.post(
             url, params=params, headers=headers, json=body
         ) as response:
@@ -180,6 +182,7 @@ class AsyncLabellerrClient:
         }
 
         async with aiofiles.open(file_path, "rb") as f:
+            assert self._session is not None
             async with self._session.put(
                 signed_url, headers=headers, data=f
             ) as response:
@@ -189,7 +192,7 @@ class AsyncLabellerrClient:
                 return True
 
     async def upload_files_batch(
-        self, client_id: str, files_list: List[str], batch_size: int = 5
+        self, client_id: str, files_list: Union[List[str], str], batch_size: int = 5
     ) -> str:
         """
         Async batch file upload with concurrency control.
@@ -199,25 +202,28 @@ class AsyncLabellerrClient:
         :param batch_size: Number of concurrent uploads
         :return: Connection ID
         """
+        normalized_files_list: List[str]
         if isinstance(files_list, str):
-            files_list = files_list.split(",")
-        elif not isinstance(files_list, list):
+            normalized_files_list = files_list.split(",")
+        elif isinstance(files_list, list):
+            normalized_files_list = files_list
+        else:
             raise LabellerrError(
                 "files_list must be either a list or a comma-separated string"
             )
 
-        if len(files_list) == 0:
+        if len(normalized_files_list) == 0:
             raise LabellerrError("No files to upload")
 
         # Validate files exist
-        for file_path in files_list:
+        for file_path in normalized_files_list:
             if not os.path.exists(file_path):
                 raise LabellerrError(f"File does not exist: {file_path}")
             if not os.path.isfile(file_path):
                 raise LabellerrError(f"Path is not a file: {file_path}")
 
         # Get upload URLs and connection ID
-        file_names = [os.path.basename(f) for f in files_list]
+        file_names = [os.path.basename(f) for f in normalized_files_list]
         response = await self.connect_local_files(client_id, file_names)
 
         connection_id = response["response"]["temporary_connection_id"]
@@ -233,14 +239,14 @@ class AsyncLabellerrClient:
                 return await self.upload_file_stream(signed_url, file_path)
 
         # Upload files concurrently
-        tasks = [upload_single_file(file_path) for file_path in files_list]
+        tasks = [upload_single_file(file_path) for file_path in normalized_files_list]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Check for errors
         failed_files = []
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                failed_files.append((files_list[i], str(result)))
+                failed_files.append((normalized_files_list[i], str(result)))
 
         if failed_files:
             error_msg = (
@@ -264,6 +270,7 @@ class AsyncLabellerrClient:
             extra_headers={"Origin": constants.ALLOWED_ORIGINS}
         )
 
+        assert self._session is not None
         async with self._session.get(url, params=params, headers=headers) as response:
             return await self._handle_response(response)
 
@@ -298,7 +305,7 @@ class AsyncLabellerrClient:
                 extra_headers={"content-type": "application/json"},
             )
 
-            payload = {
+            payload: Dict[str, Any] = {
                 "dataset_name": dataset_config["dataset_name"],
                 "dataset_description": dataset_config.get("dataset_description", ""),
                 "data_type": dataset_config["data_type"],
@@ -307,6 +314,7 @@ class AsyncLabellerrClient:
                 "client_id": dataset_config["client_id"],
             }
 
+            assert self._session is not None
             async with self._session.post(
                 url, params=params, headers=headers, json=payload
             ) as response:

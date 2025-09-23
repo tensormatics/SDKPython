@@ -1,14 +1,16 @@
+import json
 import os
 import sys
-import time
-import json
 import tempfile
+import time
 import unittest
 from dataclasses import dataclass
 from unittest.mock import patch
+
+import dotenv
+
 from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
-import dotenv
 
 dotenv.load_dotenv()
 
@@ -603,7 +605,12 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     with patch.object(
                         LabellerrClient,
                         "create_aws_connection",
-                        return_value={"response": {"status": "success", "connection_id": "conn-123"}},
+                        return_value={
+                            "response": {
+                                "status": "success",
+                                "connection_id": "conn-123",
+                            }
+                        },
                     ) as mocked:
                         result = self.client.create_aws_connection(
                             client_id=case.client_id,
@@ -661,7 +668,14 @@ if __name__ == "__main__":
     python use_case_tests.py
     """
     # Check for required environment variables
-    required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL", "AWS_CONNECTION_VIDEO", "AWS_CONNECTION_IMAGE"]
+    required_env_vars = [
+        "API_KEY",
+        "API_SECRET",
+        "CLIENT_ID",
+        "TEST_EMAIL",
+        "AWS_CONNECTION_VIDEO",
+        "AWS_CONNECTION_IMAGE",
+    ]
 
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 

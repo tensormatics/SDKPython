@@ -172,7 +172,7 @@ annotation_file = '/path/to/annotations.json'
 try:
     # Upload and wait for processing to complete
     result = client.upload_preannotation_by_project_id(project_id, client_id, annotation_format, annotation_file)
-  
+
     # Check the final status
     if result['response']['status'] == 'completed':
         print("Pre-annotations processed successfully")
@@ -202,9 +202,9 @@ annotation_file = '/path/to/annotations.json'
 try:
     # Start the async upload - returns immediately
     future = client.upload_preannotation_by_project_id_async(project_id, client_id, annotation_format, annotation_file)
-  
+
     print("Upload started, you can do other work here...")
-  
+
     # When you need the result, wait for completion
     try:
         result = future.result(timeout=300)  # 5 minutes timeout
@@ -310,7 +310,7 @@ client_id = '12345'
 
 try:
     result = client.get_all_project_per_client_id(client_id)
-  
+
     # Check if projects were retrieved successfully
     if result and 'response' in result:
         projects = result['response']
@@ -355,7 +355,7 @@ data_type = 'image'
 
 try:
     result = client.get_all_dataset(client_id, data_type)
-  
+
     # Process linked datasets
     linked_datasets = result['linked']
     print(f"Found {len(linked_datasets)} linked datasets:")

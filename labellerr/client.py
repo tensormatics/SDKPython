@@ -258,7 +258,82 @@ class LabellerrClient:
         except Exception as e:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
+    @validate_required(['client','aws_access_key_id', 'aws_secret_access_key', 's3_path',  'data_type' , 'name'])
+    def create_aws_connection(
+            self,
+            client_id: str,
+            aws_access_key: str,
+            aws_secrets_key: str,
+            s3_path: str,
+            data_type: str,
+            name: str,
+            description: str,
+            connection_type: str = "import",
+    ):
+        """
+        AWS S3 connector and, if valid, save the connection.
+        :param client_id: The ID of the client.
+        :param aws_access_key: The AWS access key.
+        :param aws_secrets_key: The AWS secrets key.
+        :param s3_path: The S3 path.
+        :param data_type: The data type.
+        :param name: The name of the connection.
+        :param description: The description.
+        :param connection_type: The connection type.
 
+        """
+
+        request_uuid = str(uuid.uuid4())
+        test_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        aws_credentials_json = json.dumps({
+            "access_key_id": aws_access_key,
+            "secret_access_key": aws_secrets_key,
+        })
+
+        test_request = {
+            "credentials": aws_credentials_json,
+            "connector": "aws",
+            "path": s3_path,
+            "connection_type": connection_type,
+            "data_type": data_type,
+        }
+
+        test_resp = self._make_request(
+            "POST", test_connection_url, headers=headers, data=test_request
+        )
+        self._handle_response(test_resp, request_uuid)
+
+        create_url = (
+            f"{constants.BASE_URL}/connectors/connections/create"
+            f"?uuid={request_uuid}&client_id={client_id}"
+        )
+
+        create_request = {
+            "client_id": client_id,
+            "connector": "aws",
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
+            "data_type": data_type,
+            "credentials": aws_credentials_json,
+        }
+
+        create_resp = self._make_request(
+            "POST", create_url, headers=headers, data=create_request
+        )
+
+        return self._handle_response(create_resp, request_uuid)
+
+    @validate_required(['client', 'gcs_cred_file', 'gcs_path', 'data_type', 'name'])
     def create_gcs_connection(
         self,
         client_id: str,
@@ -276,6 +351,8 @@ class LabellerrClient:
         :param gcs_cred_file: Path to the GCS service account JSON file.
         :param gcs_path: GCS path like gs://bucket/path
         :param data_type: Data type, e.g. "image", "video".
+        :param name: Name of the connection
+        :param description: Description of the connection
         :param connection_type: "import" or "export" (default: import)
         :param credentials: Credential type (default: svc_account_json)
         :return: Parsed JSON response
@@ -351,7 +428,7 @@ class LabellerrClient:
         request_uuid =  str(uuid.uuid4())
         list_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/list"
-            f"?client_id={client_id}&uuid={request_uuid}"
+            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
         )
 
         headers = self._build_headers(

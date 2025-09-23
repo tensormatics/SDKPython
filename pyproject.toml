@@ -45,6 +45,7 @@ dev = [
     "flake8>=3.8.0",
     "mypy>=0.800",
     "isort>=5.0.0",
+    "python-dotenv>=1.0.0",
     "build>=0.3.0",
 ]
 docs = [

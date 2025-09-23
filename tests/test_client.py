@@ -107,9 +107,10 @@ class TestInitiateCreateProject:
             project_name=sample_valid_payload["project_name"],
             data_type=sample_valid_payload["data_type"],
             client_id=sample_valid_payload["client_id"],
-            dataset_id=dataset_id,
+            attached_datasets=[dataset_id],
             annotation_template_id=template_id,
-            rotation_config=sample_valid_payload["rotation_config"],
+            rotations=sample_valid_payload["rotation_config"],
+            use_ai=False,
             created_by=sample_valid_payload["created_by"],
         )
 

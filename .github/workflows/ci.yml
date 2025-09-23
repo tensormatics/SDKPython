@@ -52,10 +52,8 @@ jobs:
           fi
 
       - name: Run unit tests
-        run: |
-          pytest -q || (echo "Unit tests failed" && exit 1)
+        run: make test
 
       - name: Run integration tests
         if: github.event_name == 'workflow_dispatch'
-        run: |
-          make integration-test
+        run: make integration-test

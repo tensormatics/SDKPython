@@ -258,7 +258,7 @@ class LabellerrClient:
         except Exception as e:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
-    @validate_required(['client','aws_access_key_id', 'aws_secret_access_key', 's3_path',  'data_type' , 'name'])
+    @validate_required(['client_id','aws_access_key', 'aws_secrets_key', 's3_path', 'data_type', 'name'])
     def create_aws_connection(
             self,
             client_id: str,
@@ -333,7 +333,7 @@ class LabellerrClient:
 
         return self._handle_response(create_resp, request_uuid)
 
-    @validate_required(['client', 'gcs_cred_file', 'gcs_path', 'data_type', 'name'])
+    @validate_required(['client_id', 'gcs_cred_file', 'gcs_path', 'data_type', 'name'])
     def create_gcs_connection(
         self,
         client_id: str,

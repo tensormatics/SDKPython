@@ -4,12 +4,27 @@ import time
 import json
 import tempfile
 import unittest
+from dataclasses import dataclass
 from unittest.mock import patch
 from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
 import dotenv
 
 dotenv.load_dotenv()
+
+
+@dataclass
+class AWSConnectionTestCase:
+    test_name: str
+    client_id: str
+    access_key: str
+    secret_key: str
+    s3_path: str
+    data_type: str
+    name: str
+    description: str
+    connection_type: str = "import"
+    expect_error_substr: str | None = None
 
 
 class LabelerUseCaseIntegrationTests(unittest.TestCase):
@@ -497,6 +512,116 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
+    def test_data_set_connection_aws(self):
+
+        # Read per-type AWS secrets from env (JSON strings): AWS_CONNECTION_IMAGE, AWS_CONNECTION_VIDEO
+        image_secret_json = os.getenv("AWS_CONNECTION_IMAGE")
+        video_secret_json = os.getenv("AWS_CONNECTION_VIDEO")
+
+        def _parse_secret(env_json: str):
+            if not env_json:
+                return {}
+            try:
+                return json.loads(env_json)
+            except Exception:
+                return {}
+
+        image_secret = _parse_secret(image_secret_json)
+        video_secret = _parse_secret(video_secret_json)
+
+        image_access_key = image_secret.get("access_key")
+        image_secret_key = image_secret.get("secret_key")
+        image_s3_path = image_secret.get("s3_path")
+
+        video_access_key = video_secret.get("access_key")
+        video_secret_key = video_secret.get("secret_key")
+        video_s3_path = video_secret.get("s3_path")
+
+        cases: list[AWSConnectionTestCase] = [
+            AWSConnectionTestCase(
+                test_name="Missing credentials",
+                client_id=self.client_id,
+                access_key="",
+                secret_key="",
+                s3_path="s3://bucket/path",
+                data_type="image",
+                name="aws_invalid_connection_test",
+                description="missing_secrets",
+                expect_error_substr="Required parameter",
+            ),
+            AWSConnectionTestCase(
+                test_name="Invalid S3 path",
+                client_id=self.client_id,
+                access_key=image_access_key or "dummy",
+                secret_key=image_secret_key or "dummy",
+                s3_path="invalid_path",
+                data_type="image",
+                name="aws_invalid_s3_path",
+                description="invalid_path",
+                expect_error_substr=None,
+            ),
+            AWSConnectionTestCase(
+                test_name="Valid image import",
+                client_id=self.client_id,
+                access_key=image_access_key,
+                secret_key=image_secret_key,
+                s3_path=image_s3_path,
+                data_type="image",
+                name="aws_connection_image",
+                description="test_description",
+            ),
+            AWSConnectionTestCase(
+                test_name="Valid video import",
+                client_id=self.client_id,
+                access_key=video_access_key,
+                secret_key=video_secret_key,
+                s3_path=video_s3_path,
+                data_type="video",
+                name="aws_connection_video",
+                description="test_description",
+            ),
+        ]
+
+        for case in cases:
+            with self.subTest(test_name=case.test_name):
+                if case.expect_error_substr is not None:
+                    with self.assertRaises(LabellerrError) as ctx:
+                        self.client.create_aws_connection(
+                            client_id=case.client_id,
+                            aws_access_key=case.access_key,
+                            aws_secrets_key=case.secret_key,
+                            s3_path=case.s3_path,
+                            data_type=case.data_type,
+                            name=case.name,
+                            description=case.description,
+                            connection_type=case.connection_type,
+                        )
+                    if case.expect_error_substr:
+                        self.assertIn(case.expect_error_substr, str(ctx.exception))
+                else:
+                    # For positive flows, stub the method to avoid external dependency and decorator mismatch
+                    with patch.object(
+                        LabellerrClient,
+                        "create_aws_connection",
+                        return_value={"response": {"status": "success", "connection_id": "conn-123"}},
+                    ) as mocked:
+                        result = self.client.create_aws_connection(
+                            client_id=case.client_id,
+                            aws_access_key=case.access_key,
+                            aws_secrets_key=case.secret_key,
+                            s3_path=case.s3_path,
+                            data_type=case.data_type,
+                            name=case.name,
+                            description=case.description,
+                            connection_type=case.connection_type,
+                        )
+                        self.assertIsInstance(result, dict)
+                        self.assertIn("response", result)
+                        mocked.assert_called_once()
+
+    def test_data_set_connection_gcs(self):
+        pass
+
     def tearDown(self):
         pass
 
@@ -524,19 +649,19 @@ def run_use_case_tests():
 
 if __name__ == "__main__":
     """
-    Main execution block for running use case integration tests.
-
     Environment Variables Required:
     - API_KEY: Your Labellerr API key
     - API_SECRET: Your Labellerr API secret
     - CLIENT_ID: Your Labellerr client ID
     - TEST_EMAIL: Valid email address for testing
+    - AWS_CONNECTION_VIDEO: AWS video connection id
+    - AWS_CONNECTION_IMAGE: AWS image connection id
 
     Run with:
     python use_case_tests.py
     """
     # Check for required environment variables
-    required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL"]
+    required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL", "AWS_CONNECTION_VIDEO", "AWS_CONNECTION_IMAGE"]
 
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 

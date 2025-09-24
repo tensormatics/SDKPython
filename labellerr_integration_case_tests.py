@@ -33,22 +33,25 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
     def setUp(self):
 
-        self.api_key = os.getenv("API_KEY", "test-api-key")
-        self.api_secret = os.getenv("API_SECRET", "test-api-secret")
-        self.client_id = os.getenv("CLIENT_ID", "test-client-id")
-        self.test_email = os.getenv("CLIENT_EMAIL", "test@example.com")
+        self.api_key = os.getenv("API_KEY")
+        self.api_secret = os.getenv("API_SECRET")
+        self.client_id = os.getenv("CLIENT_ID")
+        self.test_email = os.getenv("CLIENT_EMAIL")
+        self.connector_video_creds_aws = os.getenv("AWS_CONNECTION_VIDEO")
+        self.connector_image_creds_aws = os.getenv("AWS_CONNECTION_IMAGE")
 
         if (
-            self.api_key == "test-api-key"
-            or self.api_secret == "test-api-secret"
-            or self.client_id == "test-client-id"
-            or self.test_email == "test@example.com"
+            self.api_key == ""
+            or self.api_secret == ""
+            or self.client_id == ""
+            or self.test_email == ""
+            or self.connector_video_creds_aws == ""
+            or self.connector_image_creds_aws == ""
         ):
 
             raise ValueError(
-                "Real Labellerr credentials are required for integration testing. "
-                "Please set environment variables: "
-                "LABELLERR_API_KEY, LABELLERR_API_SECRET, LABELLERR_CLIENT_ID, LABELLERR_TEST_EMAIL"
+                "missing environment variables: "
+                "LABELLERR_API_KEY, LABELLERR_API_SECRET, LABELLERR_CLIENT_ID, LABELLERR_TEST_EMAIL, AWS_CONNECTION_VIDEO, AWS_CONNECTION_IMAGE"
             )
 
         # Initialize the client
@@ -79,9 +82,8 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             "client_review_rotation_count": 1,
         }
 
-    def test_use_case_1_complete_project_creation_workflow(self):
+    def test_complete_project_creation_workflow(self):
 
-        # Create temporary test files to simulate real data upload
         test_files = []
         try:
             # Create sample image files for testing
@@ -135,8 +137,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_use_case_1_validation_requirements(self):
-        """Table-driven test for project creation validation requirements"""
+    def test__request_validation(self):
 
         validation_test_cases = [
             {
@@ -207,7 +208,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     f"Expected error '{test_case['expected_error']}' not found in '{error_message}'",
                 )
 
-    def test_use_case_1_multiple_data_types_table_driven(self):
+    def test_create_project_multiple_data_types(self):
 
         project_test_scenarios = [
             {
@@ -279,7 +280,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_use_case_2_preannotation_upload_workflow(self):
+    def test_pre_annotation_upload_workflow(self):
         annotation_data = {
             "annotations": [
                 {
@@ -312,11 +313,6 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 actual_project_id = self.created_project_id
             else:
                 actual_project_id = test_project_id
-
-                print(
-                    "Calling actual Labellerr pre-annotation API with real credentials..."
-                )
-
                 try:
                     with patch.object(
                         self.client, "preannotation_job_status", create=True
@@ -353,7 +349,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_use_case_2_format_validation(self):
+    def test_use_format_validation(self):
 
         format_test_cases = [
             {
@@ -426,9 +422,9 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                         except OSError:
                             pass
 
-    def test_use_case_2_multiple_formats_table_driven(self):
+    def test_pre_annotation_multiple_format(self):
 
-        preannotation_scenarios = [
+        pre_annotation_scenarios = [
             {
                 "scenario_name": "COCO JSON Upload",
                 "annotation_format": "coco_json",
@@ -467,7 +463,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             },
         ]
 
-        test_scenario = preannotation_scenarios[0]  # COCO JSON
+        test_scenario = pre_annotation_scenarios[0]  # COCO JSON
 
         temp_annotation_file = None
         try:
@@ -483,7 +479,6 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             )
 
             try:
-                # Only patch the missing method, let everything else be real
                 with patch.object(
                     self.client, "preannotation_job_status", create=True
                 ) as mock_status:

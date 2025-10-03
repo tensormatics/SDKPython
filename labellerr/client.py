@@ -8,16 +8,32 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from multiprocessing import cpu_count
+from typing import Any, Dict
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
-from . import constants, gcs, utils, client_utils
-from .exceptions import LabellerrError
 
-# python -m unittest discover -s tests --run
-# python setup.py sdist bdist_wheel -- build
-create_dataset_parameters = {}
+from . import client_utils, constants, gcs, utils
+from .exceptions import LabellerrError
+from .validators import (
+    handle_api_errors,
+    log_method_call,
+    validate_client_id,
+    validate_data_type,
+    validate_dataset_ids,
+    validate_file_list_or_string,
+    validate_list_not_empty,
+    validate_not_none,
+    validate_questions_structure,
+    validate_required,
+    validate_rotations_structure,
+    validate_scope,
+    validate_string_type,
+    validate_uuid_format,
+)
+
+create_dataset_parameters: Dict[str, Any] = {}
 
 
 class LabellerrClient:
@@ -59,22 +75,30 @@ class LabellerrClient:
         """
         self._session = requests.Session()
 
-        if HTTPAdapter and Retry:
+        if HTTPAdapter is not None and Retry is not None:
             # Configure retry strategy
-            retry_strategy = Retry(
-                total=3,
-                status_forcelist=[429, 500, 502, 503, 504],
-                allowed_methods=[
-                    "HEAD",
-                    "GET",
-                    "PUT",
-                    "DELETE",
-                    "OPTIONS",
-                    "TRACE",
-                    "POST",
-                ],
-                backoff_factor=1,
-            )
+            retry_kwargs = {
+                "total": 3,
+                "status_forcelist": [429, 500, 502, 503, 504],
+                "backoff_factor": 1,
+            }
+
+            methods = [
+                "HEAD",
+                "GET",
+                "PUT",
+                "DELETE",
+                "OPTIONS",
+                "TRACE",
+                "POST",
+            ]
+
+            try:
+                # Prefer modern param if available
+                retry_strategy = Retry(allowed_methods=methods, **retry_kwargs)
+            except TypeError:
+                # Fallback for older urllib3
+                retry_strategy = Retry(**retry_kwargs)
 
             # Configure connection pooling
             adapter = HTTPAdapter(
@@ -236,6 +260,234 @@ class LabellerrClient:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
 
+    @validate_required(
+        [
+            "client_id",
+            "aws_access_key",
+            "aws_secrets_key",
+            "s3_path",
+            "data_type",
+            "name",
+        ]
+    )
+    def create_aws_connection(
+        self,
+        client_id: str,
+        aws_access_key: str,
+        aws_secrets_key: str,
+        s3_path: str,
+        data_type: str,
+        name: str,
+        description: str,
+        connection_type: str = "import",
+    ):
+        """
+        AWS S3 connector and, if valid, save the connection.
+        :param client_id: The ID of the client.
+        :param aws_access_key: The AWS access key.
+        :param aws_secrets_key: The AWS secrets key.
+        :param s3_path: The S3 path.
+        :param data_type: The data type.
+        :param name: The name of the connection.
+        :param description: The description.
+        :param connection_type: The connection type.
+
+        """
+
+        request_uuid = str(uuid.uuid4())
+        test_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        aws_credentials_json = json.dumps(
+            {
+                "access_key_id": aws_access_key,
+                "secret_access_key": aws_secrets_key,
+            }
+        )
+
+        test_request = {
+            "credentials": aws_credentials_json,
+            "connector": "aws",
+            "path": s3_path,
+            "connection_type": connection_type,
+            "data_type": data_type,
+        }
+
+        test_resp = self._make_request(
+            "POST", test_connection_url, headers=headers, data=test_request
+        )
+        self._handle_response(test_resp, request_uuid)
+
+        create_url = (
+            f"{constants.BASE_URL}/connectors/connections/create"
+            f"?uuid={request_uuid}&client_id={client_id}"
+        )
+
+        create_request = {
+            "client_id": client_id,
+            "connector": "aws",
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
+            "data_type": data_type,
+            "credentials": aws_credentials_json,
+        }
+
+        create_resp = self._make_request(
+            "POST", create_url, headers=headers, data=create_request
+        )
+
+        return self._handle_response(create_resp, request_uuid)
+
+    @validate_required(["client_id", "gcs_path", "data_type", "name"])
+    def create_gcs_connection(
+        self,
+        client_id: str,
+        gcs_cred_file: str,
+        gcs_path: str,
+        data_type: str,
+        name: str,
+        description: str,
+        connection_type: str = "import",
+        credentials: str = "svc_account_json",
+    ):
+        """
+        Create/test a GCS connector connection (multipart/form-data)
+        :param client_id: The ID of the client.
+        :param gcs_cred_file: Path to the GCS service account JSON file.
+        :param gcs_path: GCS path like gs://bucket/path
+        :param data_type: Data type, e.g. "image", "video".
+        :param name: Name of the connection
+        :param description: Description of the connection
+        :param connection_type: "import" or "export" (default: import)
+        :param credentials: Credential type (default: svc_account_json)
+        :return: Parsed JSON response
+        """
+        if not os.path.exists(gcs_cred_file):
+            raise LabellerrError(f"GCS credential file not found: {gcs_cred_file}")
+
+        request_uuid = str(uuid.uuid4())
+        test_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        test_request = {
+            "credentials": credentials,
+            "connector": "gcs",
+            "path": gcs_path,
+            "connection_type": connection_type,
+            "data_type": data_type,
+        }
+
+        with open(gcs_cred_file, "rb") as fp:
+            test_files = {
+                "attachment_files": (
+                    os.path.basename(gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+            test_resp = self._make_request(
+                "POST", test_url, headers=headers, data=test_request, files=test_files
+            )
+        self._handle_response(test_resp, request_uuid)
+
+        # If test passed, create/save the connection
+        # use same uuid to track request
+        create_url = (
+            f"{constants.BASE_URL}/connectors/connections/create"
+            f"?uuid={request_uuid}&client_id={client_id}"
+        )
+
+        create_request = {
+            "client_id": client_id,
+            "connector": "gcs",
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
+            "data_type": data_type,
+            "credentials": credentials,
+        }
+
+        with open(gcs_cred_file, "rb") as fp:
+            create_files = {
+                "attachment_files": (
+                    os.path.basename(gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+            create_resp = self._make_request(
+                "POST",
+                create_url,
+                headers=headers,
+                data=create_request,
+                files=create_files,
+            )
+
+        return self._handle_response(create_resp, request_uuid)
+
+    def list_connection(self, client_id: str, connection_type: str):
+        request_uuid = str(uuid.uuid4())
+        list_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/list"
+            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        list_connection_response = self._make_request(
+            "GET", list_connection_url, headers=headers
+        )
+
+        return self._handle_response(list_connection_response, request_uuid)
+
+    @validate_required(["client_id", "connection_id"])
+    def delete_connection(self, client_id: str, connection_id: str):
+        """
+        Deletes a connector connection by ID.
+
+        :param client_id: The ID of the client.
+        :param connection_id: The ID of the connection to delete.
+        :return: Parsed JSON response
+        """
+        request_uuid = str(uuid.uuid4())
+        delete_url = (
+            f"{constants.BASE_URL}/connectors/connections/delete"
+            f"?client_id={client_id}&uuid={request_uuid}"
+        )
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "email_id": self.api_key,
+            },
+        )
+
+        payload = json.dumps({"connection_id": connection_id})
+
+        delete_response = self._make_request(
+            "POST", delete_url, headers=headers, data=payload
+        )
+        return self._handle_response(delete_response, request_uuid)
+
     def connect_local_files(self, client_id, file_names, connection_id=None):
         """
         Connects local files to the API.
@@ -275,43 +527,25 @@ class LabellerrClient:
 
         return response
 
+    # TODO: explore https://docs.pydantic.dev/latest/api/base_model/#pydantic.BaseModel and migrate these
+    # Decorator for api error
+    @validate_required(["client_id", "files_list"])
+    @validate_client_id("client_id")
+    @validate_file_list_or_string(["files_list"])
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def upload_files(self, client_id, files_list):
         """
         Uploads files to the API.
 
         :param client_id: The ID of the client.
-        :param dataset_id: The ID of the dataset.
-        :param data_type: The type of data.
         :param files_list: The list of files to upload or a comma-separated string of file paths.
-        :return: The response from the API.
+        :return: The connection ID from the API.
         :raises LabellerrError: If the upload fails.
         """
-        try:
-            # Convert string input to list if necessary
-            if isinstance(files_list, str):
-                files_list = files_list.split(",")
-            elif not isinstance(files_list, list):
-                raise LabellerrError(
-                    "files_list must be either a list or a comma-separated string"
-                )
-
-            if len(files_list) == 0:
-                raise LabellerrError("No files to upload")
-
-            # Validate files exist
-            for file_path in files_list:
-                if not os.path.exists(file_path):
-                    raise LabellerrError(f"File does not exist: {file_path}")
-                if not os.path.isfile(file_path):
-                    raise LabellerrError(f"Path is not a file: {file_path}")
-
-            response = self.__process_batch(client_id, files_list)
-            connection_id = response["response"]["temporary_connection_id"]
-            return connection_id
-
-        except Exception as e:
-            logging.error(f"Failed to upload files : {str(e)}")
-            raise LabellerrError(f"Failed to upload files : {str(e)}")
+        response = self.__process_batch(client_id, files_list)
+        connection_id = response["response"]["temporary_connection_id"]
+        return connection_id
 
     def get_dataset(self, workspace_id, dataset_id):
         """
@@ -359,21 +593,90 @@ class LabellerrClient:
             raise
 
     def create_dataset(
-        self, dataset_config, files_to_upload=None, folder_to_upload=None
+        self,
+        dataset_config,
+        files_to_upload=None,
+        folder_to_upload=None,
+        connector_config=None,
     ):
         """
-        Creates an empty dataset.
+        Creates a dataset with support for multiple data types and connectors.
 
         :param dataset_config: A dictionary containing the configuration for the dataset.
+                              Required fields: client_id, dataset_name, data_type
+                              Optional fields: dataset_description, connector_type
+        :param files_to_upload: List of file paths to upload (for local connector)
+        :param folder_to_upload: Path to folder to upload (for local connector)
+        :param connector_config: Configuration for cloud connectors (GCP/AWS)
         :return: A dictionary containing the response status and the ID of the created dataset.
         """
 
         try:
+            # Validate required fields
+            required_fields = ["client_id", "dataset_name", "data_type"]
+            for field in required_fields:
+                if field not in dataset_config:
+                    raise LabellerrError(
+                        f"Required field '{field}' missing in dataset_config"
+                    )
+
             # Validate data_type
             if dataset_config.get("data_type") not in constants.DATA_TYPES:
                 raise LabellerrError(
                     f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
                 )
+
+            connector_type = dataset_config.get("connector_type", "local")
+            connection_id = None
+            path = connector_type
+
+            # Handle different connector types
+            if connector_type == "local":
+                if files_to_upload is not None:
+                    try:
+                        connection_id = self.upload_files(
+                            client_id=dataset_config["client_id"],
+                            files_list=files_to_upload,
+                        )
+                    except Exception as e:
+                        raise LabellerrError(
+                            f"Failed to upload files to dataset: {str(e)}"
+                        )
+
+                elif folder_to_upload is not None:
+                    try:
+                        result = self.upload_folder_files_to_dataset(
+                            {
+                                "client_id": dataset_config["client_id"],
+                                "folder_path": folder_to_upload,
+                                "data_type": dataset_config["data_type"],
+                            }
+                        )
+                        connection_id = result["connection_id"]
+                    except Exception as e:
+                        raise LabellerrError(
+                            f"Failed to upload folder files to dataset: {str(e)}"
+                        )
+                elif connector_config is None:
+                    # Create empty dataset for local connector
+                    connection_id = None
+
+            elif connector_type in ["gcp", "aws"]:
+                if connector_config is None:
+                    raise LabellerrError(
+                        f"connector_config is required for {connector_type} connector"
+                    )
+
+                try:
+                    connection_id = self._setup_cloud_connector(
+                        connector_type, dataset_config["client_id"], connector_config
+                    )
+                except Exception as e:
+                    raise LabellerrError(
+                        f"Failed to setup {connector_type} connector: {str(e)}"
+                    )
+            else:
+                raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config['client_id']}&uuid={unique_id}"
@@ -381,29 +684,7 @@ class LabellerrClient:
                 client_id=dataset_config["client_id"],
                 extra_headers={"content-type": "application/json"},
             )
-            if files_to_upload is not None:
-                try:
-                    connection_id = self.upload_files(
-                        client_id=dataset_config["client_id"],
-                        files_list=files_to_upload,
-                    )
-                except Exception as e:
-                    raise LabellerrError(f"Failed to upload files to dataset: {str(e)}")
 
-            elif folder_to_upload is not None:
-                try:
-                    result = self.upload_folder_files_to_dataset(
-                        {
-                            "client_id": dataset_config["client_id"],
-                            "folder_path": folder_to_upload,
-                            "data_type": dataset_config["data_type"],
-                        }
-                    )
-                    connection_id = result["connection_id"]
-                except Exception as e:
-                    raise LabellerrError(
-                        f"Failed to upload folder files to dataset: {str(e)}"
-                    )
             payload = json.dumps(
                 {
                     "dataset_name": dataset_config["dataset_name"],
@@ -412,11 +693,12 @@ class LabellerrClient:
                     ),
                     "data_type": dataset_config["data_type"],
                     "connection_id": connection_id,
-                    "path": "local",
+                    "path": path,
                     "client_id": dataset_config["client_id"],
+                    "connector_type": connector_type,
                 }
             )
-            response = requests.request("POST", url, headers=headers, data=payload)
+            response = self._make_request("POST", url, headers=headers, data=payload)
             response_data = self._handle_response(response, unique_id)
             dataset_id = response_data["response"]["dataset_id"]
 
@@ -426,42 +708,132 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
+    @validate_required(["client_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("dataset_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def delete_dataset(self, client_id, dataset_id):
+        """
+        Deletes a dataset from the system.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset to delete
+        :return: Dictionary containing deletion status
+        :raises LabellerrError: If the deletion fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        response = self._make_request("DELETE", url, headers=headers)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "dataset_id", "indexing_config"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("dataset_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def enable_multimodal_indexing(self, client_id, dataset_id, indexing_config):
+        """
+        Enables multimodal indexing for an existing dataset.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset
+        :param indexing_config: Configuration for multimodal indexing
+                               Example: {"enabled": True, "modalities": ["text", "image"]}
+        :return: Dictionary containing indexing status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}/indexing?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps(indexing_config)
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("project_id")
+    @validate_uuid_format("dataset_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def attach_dataset_to_project(self, client_id, project_id, dataset_id):
+        """
+        Attaches a dataset to an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to attach
+        :return: Dictionary containing attachment status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/attach?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({"dataset_id": dataset_id})
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "dataset_id"])
+    @validate_client_id("client_id")
+    @validate_uuid_format("project_id")
+    @validate_uuid_format("dataset_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def detach_dataset_from_project(self, client_id, project_id, dataset_id):
+        """
+        Detaches a dataset from an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to detach
+        :return: Dictionary containing detachment status
+        :raises LabellerrError: If the operation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/detach?client_id={client_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({"dataset_id": dataset_id})
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "datatype", "project_id", "scope"])
+    @validate_string_type("client_id")
+    @validate_string_type("datatype")
+    @validate_string_type("project_id")
+    @validate_scope("scope")
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def get_all_dataset(self, client_id, datatype, project_id, scope):
         """
-        Retrieves a dataset by its ID.
+        Retrieves datasets by parameters.
 
         :param client_id: The ID of the client.
         :param datatype: The type of data for the dataset.
-        :return: The dataset as JSON.
+        :param project_id: The ID of the project.
+        :param scope: The permission scope for the dataset.
+        :return: The dataset list as JSON.
         """
-        # validate parameters
-        if not isinstance(client_id, str):
-            raise LabellerrError("client_id must be a string")
-        if not isinstance(datatype, str):
-            raise LabellerrError("datatype must be a string")
-        if not isinstance(project_id, str):
-            raise LabellerrError("project_id must be a string")
-        if not isinstance(scope, str):
-            raise LabellerrError("scope must be a string")
-        # scope value should on in the list SCOPE_LIST
-        if scope not in constants.SCOPE_LIST:
-            raise LabellerrError(
-                f"scope must be one of {', '.join(constants.SCOPE_LIST)}"
-            )
+        unique_id = str(uuid.uuid4())
+        url = f"{self.base_url}/datasets/list?client_id={client_id}&data_type={datatype}&permission_level={scope}&project_id={project_id}&uuid={unique_id}"
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
 
-        # get dataset
-        try:
-            unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/datasets/list?client_id={client_id}&data_type={datatype}&permission_level={scope}&project_id={project_id}&uuid={unique_id}"
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"content-type": "application/json"}
-            )
-
-            response = requests.request("GET", url, headers=headers)
-            return self._handle_response(response, unique_id)
-        except LabellerrError as e:
-            logging.error(f"Failed to retrieve dataset: {e}")
-            raise
+        response = self._make_request("GET", url, headers=headers)
+        return self._handle_response(response, unique_id)
 
     def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
         """
@@ -627,7 +999,8 @@ class LabellerrClient:
             )
             client_utils.validate_annotation_format(annotation_format, annotation_file)
 
-            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
+            request_uuid = str(uuid.uuid4())
+            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
             file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url
             gcs_path = f"{project_id}/{annotation_format}-{file_name}"
@@ -653,7 +1026,7 @@ class LabellerrClient:
                 client_id=client_id, extra_headers={"email_id": self.api_key}
             )
             response = requests.request("POST", url, headers=headers, data=payload)
-            response_data = self._handle_upload_response(response)
+            response_data = self._handle_upload_response(response, request_uuid)
 
             # read job_id from the response
             job_id = response_data["response"]["job_id"]
@@ -699,7 +1072,11 @@ class LabellerrClient:
                         f"Invalid annotation_format. Must be one of {constants.ANNOTATION_FORMAT}"
                     )
 
-                url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
+                request_uuid = str(uuid.uuid4())
+                url = (
+                    f"{self.base_url}/actions/upload_answers?"
+                    f"project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+                )
 
                 # validate if the file exist then extract file name from the path
                 if os.path.exists(annotation_file):
@@ -738,7 +1115,7 @@ class LabellerrClient:
                     client_id=client_id, extra_headers={"email_id": self.api_key}
                 )
                 response = requests.request("POST", url, headers=headers, data=payload)
-                response_data = self._handle_upload_response(response)
+                response_data = self._handle_upload_response(response, request_uuid)
 
                 # read job_id from the response
                 job_id = response_data["response"]["job_id"]
@@ -853,7 +1230,8 @@ class LabellerrClient:
                     f"Invalid annotation_format. Must be one of {constants.ANNOTATION_FORMAT}"
                 )
 
-            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}"
+            request_uuid = str(uuid.uuid4())
+            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
 
             # validate if the file exist then extract file name from the path
             if os.path.exists(annotation_file):
@@ -870,7 +1248,7 @@ class LabellerrClient:
                 response = requests.request(
                     "POST", url, headers=headers, data=payload, files=files
                 )
-            response_data = self._handle_upload_response(response)
+            response_data = self._handle_upload_response(response, request_uuid)
             logging.debug(f"response_data: {response_data}")
 
             # read job_id from the response
@@ -887,42 +1265,44 @@ class LabellerrClient:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
+    @validate_required(["project_id", "client_id", "export_config"])
+    @validate_not_none(["project_id", "client_id", "export_config"])
+    @validate_string_type("project_id")
+    @validate_client_id("client_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_local_export(self, project_id, client_id, export_config):
-        unique_id = client_utils.generate_request_id()
+        """
+        Creates a local export with the given configuration.
 
-        if project_id is None:
-            raise LabellerrError("project_id cannot be null")
-
-        if client_id is None:
-            raise LabellerrError("client_id cannot be null")
-
-        if export_config is None:
-            raise LabellerrError("export_config cannot be null")
-
+        :param project_id: The ID of the project.
+        :param client_id: The ID of the client.
+        :param export_config: Export configuration dictionary.
+        :return: The response from the API.
+        :raises LabellerrError: If the export creation fails.
+        """
+        # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 
-        try:
-            export_config.update(
-                {"export_destination": "local", "question_ids": ["all"]}
-            )
-            payload = json.dumps(export_config)
-            headers = self._build_headers(
-                extra_headers={
-                    "Origin": constants.ALLOWED_ORIGINS,
-                    "Content-Type": "application/json",
-                }
-            )
+        unique_id = client_utils.generate_request_id()
+        export_config.update({"export_destination": "local", "question_ids": ["all"]})
 
-            response = requests.post(
-                f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
-                headers=headers,
-                data=payload,
-            )
+        payload = json.dumps(export_config)
+        headers = self._build_headers(
+            extra_headers={
+                "Origin": constants.ALLOWED_ORIGINS,
+                "Content-Type": "application/json",
+            }
+        )
 
-            return self._handle_response(response, unique_id)
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Failed to create local export: {str(e)}")
-            raise LabellerrError(f"Failed to create local export: {str(e)}")
+        response = self._make_request(
+            "POST",
+            f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
+            headers=headers,
+            data=payload,
+        )
+
+        return self._handle_response(response, unique_id)
 
     def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:
@@ -1000,56 +1380,73 @@ class LabellerrClient:
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
 
+    @validate_required(
+        [
+            "project_name",
+            "data_type",
+            "client_id",
+            "attached_datasets",
+            "annotation_template_id",
+            "rotations",
+        ]
+    )
+    @validate_client_id("client_id")
+    @validate_data_type("data_type")
+    @validate_dataset_ids("attached_datasets")
+    @validate_uuid_format("annotation_template_id")
+    @validate_rotations_structure("rotations")
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_project(
         self,
         project_name,
         data_type,
         client_id,
-        dataset_id,
+        attached_datasets,
         annotation_template_id,
-        rotation_config,
+        rotations,
+        use_ai=False,
         created_by=None,
     ):
         """
         Creates a project with the given configuration.
+
+        :param project_name: Name of the project
+        :param data_type: Type of data (image, video, etc.)
+        :param client_id: ID of the client
+        :param attached_datasets: List of dataset IDs to attach to the project
+        :param annotation_template_id: ID of the annotation template
+        :param rotations: Dictionary containing rotation configuration
+        :param use_ai: Boolean flag for AI usage (default: False)
+        :param created_by: Optional creator information
+        :return: Project creation response
+        :raises LabellerrError: If the creation fails
         """
-        url = f"{constants.BASE_URL}/projects/create?client_id={client_id}"
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/projects/create?client_id={client_id}&uuid={unique_id}"
 
         payload = json.dumps(
             {
                 "project_name": project_name,
-                "attached_datasets": [dataset_id],
+                "attached_datasets": attached_datasets,
                 "data_type": data_type,
                 "annotation_template_id": annotation_template_id,
-                "rotations": rotation_config,
+                "rotations": rotations,
+                "use_ai": use_ai,
                 "created_by": created_by,
             }
         )
 
         headers = self._build_headers(
+            client_id=client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
-            }
+            },
         )
 
-        # print(f"{payload}")
-
-        response = requests.post(url, headers=headers, data=payload)
-        response_data = response.json()
-
-        # print(f"{response_data}")
-
-        if "error" in response_data and response_data["error"]:
-            error_details = response_data["error"]
-            error_msg = (
-                f"Validation Error: {response_data.get('message', 'Unknown error')}"
-            )
-            for error in error_details:
-                error_msg += f"\n- Field '{error['field']}': {error['message']}"
-            raise LabellerrError(error_msg)
-
-        return response_data
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
 
     def initiate_create_project(self, payload):
         """
@@ -1066,26 +1463,48 @@ class LabellerrClient:
                 "data_type",
                 "created_by",
                 "project_name",
-                "annotation_guide",
+                # Either annotation_guide or annotation_template_id must be provided
                 "autolabel",
             ]
             for param in required_params:
                 if param not in payload:
                     raise LabellerrError(f"Required parameter {param} is missing")
 
-                if param == "client_id" and not isinstance(payload[param], str):
-                    raise LabellerrError("client_id must be a non-empty string")
+                if param == "client_id":
+                    if (
+                        not isinstance(payload[param], str)
+                        or not payload[param].strip()
+                    ):
+                        raise LabellerrError("client_id must be a non-empty string")
 
-                if param == "annotation_guide":
-                    for guide in payload["annotation_guide"]:
-                        if "option_type" not in guide:
-                            raise LabellerrError(
-                                "option_type is required in annotation_guide"
-                            )
-                        if guide["option_type"] not in constants.OPTION_TYPE_LIST:
-                            raise LabellerrError(
-                                f"option_type must be one of {constants.OPTION_TYPE_LIST}"
-                            )
+            # Validate created_by email format
+            created_by = payload.get("created_by")
+            if (
+                not isinstance(created_by, str)
+                or "@" not in created_by
+                or "." not in created_by.split("@")[-1]
+            ):
+                raise LabellerrError("Please enter email id in created_by")
+
+            # Ensure either annotation_guide or annotation_template_id is provided
+            if not payload.get("annotation_guide") and not payload.get(
+                "annotation_template_id"
+            ):
+                raise LabellerrError(
+                    "Please provide either annotation guide or annotation template id"
+                )
+
+            # If annotation_guide is provided, validate its entries
+            if payload.get("annotation_guide"):
+                for guide in payload["annotation_guide"]:
+                    if "option_type" not in guide:
+                        raise LabellerrError(
+                            "option_type is required in annotation_guide"
+                        )
+                    if guide["option_type"] not in constants.OPTION_TYPE_LIST:
+                        raise LabellerrError(
+                            f"option_type must be one of {constants.OPTION_TYPE_LIST}"
+                        )
 
             if "folder_to_upload" in payload and "files_to_upload" in payload:
                 raise LabellerrError(
@@ -1096,6 +1515,12 @@ class LabellerrClient:
                 raise LabellerrError(
                     "Either files_to_upload or folder_to_upload must be provided"
                 )
+
+            if (
+                isinstance(payload.get("files_to_upload"), list)
+                and len(payload["files_to_upload"]) == 0
+            ):
+                payload.pop("files_to_upload")
 
             if "rotation_config" not in payload:
                 payload["rotation_config"] = {
@@ -1154,21 +1579,25 @@ class LabellerrClient:
 
             logging.info("Dataset created and ready for use")
 
-            annotation_template_id = self.create_annotation_guideline(
-                payload["client_id"],
-                payload["annotation_guide"],
-                payload["project_name"],
-                payload["data_type"],
-            )
+            if payload.get("annotation_template_id"):
+                annotation_template_id = payload["annotation_template_id"]
+            else:
+                annotation_template_id = self.create_annotation_guideline(
+                    payload["client_id"],
+                    payload["annotation_guide"],
+                    payload["project_name"],
+                    payload["data_type"],
+                )
             logging.info("Annotation guidelines created")
 
             project_response = self.create_project(
                 project_name=payload["project_name"],
                 data_type=payload["data_type"],
                 client_id=payload["client_id"],
-                dataset_id=dataset_id,
+                attached_datasets=[dataset_id],
                 annotation_template_id=annotation_template_id,
-                rotation_config=payload["rotation_config"],
+                rotations=payload["rotation_config"],
+                use_ai=payload.get("use_ai", False),
                 created_by=payload["created_by"],
             )
 
@@ -1335,3 +1764,410 @@ class LabellerrClient:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
+
+    @validate_required(["client_id", "data_type", "template_name", "questions"])
+    @validate_client_id("client_id")
+    @validate_data_type("data_type")
+    @validate_list_not_empty("questions")
+    @validate_questions_structure()
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def create_template(self, client_id, data_type, template_name, questions):
+        """
+        Creates an annotation template with the given configuration.
+
+        :param client_id: The ID of the client.
+        :param data_type: The type of data for the template (image, video, etc.).
+        :param template_name: The name of the template.
+        :param questions: List of questions/annotations for the template.
+        :return: The response from the API containing template details.
+        :raises LabellerrError: If the creation fails.
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/annotations/create_template?client_id={client_id}&data_type={data_type}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps({"templateName": template_name, "questions": questions})
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(
+        ["client_id", "first_name", "last_name", "email_id", "projects", "roles"]
+    )
+    @validate_client_id("client_id")
+    @validate_string_type("first_name")
+    @validate_string_type("last_name")
+    @validate_string_type("email_id")
+    @validate_list_not_empty("projects")
+    @validate_list_not_empty("roles")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def create_user(
+        self,
+        client_id,
+        first_name,
+        last_name,
+        email_id,
+        projects,
+        roles,
+        work_phone="",
+        job_title="",
+        language="en",
+        timezone="GMT",
+    ):
+        """
+        Creates a new user in the system.
+
+        :param client_id: The ID of the client
+        :param first_name: User's first name
+        :param last_name: User's last name
+        :param email_id: User's email address
+        :param projects: List of project IDs to assign the user to
+        :param roles: List of role objects with project_id and role_id
+        :param work_phone: User's work phone number (optional)
+        :param job_title: User's job title (optional)
+        :param language: User's preferred language (default: "en")
+        :param timezone: User's timezone (default: "GMT")
+        :return: Dictionary containing user creation response
+        :raises LabellerrError: If the creation fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/users/register?client_id={client_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+        )
+
+        payload = json.dumps(
+            {
+                "first_name": first_name,
+                "last_name": last_name,
+                "work_phone": work_phone,
+                "job_title": job_title,
+                "language": language,
+                "timezone": timezone,
+                "email_id": email_id,
+                "projects": projects,
+                "client_id": client_id,
+                "roles": roles,
+            }
+        )
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "email_id", "roles"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_string_type("email_id")
+    @validate_list_not_empty("roles")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def update_user_role(
+        self,
+        client_id,
+        project_id,
+        email_id,
+        roles,
+        first_name=None,
+        last_name=None,
+        work_phone="",
+        job_title="",
+        language="en",
+        timezone="GMT",
+        profile_image="",
+    ):
+        """
+        Updates a user's role and profile information.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param email_id: User's email address
+        :param roles: List of role objects with project_id and role_id
+        :param first_name: User's first name (optional)
+        :param last_name: User's last name (optional)
+        :param work_phone: User's work phone number (optional)
+        :param job_title: User's job title (optional)
+        :param language: User's preferred language (default: "en")
+        :param timezone: User's timezone (default: "GMT")
+        :param profile_image: User's profile image (optional)
+        :return: Dictionary containing update response
+        :raises LabellerrError: If the update fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/users/update?project_id={project_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+        )
+
+        # Build the payload with all provided information
+        payload_data = {
+            "profile_image": profile_image,
+            "work_phone": work_phone,
+            "job_title": job_title,
+            "language": language,
+            "timezone": timezone,
+            "email_id": email_id,
+            "client_id": client_id,
+            "roles": roles,
+        }
+
+        # Add optional fields if provided
+        if first_name is not None:
+            payload_data["first_name"] = first_name
+        if last_name is not None:
+            payload_data["last_name"] = last_name
+
+        payload = json.dumps(payload_data)
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "email_id", "user_id"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_string_type("email_id")
+    @validate_string_type("user_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def delete_user(
+        self,
+        client_id,
+        project_id,
+        email_id,
+        user_id,
+        first_name=None,
+        last_name=None,
+        is_active=1,
+        role="Annotator",
+        user_created_at=None,
+        max_activity_created_at=None,
+        image_url="",
+        name=None,
+        activity="No Activity",
+        creation_date=None,
+        status="Activated",
+    ):
+        """
+        Deletes a user from the system.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param email_id: User's email address
+        :param user_id: User's unique identifier
+        :param first_name: User's first name (optional)
+        :param last_name: User's last name (optional)
+        :param is_active: User's active status (default: 1)
+        :param role: User's role (default: "Annotator")
+        :param user_created_at: User creation timestamp (optional)
+        :param max_activity_created_at: Max activity timestamp (optional)
+        :param image_url: User's profile image URL (optional)
+        :param name: User's display name (optional)
+        :param activity: User's activity status (default: "No Activity")
+        :param creation_date: User creation date (optional)
+        :param status: User's status (default: "Activated")
+        :return: Dictionary containing deletion response
+        :raises LabellerrError: If the deletion fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/users/delete?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+        )
+
+        # Build the payload with all provided information
+        payload_data = {
+            "email_id": email_id,
+            "is_active": is_active,
+            "role": role,
+            "user_id": user_id,
+            "imageUrl": image_url,
+            "email": email_id,
+            "activity": activity,
+            "status": status,
+        }
+
+        # Add optional fields if provided
+        if first_name is not None:
+            payload_data["first_name"] = first_name
+        if last_name is not None:
+            payload_data["last_name"] = last_name
+        if user_created_at is not None:
+            payload_data["user_created_at"] = user_created_at
+        if max_activity_created_at is not None:
+            payload_data["max_activity_created_at"] = max_activity_created_at
+        if name is not None:
+            payload_data["name"] = name
+        if creation_date is not None:
+            payload_data["creationDate"] = creation_date
+
+        payload = json.dumps(payload_data)
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "email_id"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_string_type("email_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
+        """
+        Adds a user to a project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param email_id: User's email address
+        :param role_id: Optional role ID to assign to the user
+        :return: Dictionary containing addition response
+        :raises LabellerrError: If the addition fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/annotations/add_user_to_project?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload_data = {"email_id": email_id, "uuid": unique_id}
+
+        if role_id is not None:
+            payload_data["role_id"] = role_id
+
+        payload = json.dumps(payload_data)
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "email_id"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_string_type("email_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def remove_user_from_project(self, client_id, project_id, email_id):
+        """
+        Removes a user from a project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param email_id: User's email address
+        :return: Dictionary containing removal response
+        :raises LabellerrError: If the removal fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/annotations/remove_user_from_project?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload_data = {"email_id": email_id, "uuid": unique_id}
+
+        payload = json.dumps(payload_data)
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "email_id", "new_role_id"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_string_type("email_id")
+    @validate_string_type("new_role_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def change_user_role(self, client_id, project_id, email_id, new_role_id):
+        """
+        Changes a user's role in a project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param email_id: User's email address
+        :param new_role_id: The new role ID to assign to the user
+        :return: Dictionary containing role change response
+        :raises LabellerrError: If the role change fails
+        """
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/annotations/change_user_role?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload_data = {
+            "email_id": email_id,
+            "new_role_id": new_role_id,
+            "uuid": unique_id,
+        }
+
+        payload = json.dumps(payload_data)
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "search_queries"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def list_file(
+        self, client_id, project_id, search_queries, size=10, next_search_after=None
+    ):
+
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/search/project_files?project_id={project_id}&client_id={client_id}&uuid={unique_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps(
+            {
+                "search_queries": search_queries,
+                "size": size,
+                "next_search_after": next_search_after,
+            }
+        )
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)
+
+    @validate_required(["client_id", "project_id", "file_ids", "new_status"])
+    @validate_client_id("client_id")
+    @validate_string_type("project_id")
+    @validate_list_not_empty("file_ids")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
+
+        headers = self._build_headers(
+            client_id=client_id, extra_headers={"content-type": "application/json"}
+        )
+
+        payload = json.dumps(
+            {
+                "file_ids": file_ids,
+                "new_status": new_status,
+            }
+        )
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        return self._handle_response(response, unique_id)

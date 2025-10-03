@@ -95,7 +95,7 @@ known_first_party = ["labellerr"]
 [tool.mypy]
 python_version = "3.8"
 files = ["labellerr"]
-exclude = "(^tests/|labellerr_use_case_tests.py$)"
+exclude = "(^tests/|labellerr_integration_case_tests.py$)"
 ignore_missing_imports = true
 follow_imports = "silent"
 allow_redefinition = true

@@ -57,7 +57,7 @@ check-release: ## Check if everything is ready for release
 	@echo "4. Push and create PR to main (patch) or develop (minor)"
 
 integration-test:
-	$(PYTHON) -m pytest  -v labellerr_use_case_tests.py
+	$(PYTHON) -m pytest  -v labellerr_integration_case_tests.py
 
 pre-commit-install:
 	pip install pre-commit

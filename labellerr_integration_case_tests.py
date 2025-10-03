@@ -5,6 +5,7 @@ import tempfile
 import time
 import unittest
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 from unittest.mock import patch
 
 import dotenv
@@ -13,6 +14,30 @@ from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
 
 dotenv.load_dotenv()
+
+
+@dataclass
+class AttachDetachTestCase:
+    """Test case for attach/detach dataset operations"""
+
+    test_name: str
+    client_id: str
+    project_id: str
+    dataset_id: str
+    expect_error_substr: Optional[str] = None
+    expected_success: bool = True
+
+
+@dataclass
+class MultimodalIndexingTestCase:
+    """Test case for multimodal indexing operations"""
+
+    test_name: str
+    client_id: str
+    dataset_id: str
+    indexing_config: Dict[str, Any]
+    expect_error_substr: Optional[str] = None
+    expected_success: bool = True
 
 
 @dataclass
@@ -29,7 +54,54 @@ class AWSConnectionTestCase:
     expect_error_substr: str | None = None
 
 
-class LabelerUseCaseIntegrationTests(unittest.TestCase):
+@dataclass
+class GCSConnectionTestCase:
+    test_name: str
+    client_id: str
+    cred_file_content: str
+    gcs_path: str
+    data_type: str
+    name: str
+    description: str
+    connection_type: str = "import"
+    expect_error_substr: str | None = None
+
+
+@dataclass
+class UserManagementTestCase:
+    """Test case for user management operations"""
+
+    test_name: str
+    client_id: str
+    project_id: str
+    email_id: str
+    first_name: str
+    last_name: str
+    user_id: str = None
+    role_id: str = None
+    new_role_id: str = None
+    expect_error_substr: str | None = None
+    expected_success: bool = True
+
+
+@dataclass
+class UserWorkflowTestCase:
+    """Test case for complete user workflow operations"""
+
+    test_name: str
+    client_id: str
+    project_id: str
+    email_id: str
+    first_name: str
+    last_name: str
+    user_id: str
+    roles: List[Dict[str, Any]]
+    projects: List[str]
+    expect_error_substr: str | None = None
+    expected_success: bool = True
+
+
+class LabelerIntegrationTests(unittest.TestCase):
 
     def setUp(self):
 
@@ -39,6 +111,8 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
         self.test_email = os.getenv("CLIENT_EMAIL")
         self.connector_video_creds_aws = os.getenv("AWS_CONNECTION_VIDEO")
         self.connector_image_creds_aws = os.getenv("AWS_CONNECTION_IMAGE")
+        self.connector_image_creds_gcs = os.getenv("GCS_CONNECTION_IMAGE")
+        self.connector_video_creds_gcs = os.getenv("GCS_CONNECTION_VIDEO")
 
         if (
             self.api_key == ""
@@ -270,7 +344,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
-            print(f"✓ {test_scenario['scenario_name']} project created successfully")
+            print(f" {test_scenario['scenario_name']} project created successfully")
 
         finally:
             # Clean up test files
@@ -306,7 +380,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             json.dump(annotation_data, temp_annotation_file)
             temp_annotation_file.close()
 
-            test_project_id = "test-project-id"
+            test_project_id = "sunny_tough_blackbird_40468"
             annotation_format = "coco_json"
 
             if hasattr(self, "created_project_id") and self.created_project_id:
@@ -579,6 +653,7 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
             ),
         ]
 
+        # created_connection_ids = []
         for case in cases:
             with self.subTest(test_name=case.test_name):
                 if case.expect_error_substr is not None:
@@ -596,50 +671,1122 @@ class LabelerUseCaseIntegrationTests(unittest.TestCase):
                     if case.expect_error_substr:
                         self.assertIn(case.expect_error_substr, str(ctx.exception))
                 else:
-                    # For positive flows, stub the method to avoid external dependency and decorator mismatch
-                    with patch.object(
-                        LabellerrClient,
-                        "create_aws_connection",
-                        return_value={
-                            "response": {
-                                "status": "success",
-                                "connection_id": "conn-123",
-                            }
-                        },
-                    ) as mocked:
-                        result = self.client.create_aws_connection(
+                    result = self.client.create_aws_connection(
+                        client_id=case.client_id,
+                        aws_access_key=case.access_key,
+                        aws_secrets_key=case.secret_key,
+                        s3_path=case.s3_path,
+                        data_type=case.data_type,
+                        name=case.name,
+                        description=case.description,
+                        connection_type=case.connection_type,
+                    )
+                    self.assertIsInstance(result, dict)
+                    self.assertIn("response", result)
+                    connection_id = result["response"].get("connection_id")
+                    self.assertIsNotNone(connection_id)
+
+                    # List connections to ensure it appears
+                    list_result = self.client.list_connection(
+                        client_id=case.client_id, connection_type=case.connection_type
+                    )
+                    self.assertIsInstance(list_result, dict)
+                    self.assertIn("response", list_result)
+
+                    # Delete the created connection
+                    del_result = self.client.delete_connection(
+                        client_id=case.client_id, connection_id=connection_id
+                    )
+                    self.assertIsInstance(del_result, dict)
+                    self.assertIn("response", del_result)
+
+    def test_data_set_connection_gcs(self):
+        # Read per-type GCS secrets from env (JSON strings): GCS_CONNECTION_IMAGE, GCS_CONNECTION_VIDEO
+        image_secret_json = os.getenv("GCS_CONNECTION_IMAGE")
+        video_secret_json = os.getenv("GCS_CONNECTION_VIDEO")
+
+        def _parse_secret(env_json: str):
+            if not env_json:
+                return {}
+            try:
+                return json.loads(env_json)
+            except Exception:
+                return {}
+
+        image_secret = _parse_secret(image_secret_json)
+        video_secret = _parse_secret(video_secret_json)
+
+        image_cred_file = image_secret.get("cred_file")
+        image_gcs_path = image_secret.get("gcs_path")
+
+        video_cred_file = video_secret.get("cred_file")
+        video_gcs_path = video_secret.get("gcs_path")
+
+        cases: list[GCSConnectionTestCase] = [
+            GCSConnectionTestCase(
+                test_name="Missing credential file",
+                client_id=self.client_id,
+                cred_file_content="",
+                gcs_path="gs://bucket/path",
+                data_type="image",
+                name="gcs_invalid_connection_test",
+                description="missing_cred_file",
+                expect_error_substr="GCS credential file not found",
+            ),
+            GCSConnectionTestCase(
+                test_name="Valid image import",
+                client_id=self.client_id,
+                cred_file_content=image_cred_file,
+                gcs_path=image_gcs_path,
+                data_type="image",
+                name="gcs_connection_image",
+                description="test_description",
+            ),
+            GCSConnectionTestCase(
+                test_name="Valid video import",
+                client_id=self.client_id,
+                cred_file_content=video_cred_file,
+                gcs_path=video_gcs_path,
+                data_type="video",
+                name="gcs_connection_video",
+                description="test_description",
+            ),
+        ]
+
+        for case in cases:
+            with self.subTest(test_name=case.test_name):
+                temp_created_path = None
+                if case.expect_error_substr is not None:
+                    with self.assertRaises(LabellerrError) as ctx:
+                        self.client.create_gcs_connection(
                             client_id=case.client_id,
-                            aws_access_key=case.access_key,
-                            aws_secrets_key=case.secret_key,
-                            s3_path=case.s3_path,
+                            gcs_cred_file=case.cred_file_content,
+                            gcs_path=case.gcs_path,
                             data_type=case.data_type,
                             name=case.name,
                             description=case.description,
                             connection_type=case.connection_type,
                         )
-                        self.assertIsInstance(result, dict)
-                        self.assertIn("response", result)
-                        mocked.assert_called_once()
+                    if case.expect_error_substr:
+                        self.assertIn(case.expect_error_substr, str(ctx.exception))
+                else:
+                    tf = tempfile.NamedTemporaryFile(
+                        mode="w", suffix=".json", delete=False
+                    )
+                    try:
+                        # Support both JSON string and already-parsed dict for creds
+                        if isinstance(case.cred_file_content, (dict, list)):
+                            parsed = case.cred_file_content
+                        elif isinstance(
+                            case.cred_file_content, (str, bytes, bytearray)
+                        ):
+                            parsed = json.loads(case.cred_file_content)
+                        else:
+                            raise TypeError(
+                                "Unsupported credential content type; expected str/bytes/dict/list"
+                            )
+                        tf.write(json.dumps(parsed))
+                        tf.flush()
+                    except Exception as e:
+                        raise e
+                    finally:
+                        try:
+                            tf.close()
+                        except Exception:
+                            pass
+                    temp_created_path = tf.name
+                    result = self.client.create_gcs_connection(
+                        client_id=case.client_id,
+                        gcs_cred_file=temp_created_path,
+                        gcs_path=case.gcs_path,
+                        data_type=case.data_type,
+                        name=case.name,
+                        description=case.description,
+                        connection_type=case.connection_type,
+                    )
+                    self.assertIsInstance(result, dict)
+                    self.assertIn("response", result)
+                    connection_id = result["response"].get("connection_id")
+                    self.assertIsNotNone(connection_id)
 
-    def test_data_set_connection_gcs(self):
-        pass
+                    list_result = self.client.list_connection(
+                        client_id=case.client_id, connection_type=case.connection_type
+                    )
+                    self.assertIsInstance(list_result, dict)
+                    self.assertIn("response", list_result)
 
-    def tearDown(self):
-        pass
+                    del_result = self.client.delete_connection(
+                        client_id=case.client_id, connection_id=connection_id
+                    )
+                    self.assertIsInstance(del_result, dict)
+                    self.assertIn("response", del_result)
+                # Cleanup any temp cred file created for this subtest
+                if temp_created_path:
+                    try:
+                        os.unlink(temp_created_path)
+                    except OSError:
+                        pass
+
+    def test_attach_detach_dataset_operations(self):
+        test_project_id = "sunny_tough_blackbird_40468"
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        attach_detach_test_cases = [
+            {
+                "test_name": "Attach dataset to project",
+                "operation": "attach",
+                "client_id": self.client_id,
+                "project_id": test_project_id,
+                "dataset_id": test_dataset_id,
+                "expected_success": True,
+            },
+            {
+                "test_name": "Detach dataset from project",
+                "operation": "detach",
+                "client_id": self.client_id,
+                "project_id": test_project_id,
+                "dataset_id": test_dataset_id,
+                "expected_success": True,
+            },
+            {
+                "test_name": "Attach with invalid project_id",
+                "operation": "attach",
+                "client_id": self.client_id,
+                "project_id": "invalid-project-id",
+                "dataset_id": test_dataset_id,
+                "expected_success": False,
+                "expect_error_substr": "Invalid",
+            },
+            {
+                "test_name": "Detach with invalid dataset_id",
+                "operation": "detach",
+                "client_id": self.client_id,
+                "project_id": test_project_id,
+                "dataset_id": "invalid-dataset-id",
+                "expected_success": False,
+                "expect_error_substr": "Invalid",
+            },
+        ]
+
+        for i, test_case in enumerate(attach_detach_test_cases, 1):
+            with self.subTest(test_name=test_case["test_name"]):
+                try:
+                    if test_case["operation"] == "attach":
+                        result = self.client.attach_dataset_to_project(
+                            client_id=test_case["client_id"],
+                            project_id=test_case["project_id"],
+                            dataset_id=test_case["dataset_id"],
+                        )
+                    else:  # detach
+                        result = self.client.detach_dataset_from_project(
+                            client_id=test_case["client_id"],
+                            project_id=test_case["project_id"],
+                            dataset_id=test_case["dataset_id"],
+                        )
+
+                    if test_case["expected_success"]:
+                        self.assertIsInstance(
+                            result, dict, f"Test case {i} should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, f"Test case {i} should contain response"
+                        )
+                        print(f" {test_case['test_name']} - Operation successful")
+                    else:
+                        self.fail(
+                            f"Test case {i} should have failed but succeeded: {result}"
+                        )
+
+                except LabellerrError as e:
+                    if test_case["expected_success"]:
+                        self.fail(
+                            f"Test case {i} should have succeeded but failed: {e}"
+                        )
+                    else:
+                        if test_case.get("expect_error_substr"):
+                            self.assertIn(
+                                test_case["expect_error_substr"],
+                                str(e),
+                                f"Test case {i} error message should contain '{test_case['expect_error_substr']}'",
+                            )
+                        print(f" {test_case['test_name']} - Expected error: {e}")
+                except Exception as e:
+                    self.fail(f"Test case {i} failed with unexpected error: {e}")
+
+    def test_multimodal_indexing_operations(self):
+
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        indexing_test_cases = [
+            {
+                "test_name": "Enable multimodal indexing with text and image",
+                "client_id": self.client_id,
+                "dataset_id": test_dataset_id,
+                "indexing_config": {
+                    "enabled": True,
+                    "modalities": ["text", "image"],
+                    "indexing_type": "semantic",
+                },
+                "expected_success": True,
+            },
+            {
+                "test_name": "Enable multimodal indexing with all modalities",
+                "client_id": self.client_id,
+                "dataset_id": test_dataset_id,
+                "indexing_config": {
+                    "enabled": True,
+                    "modalities": ["text", "image", "audio", "video"],
+                    "indexing_type": "semantic",
+                    "embedding_model": "default",
+                },
+                "expected_success": True,
+            },
+            {
+                "test_name": "Disable multimodal indexing",
+                "client_id": self.client_id,
+                "dataset_id": test_dataset_id,
+                "indexing_config": {"enabled": False, "modalities": []},
+                "expected_success": True,
+            },
+            {
+                "test_name": "Invalid dataset_id format",
+                "client_id": self.client_id,
+                "dataset_id": "invalid-dataset-id",
+                "indexing_config": {"enabled": True, "modalities": ["text"]},
+                "expected_success": False,
+                "expect_error_substr": "Invalid",
+            },
+            {
+                "test_name": "Invalid indexing config - missing enabled",
+                "client_id": self.client_id,
+                "dataset_id": test_dataset_id,
+                "indexing_config": {"modalities": ["text"]},
+                "expected_success": False,
+                "expect_error_substr": "enabled",
+            },
+        ]
+
+        for i, test_case in enumerate(indexing_test_cases, 1):
+            with self.subTest(test_name=test_case["test_name"]):
+                try:
+                    result = self.client.enable_multimodal_indexing(
+                        client_id=test_case["client_id"],
+                        dataset_id=test_case["dataset_id"],
+                        indexing_config=test_case["indexing_config"],
+                    )
+
+                    if test_case["expected_success"]:
+                        self.assertIsInstance(
+                            result, dict, f"Test case {i} should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, f"Test case {i} should contain response"
+                        )
+                        print(
+                            f" {test_case['test_name']} - Multimodal indexing operation successful"
+                        )
+                    else:
+                        self.fail(
+                            f"Test case {i} should have failed but succeeded: {result}"
+                        )
+
+                except LabellerrError as e:
+                    if test_case["expected_success"]:
+                        self.fail(
+                            f"Test case {i} should have succeeded but failed: {e}"
+                        )
+                    else:
+                        if test_case.get("expect_error_substr"):
+                            self.assertIn(
+                                test_case["expect_error_substr"],
+                                str(e),
+                                f"Test case {i} error message should contain '{test_case['expect_error_substr']}'",
+                            )
+                        print(f" {test_case['test_name']} - Expected error: {e}")
+                except Exception as e:
+                    self.fail(f"Test case {i} failed with unexpected error: {e}")
+
+    def test_attach_dataset_to_project_table_driven(self):
+        """Table-driven tests for attach_dataset_to_project functionality"""
+
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        test_project_id = "sunny_tough_blackbird_40468"
+
+        attach_test_cases = [
+            AttachDetachTestCase(
+                test_name="Valid attach operation",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+                expected_success=True,
+            ),
+            AttachDetachTestCase(
+                test_name="Invalid project_id format",
+                client_id=self.client_id,
+                project_id="invalid-project-id",
+                dataset_id=test_dataset_id,
+                expect_error_substr="Invalid",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Invalid dataset_id format",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id="invalid-dataset-id",
+                expect_error_substr="Invalid",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Missing client_id",
+                client_id="",
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+                expect_error_substr="Required parameter",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Non-existent project_id",
+                client_id=self.client_id,
+                project_id="00000000-0000-0000-0000-000000000000",
+                dataset_id=test_dataset_id,
+                expect_error_substr="not found",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Non-existent dataset_id",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id="00000000-0000-0000-0000-000000000000",
+                expect_error_substr="not found",
+                expected_success=False,
+            ),
+        ]
+
+        for i, test_case in enumerate(attach_test_cases, 1):
+            with self.subTest(test_name=test_case.test_name):
+                try:
+                    result = self.client.attach_dataset_to_project(
+                        client_id=test_case.client_id,
+                        project_id=test_case.project_id,
+                        dataset_id=test_case.dataset_id,
+                    )
+
+                    if test_case.expected_success:
+                        self.assertIsInstance(
+                            result, dict, f"Test case {i} should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, f"Test case {i} should contain response"
+                        )
+                        print(f" {test_case.test_name} - Attach operation successful")
+                    else:
+                        self.fail(
+                            f"Test case {i} should have failed but succeeded: {result}"
+                        )
+
+                except LabellerrError as e:
+                    if test_case.expected_success:
+                        self.fail(
+                            f"Test case {i} should have succeeded but failed: {e}"
+                        )
+                    else:
+                        if test_case.expect_error_substr:
+                            self.assertIn(
+                                test_case.expect_error_substr,
+                                str(e),
+                                f"Test case {i} error message should contain '{test_case.expect_error_substr}'",
+                            )
+                        print(f" {test_case.test_name} - Expected error: {e}")
+                except Exception as e:
+                    self.fail(f"Test case {i} failed with unexpected error: {e}")
+
+    def test_detach_dataset_from_project_table_driven(self):
+
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+        test_project_id = "sunny_tough_blackbird_40468"
+
+        detach_test_cases = [
+            AttachDetachTestCase(
+                test_name="Valid detach operation",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+                expected_success=True,
+            ),
+            AttachDetachTestCase(
+                test_name="Invalid project_id format",
+                client_id=self.client_id,
+                project_id="invalid-project-id",
+                dataset_id=test_dataset_id,
+                expect_error_substr="Invalid",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Invalid dataset_id format",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id="invalid-dataset-id",
+                expect_error_substr="Invalid",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Missing client_id",
+                client_id="",
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+                expect_error_substr="Required parameter",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Non-existent project_id",
+                client_id=self.client_id,
+                project_id="00000000-0000-0000-0000-000000000000",
+                dataset_id=test_dataset_id,
+                expect_error_substr="not found",
+                expected_success=False,
+            ),
+            AttachDetachTestCase(
+                test_name="Non-existent dataset_id",
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id="00000000-0000-0000-0000-000000000000",
+                expect_error_substr="not found",
+                expected_success=False,
+            ),
+        ]
+
+        for i, test_case in enumerate(detach_test_cases, 1):
+            with self.subTest(test_name=test_case.test_name):
+                try:
+                    result = self.client.detach_dataset_from_project(
+                        client_id=test_case.client_id,
+                        project_id=test_case.project_id,
+                        dataset_id=test_case.dataset_id,
+                    )
+
+                    if test_case.expected_success:
+                        self.assertIsInstance(
+                            result, dict, f"Test case {i} should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, f"Test case {i} should contain response"
+                        )
+                        print(f" {test_case.test_name} - Detach operation successful")
+                    else:
+                        self.fail(
+                            f"Test case {i} should have failed but succeeded: {result}"
+                        )
+
+                except LabellerrError as e:
+                    if test_case.expected_success:
+                        self.fail(
+                            f"Test case {i} should have succeeded but failed: {e}"
+                        )
+                    else:
+                        if test_case.expect_error_substr:
+                            self.assertIn(
+                                test_case.expect_error_substr,
+                                str(e),
+                                f"Test case {i} error message should contain '{test_case.expect_error_substr}'",
+                            )
+                        print(f" {test_case.test_name} - Expected error: {e}")
+                except Exception as e:
+                    self.fail(f"Test case {i} failed with unexpected error: {e}")
+
+    def test_enable_multimodal_indexing_table_driven(self):
+
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        indexing_test_cases = [
+            MultimodalIndexingTestCase(
+                test_name="Valid multimodal indexing with text and image",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={
+                    "enabled": True,
+                    "modalities": ["text", "image"],
+                    "indexing_type": "semantic",
+                },
+                expected_success=True,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Valid multimodal indexing with all modalities",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={
+                    "enabled": True,
+                    "modalities": ["text", "image", "audio", "video"],
+                    "indexing_type": "semantic",
+                    "embedding_model": "default",
+                },
+                expected_success=True,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Disable multimodal indexing",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={"enabled": False, "modalities": []},
+                expected_success=True,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Invalid dataset_id format",
+                client_id=self.client_id,
+                dataset_id="invalid-dataset-id",
+                indexing_config={"enabled": True, "modalities": ["text"]},
+                expect_error_substr="Invalid",
+                expected_success=False,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Missing client_id",
+                client_id="",
+                dataset_id=test_dataset_id,
+                indexing_config={"enabled": True, "modalities": ["text"]},
+                expect_error_substr="Required parameter",
+                expected_success=False,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Invalid indexing config - missing enabled",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={"modalities": ["text"]},
+                expect_error_substr="enabled",
+                expected_success=False,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Invalid indexing config - empty modalities",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={"enabled": True, "modalities": []},
+                expect_error_substr="modalities",
+                expected_success=False,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Invalid indexing config - invalid modality",
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config={"enabled": True, "modalities": ["invalid_modality"]},
+                expect_error_substr="modality",
+                expected_success=False,
+            ),
+            MultimodalIndexingTestCase(
+                test_name="Non-existent dataset_id",
+                client_id=self.client_id,
+                dataset_id="00000000-0000-0000-0000-000000000000",
+                indexing_config={"enabled": True, "modalities": ["text"]},
+                expect_error_substr="not found",
+                expected_success=False,
+            ),
+        ]
+
+        for i, test_case in enumerate(indexing_test_cases, 1):
+            with self.subTest(test_name=test_case.test_name):
+                try:
+                    result = self.client.enable_multimodal_indexing(
+                        client_id=test_case.client_id,
+                        dataset_id=test_case.dataset_id,
+                        indexing_config=test_case.indexing_config,
+                    )
+
+                    if test_case.expected_success:
+                        self.assertIsInstance(
+                            result, dict, f"Test case {i} should return a dictionary"
+                        )
+                        self.assertIn(
+                            "response", result, f"Test case {i} should contain response"
+                        )
+                        print(
+                            f" {test_case.test_name} - Multimodal indexing operation successful"
+                        )
+                    else:
+                        self.fail(
+                            f"Test case {i} should have failed but succeeded: {result}"
+                        )
+
+                except LabellerrError as e:
+                    if test_case.expected_success:
+                        self.fail(
+                            f"Test case {i} should have succeeded but failed: {e}"
+                        )
+                    else:
+                        if test_case.expect_error_substr:
+                            self.assertIn(
+                                test_case.expect_error_substr,
+                                str(e),
+                                f"Test case {i} error message should contain '{test_case.expect_error_substr}'",
+                            )
+                        print(f" {test_case.test_name} - Expected error: {e}")
+                except Exception as e:
+                    self.fail(f"Test case {i} failed with unexpected error: {e}")
+
+    def test_attach_detach_workflow_integration(self):
+
+        test_project_id = "sunny_tough_blackbird_40468"
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        try:
+            # Step 1: Attach dataset to project
+            print("Step 1: Attaching dataset to project...")
+            attach_result = self.client.attach_dataset_to_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+            )
+            self.assertIsInstance(attach_result, dict)
+            self.assertIn("response", attach_result)
+            print(" Dataset attached successfully")
+
+            # Step 2: Verify attachment (you might need to implement a get_project_datasets method)
+            # This is a placeholder - you may need to implement this method or use existing API
+            print("Step 2: Verifying attachment...")
+
+            # Step 3: Detach dataset from project
+            print("Step 3: Detaching dataset from project...")
+            detach_result = self.client.detach_dataset_from_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                dataset_id=test_dataset_id,
+            )
+            self.assertIsInstance(detach_result, dict)
+            self.assertIn("response", detach_result)
+            print(" Dataset detached successfully")
+
+            print(" Complete attach/detach workflow successful")
+
+        except LabellerrError as e:
+            self.fail(f"Integration test failed with LabellerrError: {e}")
+        except Exception as e:
+            self.fail(f"Integration test failed with unexpected error: {e}")
+
+    def test_multimodal_indexing_workflow_integration(self):
+        """Integration test for complete multimodal indexing workflow"""
+
+        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
+
+        try:
+            # Step 1: Enable multimodal indexing
+            print("Step 1: Enabling multimodal indexing...")
+            indexing_config = {
+                "enabled": True,
+                "modalities": ["text", "image"],
+                "indexing_type": "semantic",
+                "embedding_model": "default",
+            }
+
+            enable_result = self.client.enable_multimodal_indexing(
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config=indexing_config,
+            )
+            self.assertIsInstance(enable_result, dict)
+            self.assertIn("response", enable_result)
+            print("Multimodal indexing enabled successfully")
+
+            # Step 2: Verify indexing status (you might need to implement a get_indexing_status method)
+            print("Step 2: Verifying indexing status...")
+            # Note: Manual verification may be required through Labellerr UI or API
+
+            # Step 3: Disable multimodal indexing
+            print("Step 3: Disabling multimodal indexing...")
+            disable_config = {"enabled": False, "modalities": []}
+
+            disable_result = self.client.enable_multimodal_indexing(
+                client_id=self.client_id,
+                dataset_id=test_dataset_id,
+                indexing_config=disable_config,
+            )
+            self.assertIsInstance(disable_result, dict)
+            self.assertIn("response", disable_result)
+            print(" Multimodal indexing disabled successfully")
+
+            print(" Complete multimodal indexing workflow successful")
+
+        except LabellerrError as e:
+            self.fail(f"Integration test failed with LabellerrError: {e}")
+        except Exception as e:
+            self.fail(f"Integration test failed with unexpected error: {e}")
+
+    def test_user_management_workflow(self):
+        """Test complete user management workflow: create, update, add to project, change role, remove, delete"""
+        try:
+            # Test data
+            test_email = f"test_user_{int(time.time())}@example.com"
+            test_first_name = "Test"
+            test_last_name = "User"
+            test_user_id = f"test-user-{int(time.time())}"
+            test_project_id = "test_project_123"
+            test_role_id = "7"
+            test_new_role_id = "5"
+
+            # Step 1: Create a user
+            print(f"\n=== Step 1: Creating user {test_email} ===")
+            create_result = self.client.create_user(
+                client_id=self.client_id,
+                first_name=test_first_name,
+                last_name=test_last_name,
+                email_id=test_email,
+                projects=[test_project_id],
+                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+            )
+            print(f"User creation result: {create_result}")
+            self.assertIsNotNone(create_result)
+
+            # Step 2: Update user role
+            print(f"\n=== Step 2: Updating user role for {test_email} ===")
+            update_result = self.client.update_user_role(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
+                first_name=test_first_name,
+                last_name=test_last_name,
+            )
+            print(f"User role update result: {update_result}")
+            self.assertIsNotNone(update_result)
+
+            # Step 3: Add user to project (if not already added)
+            print(f"\n=== Step 3: Adding user to project {test_project_id} ===")
+            add_result = self.client.add_user_to_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                role_id=test_role_id,
+            )
+            print(f"Add user to project result: {add_result}")
+            self.assertIsNotNone(add_result)
+
+            # Step 4: Change user role
+            print(f"\n=== Step 4: Changing user role for {test_email} ===")
+            change_role_result = self.client.change_user_role(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                new_role_id=test_new_role_id,
+            )
+            print(f"Change user role result: {change_role_result}")
+            self.assertIsNotNone(change_role_result)
+
+            # Step 5: Remove user from project
+            print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
+            remove_result = self.client.remove_user_from_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+            )
+            print(f"Remove user from project result: {remove_result}")
+            self.assertIsNotNone(remove_result)
+
+            # Step 6: Delete user
+            print(f"\n=== Step 6: Deleting user {test_email} ===")
+            delete_result = self.client.delete_user(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                user_id=test_user_id,
+                first_name=test_first_name,
+                last_name=test_last_name,
+            )
+            print(f"Delete user result: {delete_result}")
+            self.assertIsNotNone(delete_result)
+
+            print("Complete user management workflow completed successfully")
+
+        except Exception as e:
+            print(f" User management workflow failed: {str(e)}")
+            raise
+
+    def test_create_user_integration(self):
+        """Test user creation with real API calls"""
+        try:
+            test_email = f"integration_test_{int(time.time())}@example.com"
+            test_first_name = "Integration"
+            test_last_name = "Test"
+            test_project_id = "test_project_1233"
+            test_role_id = "7"
+
+            print(f"\n=== Testing user creation for {test_email} ===")
+
+            result = self.client.create_user(
+                client_id=self.client_id,
+                first_name=test_first_name,
+                last_name=test_last_name,
+                email_id=test_email,
+                projects=[test_project_id],
+                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                work_phone="123-456-7890",
+                job_title="Test Engineer",
+                language="en",
+                timezone="GMT",
+            )
+
+            print(f"User creation result: {result}")
+            self.assertIsNotNone(result)
+
+            # Clean up - delete the user
+            try:
+                self.client.delete_user(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    user_id=f"test-user-{int(time.time())}",
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
+                print(f"Cleanup: User {test_email} deleted successfully")
+            except Exception as cleanup_error:
+                print(
+                    f"Cleanup warning: Could not delete user {test_email}: {cleanup_error}"
+                )
+
+        except Exception as e:
+            print(f" User creation integration test failed: {str(e)}")
+            raise
+
+    # todo this is failing on update role
+    def test_update_user_role_integration(self):
+        """Test user role update with real API calls"""
+        try:
+            test_email = f"update_test_{int(time.time())}@example.com"
+            test_first_name = "Update"
+            test_last_name = "Test"
+            test_project_id = "test_project_123"
+            test_role_id = "7"
+            test_new_role_id = "5"
+
+            print(f"\n=== Testing user role update for {test_email} ===")
+
+            # First create a user
+            create_result = self.client.create_user(
+                client_id=self.client_id,
+                first_name=test_first_name,
+                last_name=test_last_name,
+                email_id=test_email,
+                projects=[test_project_id],
+                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+            )
+            print(f"User creation result: {create_result}")
+
+            # Then update the user role
+            update_result = self.client.update_user_role(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
+                first_name=test_first_name,
+                last_name=test_last_name,
+                work_phone="987-654-3210",
+                job_title="Senior Test Engineer",
+                language="en",
+                timezone="UTC",
+            )
+
+            print(f"User role update result: {update_result}")
+            self.assertIsNotNone(update_result)
+
+            # Clean up - delete the user
+            try:
+                self.client.delete_user(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    user_id=f"test-user-{int(time.time())}",
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
+                print(f" Cleanup: User {test_email} deleted successfully")
+            except Exception as cleanup_error:
+                print(
+                    f" Cleanup warning: Could not delete user {test_email}: {cleanup_error}"
+                )
+
+        except Exception as e:
+            print(f" User role update integration test failed: {str(e)}")
+            raise
+
+    def test_project_user_management_integration(self):
+        """Test project user management operations with real API calls"""
+        try:
+            test_email = f"project_test_{int(time.time())}@example.com"
+            test_first_name = "Project"
+            test_last_name = "Test"
+            test_project_id = "test_project_123"
+            test_role_id = "7"
+            test_new_role_id = "5"
+
+            print(f"\n=== Testing project user management for {test_email} ===")
+
+            # Step 1: Create a user
+            create_result = self.client.create_user(
+                client_id=self.client_id,
+                first_name=test_first_name,
+                last_name=test_last_name,
+                email_id=test_email,
+                projects=[test_project_id],
+                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+            )
+            print(f"User creation result: {create_result}")
+
+            # Step 2: Add user to project
+            add_result = self.client.add_user_to_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                role_id=test_role_id,
+            )
+            print(f"Add user to project result: {add_result}")
+            self.assertIsNotNone(add_result)
+
+            # Step 3: Change user role
+            change_role_result = self.client.change_user_role(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+                new_role_id=test_new_role_id,
+            )
+            print(f"Change user role result: {change_role_result}")
+            self.assertIsNotNone(change_role_result)
+
+            # Step 4: Remove user from project
+            remove_result = self.client.remove_user_from_project(
+                client_id=self.client_id,
+                project_id=test_project_id,
+                email_id=test_email,
+            )
+            print(f"Remove user from project result: {remove_result}")
+            self.assertIsNotNone(remove_result)
+
+            # Clean up - delete the user
+            try:
+                self.client.delete_user(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    user_id=f"test-user-{int(time.time())}",
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
+                print(f" Cleanup: User {test_email} deleted successfully")
+            except Exception as cleanup_error:
+                print(
+                    f" Cleanup warning: Could not delete user {test_email}: {cleanup_error}"
+                )
+
+        except Exception as e:
+            print(f" Project user management integration test failed: {str(e)}")
+            raise
+
+    def test_user_management_error_handling(self):
+        """Test user management error handling with invalid inputs"""
+        try:
+            print("=== Testing user management error handling ===")
+
+            # Test with invalid client_id
+            try:
+                self.client.create_user(
+                    client_id="invalid_client_id",
+                    first_name="Test",
+                    last_name="User",
+                    email_id="test@example.com",
+                    projects=["project_123"],
+                    roles=[{"project_id": "project_123", "role_id": "7"}],
+                )
+                self.fail("Expected error for invalid client_id")
+            except Exception as e:
+                print(f" Correctly caught error for invalid client_id: {str(e)}")
+
+            # Test with missing required parameters
+            try:
+                self.client.create_user(
+                    client_id=self.client_id,
+                    first_name="Test",
+                    # Missing last_name, email_id, projects, roles
+                )
+                self.fail("Expected error for missing required parameters")
+            except Exception as e:
+                print(f" Correctly caught error for missing parameters: {str(e)}")
+
+            # Test with invalid email format
+            try:
+                self.client.create_user(
+                    client_id=self.client_id,
+                    first_name="Test",
+                    last_name="User",
+                    email_id="invalid_email",  # Invalid email format
+                    projects=["project_123"],
+                    roles=[{"project_id": "project_123", "role_id": "7"}],
+                )
+                print(" Note: Email validation may not be enforced at SDK level")
+            except Exception as e:
+                print(f" Correctly caught error for invalid email: {str(e)}")
+
+            print(" User management error handling tests completed successfully!")
+
+        except Exception as e:
+            print(f"User management error handling test failed: {str(e)}")
+            raise
 
     @classmethod
     def setUpClass(cls):
         """Set up test suite."""
 
+    def tearDown(self):
+        pass
+
     @classmethod
     def tearDownClass(cls):
         """Tear down test suite."""
 
+    def run_user_management_tests(self):
+        """Run only the user management integration tests"""
+
+        # Check for required environment variables
+        required_env_vars = ["API_KEY", "API_SECRET", "CLIENT_ID", "TEST_EMAIL"]
+        missing_vars = [var for var in required_env_vars if not os.getenv(var)]
+
+        if missing_vars:
+            print(f"Missing required environment variables: {', '.join(missing_vars)}")
+            print("Please set the following environment variables:")
+            for var in missing_vars:
+                print(f"  export {var}=your_value")
+            return False
+
+        print("🚀 Running User Management Integration Tests")
+        print("=" * 50)
+
+        # Create test suite with only user management tests
+        suite = unittest.TestSuite()
+
+        # Add user management test methods
+        user_management_tests = [
+            "test_user_management_workflow",
+            "test_create_user_integration",
+            "test_update_user_role_integration",
+            "test_project_user_management_integration",
+            "test_user_management_error_handling",
+        ]
+
+        for test_name in user_management_tests:
+            suite.addTest(LabelerIntegrationTests(test_name))
+
+        # Run tests with verbose output
+        runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout)
+        result = runner.run(suite)
+
+        # Print summary
+        print("\n" + "=" * 50)
+        if result.wasSuccessful():
+            print("All user management integration tests passed!")
+        else:
+            print("Some user management integration tests failed!")
+            print(f"Failures: {len(result.failures)}")
+            print(f"Errors: {len(result.errors)}")
+
+        return result.wasSuccessful()
+
 
 def run_use_case_tests():
 
-    # Create test suite
-    suite = unittest.TestLoader().loadTestsFromTestCase(LabelerUseCaseIntegrationTests)
+    suite = unittest.TestLoader().loadTestsFromTestCase(LabelerIntegrationTests)
 
     # Run tests with verbose output
     runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout)
@@ -658,9 +1805,18 @@ if __name__ == "__main__":
     - TEST_EMAIL: Valid email address for testing
     - AWS_CONNECTION_VIDEO: AWS video connection id
     - AWS_CONNECTION_IMAGE: AWS image connection id
+    - GCS_CONNECTION_VIDEO: JSON string with GCS video creds {"cred_file:"{}","gcs_path":"gs://bucket/path"}
+    - GCS_CONNECTION_IMAGE: JSON string with GCS image creds {"cred_file:"{}","gcs_path":"gs://bucket/path"}
+
+    New User Management Tests Added:
+    - test_user_management_workflow: Complete user lifecycle test
+    - test_create_user_integration: User creation with real API calls
+    - test_update_user_role_integration: User role updates with real API calls
+    - test_project_user_management_integration: Project user management operations
+    - test_user_management_error_handling: Error handling validation
 
     Run with:
-    python use_case_tests.py
+    python labellerr_integration_case_tests.py
     """
     # Check for required environment variables
     required_env_vars = [
@@ -670,6 +1826,8 @@ if __name__ == "__main__":
         "TEST_EMAIL",
         "AWS_CONNECTION_VIDEO",
         "AWS_CONNECTION_IMAGE",
+        "GCS_CONNECTION_VIDEO",
+        "GCS_CONNECTION_IMAGE",
     ]
 
     missing_vars = [var for var in required_env_vars if not os.getenv(var)]

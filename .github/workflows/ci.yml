@@ -17,6 +17,8 @@ jobs:
       TEST_EMAIL: ${{ secrets.TEST_EMAIL }}
       AWS_CONNECTION_IMAGE: ${{ secrets.AWS_CONNECTION_IMAGE }}
       AWS_CONNECTION_VIDEO: ${{ secrets.AWS_CONNECTION_VIDEO }}
+      GCS_CONNECTION_IMAGE: ${{ secrets.GCS_CONNECTION_IMAGE }}
+      GCS_CONNECTION_VIDEO: ${{ secrets.GCS_CONNECTION_VIDEO }}
 
     steps:
       - name: Checkout

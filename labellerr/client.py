@@ -11,27 +11,13 @@ from multiprocessing import cpu_count
 from typing import Any, Dict
 
 import requests
+from pydantic import ValidationError
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from . import client_utils, constants, gcs, utils
+from . import client_utils, constants, gcs, schemas, utils
 from .exceptions import LabellerrError
-from .validators import (
-    handle_api_errors,
-    log_method_call,
-    validate_client_id,
-    validate_data_type,
-    validate_dataset_ids,
-    validate_file_list_or_string,
-    validate_list_not_empty,
-    validate_not_none,
-    validate_questions_structure,
-    validate_required,
-    validate_rotations_structure,
-    validate_scope,
-    validate_string_type,
-    validate_uuid_format,
-)
+from .validators import handle_api_errors, log_method_call
 
 create_dataset_parameters: Dict[str, Any] = {}
 
@@ -260,16 +246,8 @@ class LabellerrClient:
             logging.exception(f"Error getting direct upload url: {response.text} {e}")
             raise
 
-    @validate_required(
-        [
-            "client_id",
-            "aws_access_key",
-            "aws_secrets_key",
-            "s3_path",
-            "data_type",
-            "name",
-        ]
-    )
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_aws_connection(
         self,
         client_id: str,
@@ -293,31 +271,45 @@ class LabellerrClient:
         :param connection_type: The connection type.
 
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.AWSConnectionParams(
+                client_id=client_id,
+                aws_access_key=aws_access_key,
+                aws_secrets_key=aws_secrets_key,
+                s3_path=s3_path,
+                data_type=data_type,
+                name=name,
+                description=description,
+                connection_type=connection_type,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
 
         request_uuid = str(uuid.uuid4())
         test_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={client_id}&uuid={request_uuid}"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={"email_id": self.api_key},
         )
 
         aws_credentials_json = json.dumps(
             {
-                "access_key_id": aws_access_key,
-                "secret_access_key": aws_secrets_key,
+                "access_key_id": params.aws_access_key,
+                "secret_access_key": params.aws_secrets_key,
             }
         )
 
         test_request = {
             "credentials": aws_credentials_json,
             "connector": "aws",
-            "path": s3_path,
-            "connection_type": connection_type,
-            "data_type": data_type,
+            "path": params.s3_path,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
         }
 
         test_resp = self._make_request(
@@ -327,16 +319,16 @@ class LabellerrClient:
 
         create_url = (
             f"{constants.BASE_URL}/connectors/connections/create"
-            f"?uuid={request_uuid}&client_id={client_id}"
+            f"?uuid={request_uuid}&client_id={params.client_id}"
         )
 
         create_request = {
-            "client_id": client_id,
+            "client_id": params.client_id,
             "connector": "aws",
-            "name": name,
-            "description": description,
-            "connection_type": connection_type,
-            "data_type": data_type,
+            "name": params.name,
+            "description": params.description,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
             "credentials": aws_credentials_json,
         }
 
@@ -346,7 +338,8 @@ class LabellerrClient:
 
         return self._handle_response(create_resp, request_uuid)
 
-    @validate_required(["client_id", "gcs_path", "data_type", "name"])
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def create_gcs_connection(
         self,
         client_id: str,
@@ -370,32 +363,44 @@ class LabellerrClient:
         :param credentials: Credential type (default: svc_account_json)
         :return: Parsed JSON response
         """
-        if not os.path.exists(gcs_cred_file):
-            raise LabellerrError(f"GCS credential file not found: {gcs_cred_file}")
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.GCSConnectionParams(
+                client_id=client_id,
+                gcs_cred_file=gcs_cred_file,
+                gcs_path=gcs_path,
+                data_type=data_type,
+                name=name,
+                description=description,
+                connection_type=connection_type,
+                credentials=credentials,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
 
         request_uuid = str(uuid.uuid4())
         test_url = (
             f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={client_id}&uuid={request_uuid}"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={"email_id": self.api_key},
         )
 
         test_request = {
-            "credentials": credentials,
+            "credentials": params.credentials,
             "connector": "gcs",
-            "path": gcs_path,
-            "connection_type": connection_type,
-            "data_type": data_type,
+            "path": params.gcs_path,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
         }
 
-        with open(gcs_cred_file, "rb") as fp:
+        with open(params.gcs_cred_file, "rb") as fp:
             test_files = {
                 "attachment_files": (
-                    os.path.basename(gcs_cred_file),
+                    os.path.basename(params.gcs_cred_file),
                     fp,
                     "application/json",
                 )
@@ -409,23 +414,23 @@ class LabellerrClient:
         # use same uuid to track request
         create_url = (
             f"{constants.BASE_URL}/connectors/connections/create"
-            f"?uuid={request_uuid}&client_id={client_id}"
+            f"?uuid={request_uuid}&client_id={params.client_id}"
         )
 
         create_request = {
-            "client_id": client_id,
+            "client_id": params.client_id,
             "connector": "gcs",
-            "name": name,
-            "description": description,
-            "connection_type": connection_type,
-            "data_type": data_type,
-            "credentials": credentials,
+            "name": params.name,
+            "description": params.description,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
+            "credentials": params.credentials,
         }
 
-        with open(gcs_cred_file, "rb") as fp:
+        with open(params.gcs_cred_file, "rb") as fp:
             create_files = {
                 "attachment_files": (
-                    os.path.basename(gcs_cred_file),
+                    os.path.basename(params.gcs_cred_file),
                     fp,
                     "application/json",
                 )
@@ -458,7 +463,8 @@ class LabellerrClient:
 
         return self._handle_response(list_connection_response, request_uuid)
 
-    @validate_required(["client_id", "connection_id"])
+    @log_method_call(include_params=False)
+    @handle_api_errors
     def delete_connection(self, client_id: str, connection_id: str):
         """
         Deletes a connector connection by ID.
@@ -467,21 +473,28 @@ class LabellerrClient:
         :param connection_id: The ID of the connection to delete.
         :return: Parsed JSON response
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.DeleteConnectionParams(
+                client_id=client_id, connection_id=connection_id
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         request_uuid = str(uuid.uuid4())
         delete_url = (
             f"{constants.BASE_URL}/connectors/connections/delete"
-            f"?client_id={client_id}&uuid={request_uuid}"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "email_id": self.api_key,
             },
         )
 
-        payload = json.dumps({"connection_id": connection_id})
+        payload = json.dumps({"connection_id": params.connection_id})
 
         delete_response = self._make_request(
             "POST", delete_url, headers=headers, data=payload
@@ -527,11 +540,6 @@ class LabellerrClient:
 
         return response
 
-    # TODO: explore https://docs.pydantic.dev/latest/api/base_model/#pydantic.BaseModel and migrate these
-    # Decorator for api error
-    @validate_required(["client_id", "files_list"])
-    @validate_client_id("client_id")
-    @validate_file_list_or_string(["files_list"])
     @log_method_call(include_params=False)
     @handle_api_errors
     def upload_files(self, client_id, files_list):
@@ -543,6 +551,16 @@ class LabellerrClient:
         :return: The connection ID from the API.
         :raises LabellerrError: If the upload fails.
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.UploadFilesParams(
+                client_id=client_id, files_list=files_list
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
+        # Use validated files_list from Pydantic
+        files_list = params.files_list
         response = self.__process_batch(client_id, files_list)
         connection_id = response["response"]["temporary_connection_id"]
         return connection_id
@@ -591,6 +609,52 @@ class LabellerrClient:
         except LabellerrError as e:
             logging.error(f"Project rotation update config failed: {e}")
             raise
+
+    def _setup_cloud_connector(
+        self, connector_type: str, client_id: str, connector_config: dict
+    ):
+        """
+        Internal method to setup cloud connector (AWS or GCP).
+
+        :param connector_type: Type of connector ('aws' or 'gcp')
+        :param client_id: The ID of the client
+        :param connector_config: Configuration dictionary for the connector
+        :return: connection_id from the created connection
+        """
+        if connector_type == "aws":
+            # AWS connector configuration
+            result = self.create_aws_connection(
+                client_id=client_id,
+                aws_access_key=connector_config.get("aws_access_key"),
+                aws_secrets_key=connector_config.get("aws_secrets_key"),
+                s3_path=connector_config.get("s3_path"),
+                data_type=connector_config.get("data_type"),
+                name=connector_config.get("name", f"aws_connector_{int(time.time())}"),
+                description=connector_config.get(
+                    "description", "Auto-created AWS connector"
+                ),
+                connection_type=connector_config.get("connection_type", "import"),
+            )
+        elif connector_type == "gcp":
+            # GCP connector configuration
+            result = self.create_gcs_connection(
+                client_id=client_id,
+                gcs_cred_file=connector_config.get("gcs_cred_file"),
+                gcs_path=connector_config.get("gcs_path"),
+                data_type=connector_config.get("data_type"),
+                name=connector_config.get("name", f"gcs_connector_{int(time.time())}"),
+                description=connector_config.get(
+                    "description", "Auto-created GCS connector"
+                ),
+                connection_type=connector_config.get("connection_type", "import"),
+            )
+        else:
+            raise LabellerrError(f"Unsupported cloud connector type: {connector_type}")
+
+        # Extract connection_id from the response
+        if isinstance(result, dict) and "response" in result:
+            return result["response"].get("connection_id")
+        return None
 
     def create_dataset(
         self,
@@ -708,9 +772,6 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
-    @validate_required(["client_id", "dataset_id"])
-    @validate_client_id("client_id")
-    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def delete_dataset(self, client_id, dataset_id):
@@ -722,45 +783,116 @@ class LabellerrClient:
         :return: Dictionary containing deletion status
         :raises LabellerrError: If the deletion fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.DeleteDatasetParams(
+                client_id=client_id, dataset_id=dataset_id
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
         response = self._make_request("DELETE", url, headers=headers)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "dataset_id", "indexing_config"])
-    @validate_client_id("client_id")
-    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
-    def enable_multimodal_indexing(self, client_id, dataset_id, indexing_config):
+    def enable_multimodal_indexing(self, client_id, dataset_id, is_multimodal=True):
         """
-        Enables multimodal indexing for an existing dataset.
+        Enables or disables multimodal indexing for an existing dataset.
 
         :param client_id: The ID of the client
         :param dataset_id: The ID of the dataset
-        :param indexing_config: Configuration for multimodal indexing
-                               Example: {"enabled": True, "modalities": ["text", "image"]}
+        :param is_multimodal: Boolean flag to enable (True) or disable (False) multimodal indexing
         :return: Dictionary containing indexing status
         :raises LabellerrError: If the operation fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.EnableMultimodalIndexingParams(
+                client_id=client_id,
+                dataset_id=dataset_id,
+                is_multimodal=is_multimodal,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{dataset_id}/indexing?client_id={client_id}&uuid={unique_id}"
+        url = (
+            f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
+        )
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload = json.dumps(indexing_config)
+        payload = json.dumps(
+            {
+                "dataset_id": str(params.dataset_id),
+                "client_id": params.client_id,
+                "is_multimodal": params.is_multimodal,
+            }
+        )
+
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "dataset_id"])
-    @validate_client_id("client_id")
-    @validate_uuid_format("project_id")
-    @validate_uuid_format("dataset_id")
+    @log_method_call(include_params=False)
+    @handle_api_errors
+    def get_multimodal_indexing_status(self, client_id, dataset_id):
+        """
+        Retrieves the current multimodal indexing status for a dataset.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset
+        :return: Dictionary containing indexing status and configuration
+        :raises LabellerrError: If the operation fails
+        """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.GetMultimodalIndexingStatusParams(
+                client_id=client_id,
+                dataset_id=dataset_id,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
+        url = (
+            f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
+        )
+        headers = self._build_headers(
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        payload = json.dumps(
+            {
+                "dataset_id": str(params.dataset_id),
+                "client_id": params.client_id,
+                "get_status": True,
+            }
+        )
+
+        response = self._make_request("POST", url, headers=headers, data=payload)
+        result = self._handle_response(response)
+
+        # If the response is null or empty, provide a meaningful default status
+        if result.get("response") is None:
+            result["response"] = {
+                "enabled": False,
+                "modalities": [],
+                "indexing_type": None,
+                "status": "not_configured",
+                "message": "Multimodal indexing has not been configured for this dataset",
+            }
+
+        return result
+
     @log_method_call(include_params=False)
     @handle_api_errors
     def attach_dataset_to_project(self, client_id, project_id, dataset_id):
@@ -773,20 +905,23 @@ class LabellerrClient:
         :return: Dictionary containing attachment status
         :raises LabellerrError: If the operation fails
         """
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/attach?client_id={client_id}&uuid={unique_id}"
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.AttachDatasetParams(
+                client_id=client_id, project_id=project_id, dataset_id=dataset_id
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
+        url = f"{constants.BASE_URL}/projects/attach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload = json.dumps({"dataset_id": dataset_id})
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        response = self._make_request("POST", url, headers=headers)
+        return self._handle_response(response)
 
-    @validate_required(["client_id", "project_id", "dataset_id"])
-    @validate_client_id("client_id")
-    @validate_uuid_format("project_id")
-    @validate_uuid_format("dataset_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def detach_dataset_from_project(self, client_id, project_id, dataset_id):
@@ -799,21 +934,23 @@ class LabellerrClient:
         :return: Dictionary containing detachment status
         :raises LabellerrError: If the operation fails
         """
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/{project_id}/datasets/detach?client_id={client_id}&uuid={unique_id}"
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.DetachDatasetParams(
+                client_id=client_id, project_id=project_id, dataset_id=dataset_id
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
+        url = f"{constants.BASE_URL}/projects/detach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload = json.dumps({"dataset_id": dataset_id})
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        response = self._make_request("POST", url, headers=headers)
+        return self._handle_response(response)
 
-    @validate_required(["client_id", "datatype", "project_id", "scope"])
-    @validate_string_type("client_id")
-    @validate_string_type("datatype")
-    @validate_string_type("project_id")
-    @validate_scope("scope")
     @log_method_call(include_params=False)
     @handle_api_errors
     def get_all_dataset(self, client_id, datatype, project_id, scope):
@@ -826,10 +963,21 @@ class LabellerrClient:
         :param scope: The permission scope for the dataset.
         :return: The dataset list as JSON.
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.GetAllDatasetParams(
+                client_id=client_id,
+                datatype=datatype,
+                project_id=project_id,
+                scope=scope,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{self.base_url}/datasets/list?client_id={client_id}&data_type={datatype}&permission_level={scope}&project_id={project_id}&uuid={unique_id}"
+        url = f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}&project_id={params.project_id}&uuid={unique_id}"
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
         response = self._make_request("GET", url, headers=headers)
@@ -1035,7 +1183,9 @@ class LabellerrClient:
             self.project_id = project_id
 
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
-            return self.preannotation_job_status()
+
+            future = self.preannotation_job_status_async()
+            return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
@@ -1265,10 +1415,6 @@ class LabellerrClient:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
 
-    @validate_required(["project_id", "client_id", "export_config"])
-    @validate_not_none(["project_id", "client_id", "export_config"])
-    @validate_string_type("project_id")
-    @validate_client_id("client_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_local_export(self, project_id, client_id, export_config):
@@ -1281,6 +1427,15 @@ class LabellerrClient:
         :return: The response from the API.
         :raises LabellerrError: If the export creation fails.
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.CreateLocalExportParams(
+                project_id=project_id,
+                client_id=client_id,
+                export_config=export_config,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 
@@ -1380,21 +1535,6 @@ class LabellerrClient:
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
 
-    @validate_required(
-        [
-            "project_name",
-            "data_type",
-            "client_id",
-            "attached_datasets",
-            "annotation_template_id",
-            "rotations",
-        ]
-    )
-    @validate_client_id("client_id")
-    @validate_data_type("data_type")
-    @validate_dataset_ids("attached_datasets")
-    @validate_uuid_format("annotation_template_id")
-    @validate_rotations_structure("rotations")
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_project(
@@ -1422,23 +1562,37 @@ class LabellerrClient:
         :return: Project creation response
         :raises LabellerrError: If the creation fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.CreateProjectParams(
+                project_name=project_name,
+                data_type=data_type,
+                client_id=client_id,
+                attached_datasets=attached_datasets,
+                annotation_template_id=annotation_template_id,
+                rotations=rotations,
+                use_ai=use_ai,
+                created_by=created_by,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/create?client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
 
         payload = json.dumps(
             {
-                "project_name": project_name,
-                "attached_datasets": attached_datasets,
-                "data_type": data_type,
-                "annotation_template_id": annotation_template_id,
-                "rotations": rotations,
-                "use_ai": use_ai,
-                "created_by": created_by,
+                "project_name": params.project_name,
+                "attached_datasets": params.attached_datasets,
+                "data_type": params.data_type,
+                "annotation_template_id": str(params.annotation_template_id),
+                "rotations": params.rotations.model_dump(),
+                "use_ai": params.use_ai,
+                "created_by": params.created_by,
             }
         )
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
@@ -1765,11 +1919,6 @@ class LabellerrClient:
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
 
-    @validate_required(["client_id", "data_type", "template_name", "questions"])
-    @validate_client_id("client_id")
-    @validate_data_type("data_type")
-    @validate_list_not_empty("questions")
-    @validate_questions_structure()
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_template(self, client_id, data_type, template_name, questions):
@@ -1783,27 +1932,34 @@ class LabellerrClient:
         :return: The response from the API containing template details.
         :raises LabellerrError: If the creation fails.
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.CreateTemplateParams(
+                client_id=client_id,
+                data_type=data_type,
+                template_name=template_name,
+                questions=questions,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/annotations/create_template?client_id={client_id}&data_type={data_type}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/annotations/create_template?client_id={params.client_id}&data_type={params.data_type}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload = json.dumps({"templateName": template_name, "questions": questions})
+        payload = json.dumps(
+            {
+                "templateName": params.template_name,
+                "questions": [q.model_dump() for q in params.questions],
+            }
+        )
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(
-        ["client_id", "first_name", "last_name", "email_id", "projects", "roles"]
-    )
-    @validate_client_id("client_id")
-    @validate_string_type("first_name")
-    @validate_string_type("last_name")
-    @validate_string_type("email_id")
-    @validate_list_not_empty("projects")
-    @validate_list_not_empty("roles")
     @log_method_call(include_params=False)
     @handle_api_errors
     def create_user(
@@ -1835,11 +1991,27 @@ class LabellerrClient:
         :return: Dictionary containing user creation response
         :raises LabellerrError: If the creation fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.CreateUserParams(
+                client_id=client_id,
+                first_name=first_name,
+                last_name=last_name,
+                email_id=email_id,
+                projects=projects,
+                roles=roles,
+                work_phone=work_phone,
+                job_title=job_title,
+                language=language,
+                timezone=timezone,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/users/register?client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/register?client_id={params.client_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -1848,27 +2020,22 @@ class LabellerrClient:
 
         payload = json.dumps(
             {
-                "first_name": first_name,
-                "last_name": last_name,
-                "work_phone": work_phone,
-                "job_title": job_title,
-                "language": language,
-                "timezone": timezone,
-                "email_id": email_id,
-                "projects": projects,
-                "client_id": client_id,
-                "roles": roles,
+                "first_name": params.first_name,
+                "last_name": params.last_name,
+                "work_phone": params.work_phone,
+                "job_title": params.job_title,
+                "language": params.language,
+                "timezone": params.timezone,
+                "email_id": params.email_id,
+                "projects": params.projects,
+                "client_id": params.client_id,
+                "roles": params.roles,
             }
         )
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "email_id", "roles"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_string_type("email_id")
-    @validate_list_not_empty("roles")
     @log_method_call(include_params=False)
     @handle_api_errors
     def update_user_role(
@@ -1902,11 +2069,28 @@ class LabellerrClient:
         :return: Dictionary containing update response
         :raises LabellerrError: If the update fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.UpdateUserRoleParams(
+                client_id=client_id,
+                project_id=project_id,
+                email_id=email_id,
+                roles=roles,
+                first_name=first_name,
+                last_name=last_name,
+                work_phone=work_phone,
+                job_title=job_title,
+                language=language,
+                timezone=timezone,
+                profile_image=profile_image,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/users/update?project_id={project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/update?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -1914,33 +2098,34 @@ class LabellerrClient:
         )
 
         # Build the payload with all provided information
+        # Extract project_ids from roles for API requirement
+        project_ids = [
+            role.get("project_id") for role in params.roles if "project_id" in role
+        ]
+
         payload_data = {
-            "profile_image": profile_image,
-            "work_phone": work_phone,
-            "job_title": job_title,
-            "language": language,
-            "timezone": timezone,
-            "email_id": email_id,
-            "client_id": client_id,
-            "roles": roles,
+            "profile_image": params.profile_image,
+            "work_phone": params.work_phone,
+            "job_title": params.job_title,
+            "language": params.language,
+            "timezone": params.timezone,
+            "email_id": params.email_id,
+            "client_id": params.client_id,
+            "roles": params.roles,
+            "projects": project_ids,  # API requires projects list extracted from roles (same format as create_user)
         }
 
         # Add optional fields if provided
-        if first_name is not None:
-            payload_data["first_name"] = first_name
-        if last_name is not None:
-            payload_data["last_name"] = last_name
+        if params.first_name is not None:
+            payload_data["first_name"] = params.first_name
+        if params.last_name is not None:
+            payload_data["last_name"] = params.last_name
 
         payload = json.dumps(payload_data)
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "email_id", "user_id"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_string_type("email_id")
-    @validate_string_type("user_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def delete_user(
@@ -1982,11 +2167,32 @@ class LabellerrClient:
         :return: Dictionary containing deletion response
         :raises LabellerrError: If the deletion fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.DeleteUserParams(
+                client_id=client_id,
+                project_id=project_id,
+                email_id=email_id,
+                user_id=user_id,
+                first_name=first_name,
+                last_name=last_name,
+                is_active=is_active,
+                role=role,
+                user_created_at=user_created_at,
+                max_activity_created_at=max_activity_created_at,
+                image_url=image_url,
+                name=name,
+                activity=activity,
+                creation_date=creation_date,
+                status=status,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/users/delete?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/delete?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id,
+            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -1995,39 +2201,35 @@ class LabellerrClient:
 
         # Build the payload with all provided information
         payload_data = {
-            "email_id": email_id,
-            "is_active": is_active,
-            "role": role,
-            "user_id": user_id,
-            "imageUrl": image_url,
-            "email": email_id,
-            "activity": activity,
-            "status": status,
+            "email_id": params.email_id,
+            "is_active": params.is_active,
+            "role": params.role,
+            "user_id": params.user_id,
+            "imageUrl": params.image_url,
+            "email": params.email_id,
+            "activity": params.activity,
+            "status": params.status,
         }
 
         # Add optional fields if provided
-        if first_name is not None:
-            payload_data["first_name"] = first_name
-        if last_name is not None:
-            payload_data["last_name"] = last_name
-        if user_created_at is not None:
-            payload_data["user_created_at"] = user_created_at
-        if max_activity_created_at is not None:
-            payload_data["max_activity_created_at"] = max_activity_created_at
-        if name is not None:
-            payload_data["name"] = name
-        if creation_date is not None:
-            payload_data["creationDate"] = creation_date
+        if params.first_name is not None:
+            payload_data["first_name"] = params.first_name
+        if params.last_name is not None:
+            payload_data["last_name"] = params.last_name
+        if params.user_created_at is not None:
+            payload_data["user_created_at"] = params.user_created_at
+        if params.max_activity_created_at is not None:
+            payload_data["max_activity_created_at"] = params.max_activity_created_at
+        if params.name is not None:
+            payload_data["name"] = params.name
+        if params.creation_date is not None:
+            payload_data["creationDate"] = params.creation_date
 
         payload = json.dumps(payload_data)
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "email_id"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_string_type("email_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
@@ -2041,26 +2243,33 @@ class LabellerrClient:
         :return: Dictionary containing addition response
         :raises LabellerrError: If the addition fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.AddUserToProjectParams(
+                client_id=client_id,
+                project_id=project_id,
+                email_id=email_id,
+                role_id=role_id,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/annotations/add_user_to_project?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/add_user_to_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload_data = {"email_id": email_id, "uuid": unique_id}
+        payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
-        if role_id is not None:
-            payload_data["role_id"] = role_id
+        if params.role_id is not None:
+            payload_data["role_id"] = params.role_id
 
         payload = json.dumps(payload_data)
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "email_id"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_string_type("email_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def remove_user_from_project(self, client_id, project_id, email_id):
@@ -2073,24 +2282,28 @@ class LabellerrClient:
         :return: Dictionary containing removal response
         :raises LabellerrError: If the removal fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.RemoveUserFromProjectParams(
+                client_id=client_id, project_id=project_id, email_id=email_id
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/annotations/remove_user_from_project?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/remove_user_from_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
-        payload_data = {"email_id": email_id, "uuid": unique_id}
+        payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         payload = json.dumps(payload_data)
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "email_id", "new_role_id"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_string_type("email_id")
-    @validate_string_type("new_role_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def change_user_role(self, client_id, project_id, email_id, new_role_id):
@@ -2104,16 +2317,28 @@ class LabellerrClient:
         :return: Dictionary containing role change response
         :raises LabellerrError: If the role change fails
         """
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.ChangeUserRoleParams(
+                client_id=client_id,
+                project_id=project_id,
+                email_id=email_id,
+                new_role_id=new_role_id,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/annotations/change_user_role?client_id={client_id}&project_id={project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/change_user_role?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
         payload_data = {
-            "email_id": email_id,
-            "new_role_id": new_role_id,
+            "email_id": params.email_id,
+            "new_role_id": params.new_role_id,
             "uuid": unique_id,
         }
 
@@ -2121,51 +2346,68 @@ class LabellerrClient:
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "search_queries"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
     @log_method_call(include_params=False)
     @handle_api_errors
     def list_file(
         self, client_id, project_id, search_queries, size=10, next_search_after=None
     ):
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.ListFileParams(
+                client_id=client_id,
+                project_id=project_id,
+                search_queries=search_queries,
+                size=size,
+                next_search_after=next_search_after,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/search/project_files?project_id={project_id}&client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/search/project_files?project_id={params.project_id}&client_id={params.client_id}&uuid={unique_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
         payload = json.dumps(
             {
-                "search_queries": search_queries,
-                "size": size,
-                "next_search_after": next_search_after,
+                "search_queries": params.search_queries,
+                "size": params.size,
+                "next_search_after": params.next_search_after,
             }
         )
 
         response = self._make_request("POST", url, headers=headers, data=payload)
         return self._handle_response(response, unique_id)
 
-    @validate_required(["client_id", "project_id", "file_ids", "new_status"])
-    @validate_client_id("client_id")
-    @validate_string_type("project_id")
-    @validate_list_not_empty("file_ids")
     @log_method_call(include_params=False)
     @handle_api_errors
     def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
+        # Validate parameters using Pydantic
+        try:
+            params = schemas.BulkAssignFilesParams(
+                client_id=client_id,
+                project_id=project_id,
+                file_ids=file_ids,
+                new_status=new_status,
+            )
+        except ValidationError as e:
+            raise LabellerrError(str(e))
+
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
+        url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
 
         headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
         )
 
         payload = json.dumps(
             {
-                "file_ids": file_ids,
-                "new_status": new_status,
+                "file_ids": params.file_ids,
+                "new_status": params.new_status,
             }
         )
 

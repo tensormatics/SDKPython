@@ -791,7 +791,135 @@ def handle_api_errors(func: Callable) -> Callable:
             raise
         except Exception as e:
             method_name = func.__name__
-            logging.error(f"Unexpected error in {method_name}: {str(e)}")
-            raise LabellerrError(f"Failed to {method_name.replace('_', ' ')}: {str(e)}")
+            logging.error(f"Unexpected error in {method_name}: {e}")
+            raise
 
     return wrapper
+
+
+def auto_log_and_handle_errors(
+    include_params: bool = False, exclude_methods: List[str] = None
+):
+    """
+    Class decorator that automatically applies logging and error handling to all public methods.
+
+    :param include_params: Whether to include parameters in log messages (default: False)
+    :param exclude_methods: List of method names to exclude from auto-decoration
+    """
+    if exclude_methods is None:
+        exclude_methods = []
+
+    def class_decorator(cls):
+        import inspect
+
+        # Get all methods in the class
+        for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
+            # Skip private methods, dunder methods, and excluded methods
+            if name.startswith("_") or name in exclude_methods:
+                continue
+
+            # Check if method already has decorators we want to apply
+            has_log_decorator = hasattr(method, "__wrapped__")
+            has_error_decorator = hasattr(method, "__wrapped__")
+
+            # Apply decorators if not already present
+            if not has_log_decorator and not has_error_decorator:
+                # Apply both decorators: error handling first, then logging
+                decorated_method = log_method_call(include_params=include_params)(
+                    method
+                )
+                decorated_method = handle_api_errors(decorated_method)
+                setattr(cls, name, decorated_method)
+
+        return cls
+
+    return class_decorator
+
+
+def auto_log_and_handle_errors_async(
+    include_params: bool = False, exclude_methods: List[str] = None
+):
+    """
+    Class decorator that automatically applies logging and error handling to all public async methods.
+
+    :param include_params: Whether to include parameters in log messages (default: False)
+    :param exclude_methods: List of method names to exclude from auto-decoration
+    """
+    if exclude_methods is None:
+        exclude_methods = []
+
+    def async_log_decorator(include_params: bool = True):
+        """Async version of log_method_call decorator."""
+
+        def decorator(func: Callable) -> Callable:
+            @functools.wraps(func)
+            async def wrapper(self, *args, **kwargs):
+                method_name = func.__name__
+                if include_params:
+                    import inspect
+
+                    sig = inspect.signature(func)
+                    bound_args = sig.bind(self, *args, **kwargs)
+                    bound_args.apply_defaults()
+
+                    filtered_params = {
+                        k: v
+                        for k, v in bound_args.arguments.items()
+                        if k != "self"
+                        and "secret" not in k.lower()
+                        and "key" not in k.lower()
+                    }
+                    logging.debug(
+                        f"Calling {method_name} with params: {filtered_params}"
+                    )
+                else:
+                    logging.debug(f"Calling {method_name}")
+
+                try:
+                    result = await func(self, *args, **kwargs)
+                    logging.debug(f"{method_name} completed successfully")
+                    return result
+                except Exception as e:
+                    logging.error(f"{method_name} failed: {str(e)}")
+                    raise
+
+            return wrapper
+
+        return decorator
+
+    def async_error_handler(func: Callable) -> Callable:
+        """Async version of handle_api_errors decorator."""
+
+        @functools.wraps(func)
+        async def wrapper(self, *args, **kwargs):
+            try:
+                return await func(self, *args, **kwargs)
+            except LabellerrError:
+                raise
+            except Exception as e:
+                method_name = func.__name__
+                logging.error(f"Unexpected error in {method_name}: {e}")
+                raise
+
+        return wrapper
+
+    def class_decorator(cls):
+        import inspect
+
+        for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
+            if name.startswith("_") or name in exclude_methods:
+                continue
+
+            # Only apply to async methods
+            if inspect.iscoroutinefunction(method):
+                has_decorators = hasattr(method, "__wrapped__")
+                if not has_decorators:
+                    decorated_method = async_log_decorator(
+                        include_params=include_params
+                    )(method)
+                    decorated_method = async_error_handler(decorated_method)
+                    setattr(cls, name, decorated_method)
+
+        return cls
+
+    return class_decorator

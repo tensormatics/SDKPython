@@ -1,4 +1,5 @@
 import json
+import logging
 import uuid
 
 from labellerr import LabellerrError, constants
@@ -21,7 +22,8 @@ def _setup_cloud_connector(self, connector_type, client_id, connector_config):
         else:
             raise LabellerrError(f"Unsupported connector type: {connector_type}")
     except Exception as e:
-        raise LabellerrError(f"Failed to setup {connector_type} connector: {str(e)}")
+        logging.error(f"Failed to setup {connector_type} connector: {e}")
+        raise
 
 
 def _setup_gcp_connector(self, client_id, gcp_config):

@@ -17,11 +17,20 @@ from urllib3.util.retry import Retry
 
 from . import client_utils, constants, gcs, schemas, utils
 from .exceptions import LabellerrError
-from .validators import handle_api_errors, log_method_call
+from .validators import auto_log_and_handle_errors, handle_api_errors, log_method_call
 
 create_dataset_parameters: Dict[str, Any] = {}
 
 
+@auto_log_and_handle_errors(
+    include_params=False,
+    exclude_methods=[
+        "close",
+        "validate_rotation_config",
+        "get_total_folder_file_count_and_total_size",
+        "get_total_file_count_and_total_size",
+    ],
+)
 class LabellerrClient:
     """
     A client for interacting with the Labellerr API.
@@ -102,12 +111,16 @@ class LabellerrClient:
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: Request URL
-        :param request_id: Optional request tracking ID
+        :param request_id: Optional request tracking ID (auto-generated if not provided)
         :param success_codes: Optional list of success status codes (default: [200, 201])
         :param kwargs: Additional arguments to pass to requests
         :return: JSON response data for successful requests
         :raises LabellerrError: For non-successful responses
         """
+        # Generate request_id if not provided
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+
         # Set default timeout if not provided
         kwargs.setdefault("timeout", (30, 300))  # connect, read
 
@@ -142,7 +155,7 @@ class LabellerrClient:
                 {
                     "status": "internal server error",
                     "message": "Please contact support with the request tracking id",
-                    "request_id": request_id or str(uuid.uuid4()),
+                    "request_id": request_id,
                 }
             )
 
@@ -285,8 +298,6 @@ class LabellerrClient:
             logging.exception(f"Error getting direct upload url: {e}")
             raise
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_aws_connection(
         self,
         client_id: str,
@@ -311,19 +322,16 @@ class LabellerrClient:
 
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.AWSConnectionParams(
-                client_id=client_id,
-                aws_access_key=aws_access_key,
-                aws_secrets_key=aws_secrets_key,
-                s3_path=s3_path,
-                data_type=data_type,
-                name=name,
-                description=description,
-                connection_type=connection_type,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.AWSConnectionParams(
+            client_id=client_id,
+            aws_access_key=aws_access_key,
+            aws_secrets_key=aws_secrets_key,
+            s3_path=s3_path,
+            data_type=data_type,
+            name=name,
+            description=description,
+            connection_type=connection_type,
+        )
 
         request_uuid = str(uuid.uuid4())
         test_connection_url = (
@@ -382,8 +390,6 @@ class LabellerrClient:
             request_id=request_uuid,
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_gcs_connection(
         self,
         client_id: str,
@@ -408,19 +414,16 @@ class LabellerrClient:
         :return: Parsed JSON response
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.GCSConnectionParams(
-                client_id=client_id,
-                gcs_cred_file=gcs_cred_file,
-                gcs_path=gcs_path,
-                data_type=data_type,
-                name=name,
-                description=description,
-                connection_type=connection_type,
-                credentials=credentials,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.GCSConnectionParams(
+            client_id=client_id,
+            gcs_cred_file=gcs_cred_file,
+            gcs_path=gcs_path,
+            data_type=data_type,
+            name=name,
+            description=description,
+            connection_type=connection_type,
+            credentials=credentials,
+        )
 
         request_uuid = str(uuid.uuid4())
         test_url = (
@@ -508,8 +511,6 @@ class LabellerrClient:
             "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def delete_connection(self, client_id: str, connection_id: str):
         """
         Deletes a connector connection by ID.
@@ -519,12 +520,9 @@ class LabellerrClient:
         :return: Parsed JSON response
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.DeleteConnectionParams(
-                client_id=client_id, connection_id=connection_id
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.DeleteConnectionParams(
+            client_id=client_id, connection_id=connection_id
+        )
         request_uuid = str(uuid.uuid4())
         delete_url = (
             f"{constants.BASE_URL}/connectors/connections/delete"
@@ -583,8 +581,6 @@ class LabellerrClient:
 
         return response
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def upload_files(self, client_id, files_list):
         """
         Uploads files to the API.
@@ -595,12 +591,7 @@ class LabellerrClient:
         :raises LabellerrError: If the upload fails.
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.UploadFilesParams(
-                client_id=client_id, files_list=files_list
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.UploadFilesParams(client_id=client_id, files_list=files_list)
 
         # Use validated files_list from Pydantic
         files_list = params.files_list
@@ -815,8 +806,6 @@ class LabellerrClient:
             logging.error(f"Failed to create dataset: {e}")
             raise
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def delete_dataset(self, client_id, dataset_id):
         """
         Deletes a dataset from the system.
@@ -827,12 +816,7 @@ class LabellerrClient:
         :raises LabellerrError: If the deletion fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.DeleteDatasetParams(
-                client_id=client_id, dataset_id=dataset_id
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.DeleteDatasetParams(client_id=client_id, dataset_id=dataset_id)
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
         headers = self._build_headers(
@@ -842,8 +826,6 @@ class LabellerrClient:
 
         return self._request("DELETE", url, headers=headers, request_id=unique_id)
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def enable_multimodal_indexing(self, client_id, dataset_id, is_multimodal=True):
         """
         Enables or disables multimodal indexing for an existing dataset.
@@ -855,14 +837,11 @@ class LabellerrClient:
         :raises LabellerrError: If the operation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.EnableMultimodalIndexingParams(
-                client_id=client_id,
-                dataset_id=dataset_id,
-                is_multimodal=is_multimodal,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.EnableMultimodalIndexingParams(
+            client_id=client_id,
+            dataset_id=dataset_id,
+            is_multimodal=is_multimodal,
+        )
 
         unique_id = str(uuid.uuid4())
         url = (
@@ -885,8 +864,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def get_multimodal_indexing_status(self, client_id, dataset_id):
         """
         Retrieves the current multimodal indexing status for a dataset.
@@ -897,13 +874,10 @@ class LabellerrClient:
         :raises LabellerrError: If the operation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.GetMultimodalIndexingStatusParams(
-                client_id=client_id,
-                dataset_id=dataset_id,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.GetMultimodalIndexingStatusParams(
+            client_id=client_id,
+            dataset_id=dataset_id,
+        )
 
         url = (
             f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
@@ -935,8 +909,6 @@ class LabellerrClient:
 
         return result
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def attach_dataset_to_project(self, client_id, project_id, dataset_id):
         """
         Attaches a dataset to an existing project.
@@ -948,12 +920,9 @@ class LabellerrClient:
         :raises LabellerrError: If the operation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.AttachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=dataset_id
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.AttachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_id
+        )
 
         url = f"{constants.BASE_URL}/projects/attach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
         headers = self._build_headers(
@@ -963,8 +932,6 @@ class LabellerrClient:
 
         return self._request("POST", url, headers=headers)
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def detach_dataset_from_project(self, client_id, project_id, dataset_id):
         """
         Detaches a dataset from an existing project.
@@ -976,12 +943,9 @@ class LabellerrClient:
         :raises LabellerrError: If the operation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.DetachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=dataset_id
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.DetachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_id
+        )
 
         url = f"{constants.BASE_URL}/projects/detach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
         headers = self._build_headers(
@@ -991,9 +955,7 @@ class LabellerrClient:
 
         return self._request("POST", url, headers=headers)
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
-    def get_all_dataset(self, client_id, datatype, project_id, scope):
+    def get_all_datasets(self, client_id, datatype, project_id, scope):
         """
         Retrieves datasets by parameters.
 
@@ -1004,15 +966,12 @@ class LabellerrClient:
         :return: The dataset list as JSON.
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.GetAllDatasetParams(
-                client_id=client_id,
-                datatype=datatype,
-                project_id=project_id,
-                scope=scope,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.GetAllDatasetParams(
+            client_id=client_id,
+            datatype=datatype,
+            project_id=project_id,
+            scope=scope,
+        )
         unique_id = str(uuid.uuid4())
         url = (
             f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
@@ -1118,7 +1077,7 @@ class LabellerrClient:
             return self._handle_response(response, unique_id)
         except Exception as e:
             logging.error(f"Failed to retrieve projects: {str(e)}")
-            raise LabellerrError(f"Failed to retrieve projects: {str(e)}")
+            raise
 
     def create_annotation_guideline(
         self, client_id, questions, template_name, data_type
@@ -1150,9 +1109,7 @@ class LabellerrClient:
             return response_data["response"]["template_id"]
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to update project annotation guideline: {str(e)}")
-            raise LabellerrError(
-                f"Failed to update project annotation guideline: {str(e)}"
-            )
+            raise
 
     def validate_rotation_config(self, rotation_config):
         """
@@ -1230,7 +1187,7 @@ class LabellerrClient:
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
-            raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
+            raise
 
     def upload_preannotation_by_project_id_async(
         self, project_id, client_id, annotation_format, annotation_file
@@ -1343,13 +1300,11 @@ class LabellerrClient:
                         logging.error(
                             f"Failed to get preannotation job status: {str(e)}"
                         )
-                        raise LabellerrError(
-                            f"Failed to get preannotation job status: {str(e)}"
-                        )
+                        raise
 
             except Exception as e:
                 logging.exception(f"Failed to upload preannotation: {str(e)}")
-                raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
+                raise
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(upload_and_monitor)
@@ -1385,9 +1340,7 @@ class LabellerrClient:
 
                 except Exception as e:
                     logging.error(f"Failed to get preannotation job status: {str(e)}")
-                    raise LabellerrError(
-                        f"Failed to get preannotation job status: {str(e)}"
-                    )
+                    raise
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(check_status)
@@ -1455,10 +1408,8 @@ class LabellerrClient:
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
-            raise LabellerrError(f"Failed to upload preannotation: {str(e)}")
+            raise
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_local_export(self, project_id, client_id, export_config):
         """
         Creates a local export with the given configuration.
@@ -1470,14 +1421,11 @@ class LabellerrClient:
         :raises LabellerrError: If the export creation fails.
         """
         # Validate parameters using Pydantic
-        try:
-            schemas.CreateLocalExportParams(
-                project_id=project_id,
-                client_id=client_id,
-                export_config=export_config,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        schemas.CreateLocalExportParams(
+            project_id=project_id,
+            client_id=client_id,
+            export_config=export_config,
+        )
         # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 
@@ -1525,10 +1473,10 @@ class LabellerrClient:
                 )
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to download export: {str(e)}")
-            raise LabellerrError(f"Failed to download export: {str(e)}")
+            raise
         except Exception as e:
             logging.error(f"Unexpected error in download_function: {str(e)}")
-            raise LabellerrError(f"Unexpected error in download_function: {str(e)}")
+            raise
 
     def check_export_status(self, project_id, report_ids, client_id):
         request_uuid = client_utils.generate_request_id()
@@ -1571,13 +1519,11 @@ class LabellerrClient:
 
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to check export status: {str(e)}")
-            raise LabellerrError(f"Failed to check export status: {str(e)}")
+            raise
         except Exception as e:
             logging.error(f"Unexpected error checking export status: {str(e)}")
-            raise LabellerrError(f"Unexpected error checking export status: {str(e)}")
+            raise
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_project(
         self,
         project_name,
@@ -1604,19 +1550,16 @@ class LabellerrClient:
         :raises LabellerrError: If the creation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.CreateProjectParams(
-                project_name=project_name,
-                data_type=data_type,
-                client_id=client_id,
-                attached_datasets=attached_datasets,
-                annotation_template_id=annotation_template_id,
-                rotations=rotations,
-                use_ai=use_ai,
-                created_by=created_by,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.CreateProjectParams(
+            project_name=project_name,
+            data_type=data_type,
+            client_id=client_id,
+            attached_datasets=attached_datasets,
+            annotation_template_id=annotation_template_id,
+            rotations=rotations,
+            use_ai=use_ai,
+            created_by=created_by,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
 
@@ -1803,12 +1746,11 @@ class LabellerrClient:
                 "project_id": project_response,
             }
 
-        except LabellerrError as e:
-            logging.error(f"Project creation failed: {str(e)}")
+        except LabellerrError:
             raise
         except Exception as e:
             logging.exception("Unexpected error in project creation")
-            raise LabellerrError(f"Project creation failed: {str(e)}") from e
+            raise
 
     def upload_folder_files_to_dataset(self, data_config):
         """
@@ -1854,7 +1796,8 @@ class LabellerrClient:
                     )
                 )
             except Exception as e:
-                raise LabellerrError(f"Failed to analyze folder contents: {str(e)}")
+                logging.error(f"Failed to analyze folder contents: {str(e)}")
+                raise
 
             # Check file limits
             if total_file_count > constants.TOTAL_FILES_COUNT_LIMIT_PER_DATASET:
@@ -1956,13 +1899,12 @@ class LabellerrClient:
                 "fail": fail_queue,
             }
 
-        except LabellerrError as e:
-            raise e
+        except LabellerrError:
+            raise
         except Exception as e:
-            raise LabellerrError(f"Failed to upload files: {str(e)}")
+            logging.error(f"Failed to upload files: {str(e)}")
+            raise
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_template(self, client_id, data_type, template_name, questions):
         """
         Creates an annotation template with the given configuration.
@@ -1975,15 +1917,12 @@ class LabellerrClient:
         :raises LabellerrError: If the creation fails.
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.CreateTemplateParams(
-                client_id=client_id,
-                data_type=data_type,
-                template_name=template_name,
-                questions=questions,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.CreateTemplateParams(
+            client_id=client_id,
+            data_type=data_type,
+            template_name=template_name,
+            questions=questions,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/annotations/create_template?client_id={params.client_id}&data_type={params.data_type}&uuid={unique_id}"
 
@@ -2003,8 +1942,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def create_user(
         self,
         client_id,
@@ -2035,21 +1972,18 @@ class LabellerrClient:
         :raises LabellerrError: If the creation fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.CreateUserParams(
-                client_id=client_id,
-                first_name=first_name,
-                last_name=last_name,
-                email_id=email_id,
-                projects=projects,
-                roles=roles,
-                work_phone=work_phone,
-                job_title=job_title,
-                language=language,
-                timezone=timezone,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.CreateUserParams(
+            client_id=client_id,
+            first_name=first_name,
+            last_name=last_name,
+            email_id=email_id,
+            projects=projects,
+            roles=roles,
+            work_phone=work_phone,
+            job_title=job_title,
+            language=language,
+            timezone=timezone,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/register?client_id={params.client_id}&uuid={unique_id}"
 
@@ -2080,8 +2014,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def update_user_role(
         self,
         client_id,
@@ -2114,22 +2046,19 @@ class LabellerrClient:
         :raises LabellerrError: If the update fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.UpdateUserRoleParams(
-                client_id=client_id,
-                project_id=project_id,
-                email_id=email_id,
-                roles=roles,
-                first_name=first_name,
-                last_name=last_name,
-                work_phone=work_phone,
-                job_title=job_title,
-                language=language,
-                timezone=timezone,
-                profile_image=profile_image,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.UpdateUserRoleParams(
+            client_id=client_id,
+            project_id=project_id,
+            email_id=email_id,
+            roles=roles,
+            first_name=first_name,
+            last_name=last_name,
+            work_phone=work_phone,
+            job_title=job_title,
+            language=language,
+            timezone=timezone,
+            profile_image=profile_image,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/update?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
@@ -2171,8 +2100,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def delete_user(
         self,
         client_id,
@@ -2213,26 +2140,23 @@ class LabellerrClient:
         :raises LabellerrError: If the deletion fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.DeleteUserParams(
-                client_id=client_id,
-                project_id=project_id,
-                email_id=email_id,
-                user_id=user_id,
-                first_name=first_name,
-                last_name=last_name,
-                is_active=is_active,
-                role=role,
-                user_created_at=user_created_at,
-                max_activity_created_at=max_activity_created_at,
-                image_url=image_url,
-                name=name,
-                activity=activity,
-                creation_date=creation_date,
-                status=status,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.DeleteUserParams(
+            client_id=client_id,
+            project_id=project_id,
+            email_id=email_id,
+            user_id=user_id,
+            first_name=first_name,
+            last_name=last_name,
+            is_active=is_active,
+            role=role,
+            user_created_at=user_created_at,
+            max_activity_created_at=max_activity_created_at,
+            image_url=image_url,
+            name=name,
+            activity=activity,
+            creation_date=creation_date,
+            status=status,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/delete?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
@@ -2276,8 +2200,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
         """
         Adds a user to a project.
@@ -2290,15 +2212,12 @@ class LabellerrClient:
         :raises LabellerrError: If the addition fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.AddUserToProjectParams(
-                client_id=client_id,
-                project_id=project_id,
-                email_id=email_id,
-                role_id=role_id,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.AddUserToProjectParams(
+            client_id=client_id,
+            project_id=project_id,
+            email_id=email_id,
+            role_id=role_id,
+        )
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/add_user_to_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
@@ -2317,8 +2236,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def remove_user_from_project(self, client_id, project_id, email_id):
         """
         Removes a user from a project.
@@ -2330,12 +2247,9 @@ class LabellerrClient:
         :raises LabellerrError: If the removal fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.RemoveUserFromProjectParams(
-                client_id=client_id, project_id=project_id, email_id=email_id
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.RemoveUserFromProjectParams(
+            client_id=client_id, project_id=project_id, email_id=email_id
+        )
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/remove_user_from_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
@@ -2352,8 +2266,6 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def change_user_role(self, client_id, project_id, email_id, new_role_id):
         """
         Changes a user's role in a project.
@@ -2366,15 +2278,12 @@ class LabellerrClient:
         :raises LabellerrError: If the role change fails
         """
         # Validate parameters using Pydantic
-        try:
-            params = schemas.ChangeUserRoleParams(
-                client_id=client_id,
-                project_id=project_id,
-                email_id=email_id,
-                new_role_id=new_role_id,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.ChangeUserRoleParams(
+            client_id=client_id,
+            project_id=project_id,
+            email_id=email_id,
+            new_role_id=new_role_id,
+        )
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/change_user_role?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
@@ -2395,22 +2304,17 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def list_file(
         self, client_id, project_id, search_queries, size=10, next_search_after=None
     ):
         # Validate parameters using Pydantic
-        try:
-            params = schemas.ListFileParams(
-                client_id=client_id,
-                project_id=project_id,
-                search_queries=search_queries,
-                size=size,
-                next_search_after=next_search_after,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.ListFileParams(
+            client_id=client_id,
+            project_id=project_id,
+            search_queries=search_queries,
+            size=size,
+            next_search_after=next_search_after,
+        )
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/search/project_files?project_id={params.project_id}&client_id={params.client_id}&uuid={unique_id}"
@@ -2432,19 +2336,14 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
-    @log_method_call(include_params=False)
-    @handle_api_errors
     def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
         # Validate parameters using Pydantic
-        try:
-            params = schemas.BulkAssignFilesParams(
-                client_id=client_id,
-                project_id=project_id,
-                file_ids=file_ids,
-                new_status=new_status,
-            )
-        except ValidationError as e:
-            raise LabellerrError(str(e))
+        params = schemas.BulkAssignFilesParams(
+            client_id=client_id,
+            project_id=project_id,
+            file_ids=file_ids,
+            new_status=new_status,
+        )
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"

@@ -11,8 +11,13 @@ import aiohttp
 
 from . import client_utils, constants
 from .exceptions import LabellerrError
+from .validators import auto_log_and_handle_errors_async
 
 
+@auto_log_and_handle_errors_async(
+    include_params=False,
+    exclude_methods=["close", "_ensure_session", "_build_headers"],
+)
 class AsyncLabellerrClient:
     """
     Async client for interacting with the Labellerr API using aiohttp for better performance.
@@ -95,18 +100,24 @@ class AsyncLabellerrClient:
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: Request URL
-        :param request_id: Optional request tracking ID
+        :param request_id: Optional request tracking ID (auto-generated if not provided)
         :param success_codes: Optional list of success status codes (default: [200, 201])
         :param kwargs: Additional arguments to pass to aiohttp
         :return: JSON response data for successful requests
         :raises LabellerrError: For non-successful responses
         """
+        # Generate request_id if not provided
+        if request_id is None:
+            request_id = str(uuid.uuid4())
+
         await self._ensure_session()
 
         if success_codes is None:
             success_codes = [200, 201]
 
-        assert self._session is not None
+        assert (
+            self._session is not None
+        ), "Session must be initialized before making requests"
         async with self._session.request(method, url, **kwargs) as response:
             if response.status in success_codes:
                 try:
@@ -127,7 +138,7 @@ class AsyncLabellerrClient:
                     {
                         "status": "internal server error",
                         "message": "Please contact support with the request tracking id",
-                        "request_id": request_id or str(uuid.uuid4()),
+                        "request_id": request_id,
                         "error": text,
                     }
                 )
@@ -225,7 +236,9 @@ class AsyncLabellerrClient:
         }
 
         async with aiofiles.open(file_path, "rb") as f:
-            assert self._session is not None
+            assert (
+                self._session is not None
+            ), "Session must be initialized before uploading files"
             async with self._session.put(
                 signed_url, headers=headers, data=f
             ) as response:

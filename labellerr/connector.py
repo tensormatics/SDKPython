@@ -52,8 +52,9 @@ def _setup_gcp_connector(self, client_id, gcp_config):
         }
     )
 
-    response = self._make_request("POST", url, headers=headers, data=payload)
-    response_data = self._handle_response(response, unique_id)
+    response_data = self._request(
+        "POST", url, headers=headers, data=payload, request_id=unique_id
+    )
     return response_data["response"]["connection_id"]
 
 
@@ -87,6 +88,7 @@ def _setup_aws_connector(self, client_id, aws_config):
         }
     )
 
-    response = self._make_request("POST", url, headers=headers, data=payload)
-    response_data = self._handle_response(response, unique_id)
+    response_data = self._request(
+        "POST", url, headers=headers, data=payload, request_id=unique_id
+    )
     return response_data["response"]["connection_id"]

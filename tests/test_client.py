@@ -325,21 +325,13 @@ class TestInitiateCreateProject:
 class TestCreateUser:
     """Test cases for create_user method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_create_user_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_create_user_success(self, mock_request, client):
         """Test successful user creation"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "created"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "created"}
+        }
 
         # Test data
         client_id = "12345"
@@ -365,7 +357,7 @@ class TestCreateUser:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "created"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_create_user_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -425,21 +417,13 @@ class TestCreateUser:
 class TestUpdateUserRole:
     """Test cases for update_user_role method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_update_user_role_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_update_user_role_success(self, mock_request, client):
         """Test successful user role update"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "updated"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "updated"}
+        }
 
         # Test data
         client_id = "12345"
@@ -463,7 +447,7 @@ class TestUpdateUserRole:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "updated"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_update_user_role_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -500,21 +484,13 @@ class TestUpdateUserRole:
 
         assert "roles must be a non-empty list" in str(exc_info.value)
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_update_user_role_with_optional_fields(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_update_user_role_with_optional_fields(self, mock_request, client):
         """Test user role update with all optional fields"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "updated"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "updated"}
+        }
 
         # Test data
         client_id = "12345"
@@ -540,27 +516,19 @@ class TestUpdateUserRole:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "updated"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
 
 class TestDeleteUser:
     """Test cases for delete_user method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_delete_user_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_delete_user_success(self, mock_request, client):
         """Test successful user deletion"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "deleted"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "deleted"}
+        }
 
         # Test data
         client_id = "12345"
@@ -581,7 +549,7 @@ class TestDeleteUser:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "deleted"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_delete_user_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -606,21 +574,13 @@ class TestDeleteUser:
 
         assert "client_id must be a string" in str(exc_info.value)
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_delete_user_with_all_fields(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_delete_user_with_all_fields(self, mock_request, client):
         """Test user deletion with all optional fields"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "deleted"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "deleted"}
+        }
 
         # Test data
         client_id = "12345"
@@ -650,7 +610,7 @@ class TestDeleteUser:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "deleted"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_delete_user_invalid_project_id(self, client):
         """Test error handling for invalid project_id"""
@@ -692,21 +652,13 @@ class TestDeleteUser:
 class TestAddUserToProject:
     """Test cases for add_user_to_project method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_add_user_to_project_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_add_user_to_project_success(self, mock_request, client):
         """Test successful user addition to project"""
-        # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "added"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "added"}
+        }
 
         # Test data
         client_id = "12345"
@@ -725,7 +677,7 @@ class TestAddUserToProject:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "added"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_add_user_to_project_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -753,21 +705,14 @@ class TestAddUserToProject:
 class TestRemoveUserFromProject:
     """Test cases for remove_user_from_project method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_remove_user_from_project_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_remove_user_from_project_success(self, mock_request, client):
         """Test successful user removal from project"""
         # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "removed"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "removed"}
+        }
 
         # Test data
         client_id = "12345"
@@ -782,7 +727,7 @@ class TestRemoveUserFromProject:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "removed"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_remove_user_from_project_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -810,21 +755,14 @@ class TestRemoveUserFromProject:
 class TestChangeUserRole:
     """Test cases for change_user_role method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_change_user_role_success(self, mock_make_request, client):
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_change_user_role_success(self, mock_request, client):
         """Test successful user role change"""
         # Mock response
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"user_id": "user_123", "status": "role_changed"}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"user_id": "user_123", "status": "role_changed"}
+        }
 
         # Test data
         client_id = "12345"
@@ -843,7 +781,7 @@ class TestChangeUserRole:
         # Assert
         assert result["response"]["user_id"] == "user_123"
         assert result["response"]["status"] == "role_changed"
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_change_user_role_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
@@ -873,19 +811,12 @@ class TestChangeUserRole:
 class TestListAndBulkAssignFiles:
     """Tests for list_file and bulk_assign_files methods"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_list_file_success(self, mock_make_request, client):
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {
-                    "response": {"files": [{"id": "file1"}], "next_search_after": None}
-                },
-            },
-        )()
-        mock_make_request.return_value = mock_response
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_list_file_success(self, mock_request, client):
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {
+            "response": {"files": [{"id": "file1"}], "next_search_after": None}
+        }
 
         result = client.list_file(
             client_id="12345",
@@ -902,23 +833,16 @@ class TestListAndBulkAssignFiles:
         )
 
         assert "files" in result["response"]
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_list_file_missing_required(self, client):
         with pytest.raises(TypeError):
             client.list_file(client_id="12345", project_id="project_123")
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    def test_bulk_assign_files_success(self, mock_make_request, client):
-        mock_response = type(
-            "MockResponse",
-            (),
-            {
-                "status_code": 200,
-                "json": lambda *args, **kwargs: {"response": {"updated": 1}},
-            },
-        )()
-        mock_make_request.return_value = mock_response
+    @patch("labellerr.client.LabellerrClient._request")
+    def test_bulk_assign_files_success(self, mock_request, client):
+        # Mock response - _request now returns JSON directly
+        mock_request.return_value = {"response": {"updated": 1}}
 
         result = client.bulk_assign_files(
             client_id="12345",
@@ -928,7 +852,7 @@ class TestListAndBulkAssignFiles:
         )
 
         assert result["response"]["updated"] == 1
-        mock_make_request.assert_called_once()
+        mock_request.assert_called_once()
 
     def test_bulk_assign_files_missing_required(self, client):
         with pytest.raises(TypeError):

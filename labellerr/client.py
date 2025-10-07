@@ -96,17 +96,55 @@ class LabellerrClient:
             self._session.mount("http://", adapter)
             self._session.mount("https://", adapter)
 
-    def _make_request(self, method, url, **kwargs):
+    def _request(self, method, url, request_id=None, success_codes=None, **kwargs):
         """
-        Make HTTP request using session if available, otherwise use requests directly.
+        Make HTTP request and handle response in a single method.
+
+        :param method: HTTP method (GET, POST, etc.)
+        :param url: Request URL
+        :param request_id: Optional request tracking ID
+        :param success_codes: Optional list of success status codes (default: [200, 201])
+        :param kwargs: Additional arguments to pass to requests
+        :return: JSON response data for successful requests
+        :raises LabellerrError: For non-successful responses
         """
         # Set default timeout if not provided
         kwargs.setdefault("timeout", (30, 300))  # connect, read
 
+        # Make the request
         if self._session:
-            return self._session.request(method, url, **kwargs)
+            response = self._session.request(method, url, **kwargs)
         else:
-            return requests.request(method, url, **kwargs)
+            response = requests.request(method, url, **kwargs)
+
+        # Handle the response
+        if success_codes is None:
+            success_codes = [200, 201]
+
+        if response.status_code in success_codes:
+            try:
+                return response.json()
+            except ValueError:
+                # Handle cases where response is successful but not JSON
+                raise LabellerrError(f"Expected JSON response but got: {response.text}")
+        elif 400 <= response.status_code < 500:
+            try:
+                error_data = response.json()
+                raise LabellerrError(
+                    {"error": error_data, "code": response.status_code}
+                )
+            except ValueError:
+                raise LabellerrError(
+                    {"error": response.text, "code": response.status_code}
+                )
+        else:
+            raise LabellerrError(
+                {
+                    "status": "internal server error",
+                    "message": "Please contact support with the request tracking id",
+                    "request_id": request_id or str(uuid.uuid4()),
+                }
+            )
 
     def close(self):
         """
@@ -142,7 +180,8 @@ class LabellerrClient:
 
     def _handle_response(self, response, request_id=None, success_codes=None):
         """
-        Standardized response handling with consistent error patterns.
+        Legacy method for handling response objects directly.
+        Kept for backward compatibility with special response handlers.
 
         :param response: requests.Response object
         :param request_id: Optional request tracking ID
@@ -237,13 +276,13 @@ class LabellerrClient:
         url = f"{constants.BASE_URL}/connectors/direct-upload-url?client_id={client_id}&purpose={purpose}&file_name={file_name}"
         headers = self._build_headers(client_id=client_id)
 
-        response = self._make_request("GET", url, headers=headers)
-
         try:
-            response_data = self._handle_response(response, success_codes=[200])
+            response_data = self._request(
+                "GET", url, headers=headers, success_codes=[200]
+            )
             return response_data["response"]
         except Exception as e:
-            logging.exception(f"Error getting direct upload url: {response.text} {e}")
+            logging.exception(f"Error getting direct upload url: {e}")
             raise
 
     @log_method_call(include_params=False)
@@ -312,10 +351,13 @@ class LabellerrClient:
             "data_type": params.data_type,
         }
 
-        test_resp = self._make_request(
-            "POST", test_connection_url, headers=headers, data=test_request
+        self._request(
+            "POST",
+            test_connection_url,
+            headers=headers,
+            data=test_request,
+            request_id=request_uuid,
         )
-        self._handle_response(test_resp, request_uuid)
 
         create_url = (
             f"{constants.BASE_URL}/connectors/connections/create"
@@ -332,11 +374,13 @@ class LabellerrClient:
             "credentials": aws_credentials_json,
         }
 
-        create_resp = self._make_request(
-            "POST", create_url, headers=headers, data=create_request
+        return self._request(
+            "POST",
+            create_url,
+            headers=headers,
+            data=create_request,
+            request_id=request_uuid,
         )
-
-        return self._handle_response(create_resp, request_uuid)
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -405,10 +449,14 @@ class LabellerrClient:
                     "application/json",
                 )
             }
-            test_resp = self._make_request(
-                "POST", test_url, headers=headers, data=test_request, files=test_files
+            self._request(
+                "POST",
+                test_url,
+                headers=headers,
+                data=test_request,
+                files=test_files,
+                request_id=request_uuid,
             )
-        self._handle_response(test_resp, request_uuid)
 
         # If test passed, create/save the connection
         # use same uuid to track request
@@ -435,15 +483,14 @@ class LabellerrClient:
                     "application/json",
                 )
             }
-            create_resp = self._make_request(
+            return self._request(
                 "POST",
                 create_url,
                 headers=headers,
                 data=create_request,
                 files=create_files,
+                request_id=request_uuid,
             )
-
-        return self._handle_response(create_resp, request_uuid)
 
     def list_connection(self, client_id: str, connection_type: str):
         request_uuid = str(uuid.uuid4())
@@ -457,11 +504,9 @@ class LabellerrClient:
             extra_headers={"email_id": self.api_key},
         )
 
-        list_connection_response = self._make_request(
-            "GET", list_connection_url, headers=headers
+        return self._request(
+            "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
-
-        return self._handle_response(list_connection_response, request_uuid)
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -496,10 +541,9 @@ class LabellerrClient:
 
         payload = json.dumps({"connection_id": params.connection_id})
 
-        delete_response = self._make_request(
-            "POST", delete_url, headers=headers, data=payload
+        return self._request(
+            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
         )
-        return self._handle_response(delete_response, request_uuid)
 
     def connect_local_files(self, client_id, file_names, connection_id=None):
         """
@@ -516,8 +560,7 @@ class LabellerrClient:
         if connection_id is not None:
             body["temporary_connection_id"] = connection_id
 
-        response = self._make_request("POST", url, headers=headers, json=body)
-        return self._handle_response(response)
+        return self._request("POST", url, headers=headers, json=body)
 
     def __process_batch(self, client_id, files_list, connection_id=None):
         """
@@ -579,8 +622,7 @@ class LabellerrClient:
             extra_headers={"Origin": constants.ALLOWED_ORIGINS}
         )
 
-        response = self._make_request("GET", url, headers=headers)
-        return self._handle_response(response)
+        return self._request("GET", url, headers=headers)
 
     def update_rotation_count(self):
         """
@@ -762,8 +804,9 @@ class LabellerrClient:
                     "connector_type": connector_type,
                 }
             )
-            response = self._make_request("POST", url, headers=headers, data=payload)
-            response_data = self._handle_response(response, unique_id)
+            response_data = self._request(
+                "POST", url, headers=headers, data=payload, request_id=unique_id
+            )
             dataset_id = response_data["response"]["dataset_id"]
 
             return {"response": "success", "dataset_id": dataset_id}
@@ -797,8 +840,7 @@ class LabellerrClient:
             extra_headers={"content-type": "application/json"},
         )
 
-        response = self._make_request("DELETE", url, headers=headers)
-        return self._handle_response(response, unique_id)
+        return self._request("DELETE", url, headers=headers, request_id=unique_id)
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -839,8 +881,9 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -878,8 +921,7 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        result = self._handle_response(response)
+        result = self._request("POST", url, headers=headers, data=payload)
 
         # If the response is null or empty, provide a meaningful default status
         if result.get("response") is None:
@@ -919,8 +961,7 @@ class LabellerrClient:
             extra_headers={"content-type": "application/json"},
         )
 
-        response = self._make_request("POST", url, headers=headers)
-        return self._handle_response(response)
+        return self._request("POST", url, headers=headers)
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -948,8 +989,7 @@ class LabellerrClient:
             extra_headers={"content-type": "application/json"},
         )
 
-        response = self._make_request("POST", url, headers=headers)
-        return self._handle_response(response)
+        return self._request("POST", url, headers=headers)
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -974,14 +1014,16 @@ class LabellerrClient:
         except ValidationError as e:
             raise LabellerrError(str(e))
         unique_id = str(uuid.uuid4())
-        url = f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}&project_id={params.project_id}&uuid={unique_id}"
+        url = (
+            f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
+            f"&project_id={params.project_id}&uuid={unique_id}"
+        )
         headers = self._build_headers(
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
 
-        response = self._make_request("GET", url, headers=headers)
-        return self._handle_response(response, unique_id)
+        return self._request("GET", url, headers=headers, request_id=unique_id)
 
     def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
         """
@@ -1429,7 +1471,7 @@ class LabellerrClient:
         """
         # Validate parameters using Pydantic
         try:
-            params = schemas.CreateLocalExportParams(
+            schemas.CreateLocalExportParams(
                 project_id=project_id,
                 client_id=client_id,
                 export_config=export_config,
@@ -1450,14 +1492,13 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request(
+        return self._request(
             "POST",
             f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
             headers=headers,
             data=payload,
+            request_id=unique_id,
         )
-
-        return self._handle_response(response, unique_id)
 
     def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:
@@ -1599,8 +1640,9 @@ class LabellerrClient:
             },
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     def initiate_create_project(self, payload):
         """
@@ -1957,8 +1999,9 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2033,8 +2076,9 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2123,8 +2167,9 @@ class LabellerrClient:
 
         payload = json.dumps(payload_data)
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2227,8 +2272,9 @@ class LabellerrClient:
 
         payload = json.dumps(payload_data)
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2267,8 +2313,9 @@ class LabellerrClient:
             payload_data["role_id"] = params.role_id
 
         payload = json.dumps(payload_data)
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2301,8 +2348,9 @@ class LabellerrClient:
         payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         payload = json.dumps(payload_data)
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2343,8 +2391,9 @@ class LabellerrClient:
         }
 
         payload = json.dumps(payload_data)
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2379,8 +2428,9 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
 
     @log_method_call(include_params=False)
     @handle_api_errors
@@ -2411,5 +2461,6 @@ class LabellerrClient:
             }
         )
 
-        response = self._make_request("POST", url, headers=headers, data=payload)
-        return self._handle_response(response, unique_id)
+        return self._request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )

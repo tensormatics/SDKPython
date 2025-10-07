@@ -82,11 +82,62 @@ class AsyncLabellerrClient:
             extra_headers=extra_headers,
         )
 
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        request_id: Optional[str] = None,
+        success_codes: Optional[list] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Make HTTP request and handle response in a single async method.
+
+        :param method: HTTP method (GET, POST, etc.)
+        :param url: Request URL
+        :param request_id: Optional request tracking ID
+        :param success_codes: Optional list of success status codes (default: [200, 201])
+        :param kwargs: Additional arguments to pass to aiohttp
+        :return: JSON response data for successful requests
+        :raises LabellerrError: For non-successful responses
+        """
+        await self._ensure_session()
+
+        if success_codes is None:
+            success_codes = [200, 201]
+
+        assert self._session is not None
+        async with self._session.request(method, url, **kwargs) as response:
+            if response.status in success_codes:
+                try:
+                    return await response.json()
+                except Exception:
+                    text = await response.text()
+                    raise LabellerrError(f"Expected JSON response but got: {text}")
+            elif 400 <= response.status < 500:
+                try:
+                    error_data = await response.json()
+                    raise LabellerrError({"error": error_data, "code": response.status})
+                except Exception:
+                    text = await response.text()
+                    raise LabellerrError({"error": text, "code": response.status})
+            else:
+                text = await response.text()
+                raise LabellerrError(
+                    {
+                        "status": "internal server error",
+                        "message": "Please contact support with the request tracking id",
+                        "request_id": request_id or str(uuid.uuid4()),
+                        "error": text,
+                    }
+                )
+
     async def _handle_response(
         self, response: aiohttp.ClientResponse, request_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Async standardized response handling.
+        Legacy method for handling response objects directly.
+        Kept for backward compatibility with special response handlers.
 
         :param response: aiohttp ClientResponse object
         :param request_id: Optional request tracking ID
@@ -123,19 +174,15 @@ class AsyncLabellerrClient:
         """
         Async version of get_direct_upload_url.
         """
-        await self._ensure_session()
-
         url = f"{constants.BASE_URL}/connectors/direct-upload-url"
         params = {"client_id": client_id, "purpose": purpose, "file_name": file_name}
         headers = self._build_headers(client_id=client_id)
 
         try:
-            assert self._session is not None
-            async with self._session.get(
-                url, params=params, headers=headers
-            ) as response:
-                response_data = await self._handle_response(response)
-                return response_data["response"]
+            response_data = await self._request(
+                "GET", url, params=params, headers=headers
+            )
+            return response_data["response"]
         except Exception as e:
             logging.exception(f"Error getting direct upload url: {e}")
             raise
@@ -146,8 +193,6 @@ class AsyncLabellerrClient:
         """
         Async version of connect_local_files.
         """
-        await self._ensure_session()
-
         url = f"{constants.BASE_URL}/connectors/connect/local"
         params = {"client_id": client_id}
         headers = self._build_headers(client_id=client_id)
@@ -156,11 +201,9 @@ class AsyncLabellerrClient:
         if connection_id is not None:
             body["temporary_connection_id"] = connection_id
 
-        assert self._session is not None
-        async with self._session.post(
-            url, params=params, headers=headers, json=body
-        ) as response:
-            return await self._handle_response(response)
+        return await self._request(
+            "POST", url, params=params, headers=headers, json=body
+        )
 
     async def upload_file_stream(
         self, signed_url: str, file_path: str, chunk_size: int = 8192
@@ -262,17 +305,13 @@ class AsyncLabellerrClient:
         """
         Async version of get_dataset.
         """
-        await self._ensure_session()
-
         url = f"{constants.BASE_URL}/datasets/{dataset_id}"
         params = {"client_id": workspace_id, "uuid": str(uuid.uuid4())}
         headers = self._build_headers(
             extra_headers={"Origin": constants.ALLOWED_ORIGINS}
         )
 
-        assert self._session is not None
-        async with self._session.get(url, params=params, headers=headers) as response:
-            return await self._handle_response(response)
+        return await self._request("GET", url, params=params, headers=headers)
 
     async def create_dataset(
         self,
@@ -282,8 +321,6 @@ class AsyncLabellerrClient:
         """
         Async version of create_dataset.
         """
-        await self._ensure_session()
-
         try:
             # Validate data_type
             if dataset_config.get("data_type") not in constants.DATA_TYPES:
@@ -314,13 +351,16 @@ class AsyncLabellerrClient:
                 "client_id": dataset_config["client_id"],
             }
 
-            assert self._session is not None
-            async with self._session.post(
-                url, params=params, headers=headers, json=payload
-            ) as response:
-                response_data = await self._handle_response(response, unique_id)
-                dataset_id = response_data["response"]["dataset_id"]
-                return {"response": "success", "dataset_id": dataset_id}
+            response_data = await self._request(
+                "POST",
+                url,
+                params=params,
+                headers=headers,
+                json=payload,
+                request_id=unique_id,
+            )
+            dataset_id = response_data["response"]["dataset_id"]
+            return {"response": "success", "dataset_id": dataset_id}
 
         except LabellerrError as e:
             logging.error(f"Failed to create dataset: {e}")

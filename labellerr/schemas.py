@@ -6,10 +6,7 @@ import os
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-
-from . import constants
-from .exceptions import LabellerrError
+from pydantic import BaseModel, Field, field_validator
 
 
 class NonEmptyStr(str):
@@ -77,7 +74,19 @@ class RotationConfig(BaseModel):
 class Question(BaseModel):
     """Question structure for annotation templates."""
 
-    option_type: Literal[tuple(constants.OPTION_TYPE_LIST)]
+    option_type: Literal[
+        "input",
+        "radio",
+        "boolean",
+        "select",
+        "dropdown",
+        "stt",
+        "imc",
+        "BoundingBox",
+        "polygon",
+        "dot",
+        "audio",
+    ]
     # Additional fields can be added as needed
 
 
@@ -88,7 +97,7 @@ class AWSConnectionParams(BaseModel):
     aws_access_key: str = Field(min_length=1)
     aws_secrets_key: str = Field(min_length=1)
     s3_path: str = Field(min_length=1)
-    data_type: Literal[constants.DATA_TYPES]
+    data_type: Literal["image", "video", "audio", "document", "text"]
     name: str = Field(min_length=1)
     description: str
     connection_type: str = "import"
@@ -100,7 +109,7 @@ class GCSConnectionParams(BaseModel):
     client_id: str = Field(min_length=1)
     gcs_cred_file: str
     gcs_path: str = Field(min_length=1)
-    data_type: Literal[constants.DATA_TYPES]
+    data_type: Literal["image", "video", "audio", "document", "text"]
     name: str = Field(min_length=1)
     description: str
     connection_type: str = "import"
@@ -193,7 +202,7 @@ class GetAllDatasetParams(BaseModel):
     client_id: str = Field(min_length=1)
     datatype: str = Field(min_length=1)
     project_id: str = Field(min_length=1)
-    scope: Literal[tuple(constants.SCOPE_LIST)]
+    scope: Literal["project", "client", "public"]
 
 
 class CreateLocalExportParams(BaseModel):
@@ -208,7 +217,7 @@ class CreateProjectParams(BaseModel):
     """Parameters for creating a project."""
 
     project_name: str = Field(min_length=1)
-    data_type: Literal[constants.DATA_TYPES]
+    data_type: Literal["image", "video", "audio", "document", "text"]
     client_id: str = Field(min_length=1)
     attached_datasets: List[str] = Field(min_length=1)
     annotation_template_id: UUID
@@ -231,7 +240,7 @@ class CreateTemplateParams(BaseModel):
     """Parameters for creating an annotation template."""
 
     client_id: str = Field(min_length=1)
-    data_type: Literal[constants.DATA_TYPES]
+    data_type: Literal["image", "video", "audio", "document", "text"]
     template_name: str = Field(min_length=1)
     questions: List[Question] = Field(min_length=1)
 

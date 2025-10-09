@@ -239,7 +239,7 @@ def request(method, url, request_id=None, success_codes=None, **kwargs):
     # Set default timeout if not provided
     kwargs.setdefault("timeout", (30, 300))  # connect, read
 
-    # Make the request
+    # Make the request[
     response = requests.request(method, url, **kwargs)
 
     # Handle the response

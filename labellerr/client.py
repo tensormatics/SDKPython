@@ -1687,6 +1687,7 @@ class LabellerrClient:
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
+    # TODO: this is not working from UI
     def change_user_role(self, client_id, project_id, email_id, new_role_id):
         """
         Changes a user's role in a project.

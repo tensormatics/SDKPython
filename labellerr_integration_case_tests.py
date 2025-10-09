@@ -116,7 +116,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
         # Configurable test IDs for attach/detach operations
         self.test_project_id = os.getenv(
-            "TEST_PROJECT_ID", "sunny_tough_blackbird_40468"
+            "TEST_PROJECT_ID", "sisely_serious_tarantula_26824"
         )
         self.test_dataset_id = os.getenv(
             "TEST_DATASET_ID", "769a313a-ea7e-47f2-83de-e4a11befd048"

@@ -662,7 +662,7 @@ class DataSets(object):
         )
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/actions/jobs/add_datasets_to_project?project_id={params.project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/actions/jobs/add_datasets_to_project?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
         headers = client_utils.build_headers(
             api_key=self.api_key,
             api_secret=self.api_secret,

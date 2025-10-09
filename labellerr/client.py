@@ -6,17 +6,16 @@ import logging
 import os
 import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from functools import wraps
-from multiprocessing import cpu_count
 from typing import Any, Dict, List, Union
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from . import client_utils, constants, gcs, schemas, utils
+from . import client_utils, constants, gcs, schemas
+from .core.datasets.datasets import DataSets
 from .exceptions import LabellerrError
 from .validators import auto_log_and_handle_errors
 
@@ -44,16 +43,8 @@ class KeyFrame:
     source: str = "manual"
 
     def __post_init__(self):
-        if not isinstance(self.frame_number, int):
-            raise ValueError("frame_number must be an integer")
         if self.frame_number < 0:
             raise ValueError("frame_number must be non-negative")
-        if not isinstance(self.is_manual, bool):
-            raise ValueError("is_manual must be a boolean")
-        if not isinstance(self.method, str):
-            raise ValueError("method must be a string")
-        if not isinstance(self.source, str):
-            raise ValueError("source must be a string")
 
 
 def validate_params(**validations):
@@ -130,6 +121,9 @@ class LabellerrClient:
         if enable_connection_pooling:
             self._setup_session()
 
+        # Initialize DataSets handler for dataset-related operations
+        self.datasets = DataSets(api_key, api_secret, self)
+
     def _setup_session(self):
         """
         Set up requests session with connection pooling for better performance.
@@ -171,60 +165,6 @@ class LabellerrClient:
             self._session.mount("http://", adapter)
             self._session.mount("https://", adapter)
 
-    def _request(self, method, url, request_id=None, success_codes=None, **kwargs):
-        """
-        Make HTTP request and handle response in a single method.
-
-        :param method: HTTP method (GET, POST, etc.)
-        :param url: Request URL
-        :param request_id: Optional request tracking ID (auto-generated if not provided)
-        :param success_codes: Optional list of success status codes (default: [200, 201])
-        :param kwargs: Additional arguments to pass to requests
-        :return: JSON response data for successful requests
-        :raises LabellerrError: For non-successful responses
-        """
-        # Generate request_id if not provided
-        if request_id is None:
-            request_id = str(uuid.uuid4())
-
-        # Set default timeout if not provided
-        kwargs.setdefault("timeout", (30, 300))  # connect, read
-
-        # Make the request
-        if self._session:
-            response = self._session.request(method, url, **kwargs)
-        else:
-            response = requests.request(method, url, **kwargs)
-
-        # Handle the response
-        if success_codes is None:
-            success_codes = [200, 201]
-
-        if response.status_code in success_codes:
-            try:
-                return response.json()
-            except ValueError:
-                # Handle cases where response is successful but not JSON
-                raise LabellerrError(f"Expected JSON response but got: {response.text}")
-        elif 400 <= response.status_code < 500:
-            try:
-                error_data = response.json()
-                raise LabellerrError(
-                    {"error": error_data, "code": response.status_code}
-                )
-            except ValueError:
-                raise LabellerrError(
-                    {"error": response.text, "code": response.status_code}
-                )
-        else:
-            raise LabellerrError(
-                {
-                    "status": "internal server error",
-                    "message": "Please contact support with the request tracking id",
-                    "request_id": request_id,
-                }
-            )
-
     def close(self):
         """
         Close the session and cleanup resources.
@@ -241,61 +181,6 @@ class LabellerrClient:
         """Context manager exit."""
         self.close()
 
-    def _build_headers(self, client_id=None, extra_headers=None):
-        """
-        Builds standard headers for API requests.
-
-        :param client_id: Optional client ID to include in headers
-        :param extra_headers: Optional dictionary of additional headers
-        :return: Dictionary of headers
-        """
-        return client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            source="sdk",
-            client_id=client_id,
-            extra_headers=extra_headers,
-        )
-
-    def _handle_response(self, response, request_id=None, success_codes=None):
-        """
-        Legacy method for handling response objects directly.
-        Kept for backward compatibility with special response handlers.
-
-        :param response: requests.Response object
-        :param request_id: Optional request tracking ID
-        :param success_codes: Optional list of success status codes (default: [200, 201])
-        :return: JSON response data for successful requests
-        :raises LabellerrError: For non-successful responses
-        """
-        if success_codes is None:
-            success_codes = [200, 201]
-
-        if response.status_code in success_codes:
-            try:
-                return response.json()
-            except ValueError:
-                # Handle cases where response is successful but not JSON
-                raise LabellerrError(f"Expected JSON response but got: {response.text}")
-        elif 400 <= response.status_code < 500:
-            try:
-                error_data = response.json()
-                raise LabellerrError(
-                    {"error": error_data, "code": response.status_code}
-                )
-            except ValueError:
-                raise LabellerrError(
-                    {"error": response.text, "code": response.status_code}
-                )
-        else:
-            raise LabellerrError(
-                {
-                    "status": "internal server error",
-                    "message": "Please contact support with the request tracking id",
-                    "request_id": request_id or str(uuid.uuid4()),
-                }
-            )
-
     def _handle_upload_response(self, response, request_id=None):
         """
         Specialized error handling for upload operations that may have different success patterns.
@@ -311,7 +196,7 @@ class LabellerrClient:
             raise LabellerrError(f"Failed to parse response: {response.text}")
 
         if response.status_code not in [200, 201]:
-            if response.status_code >= 400 and response.status_code < 500:
+            if 400 <= response.status_code < 500:
                 raise LabellerrError(
                     {"error": response_data, "code": response.status_code}
                 )
@@ -344,19 +229,33 @@ class LabellerrClient:
                 f"{operation_name} failed: {response.status_code} - {response.text}"
             )
 
+    def _request(self, method, url, **kwargs):
+        """
+        Wrapper around client_utils.request for backward compatibility.
+
+        :param method: HTTP method
+        :param url: Request URL
+        :param kwargs: Additional arguments
+        :return: Response data
+        """
+        return client_utils.request(method, url, **kwargs)
+
     def get_direct_upload_url(self, file_name, client_id, purpose="pre-annotations"):
         """
         Get the direct upload URL for the given file names.
 
-        :param file_names: The list of file names.
+        :param file_name: The list of file names.
         :param client_id: The ID of the client.
+        :param purpose: The purpose of the URL.
         :return: The response from the API.
         """
         url = f"{constants.BASE_URL}/connectors/direct-upload-url?client_id={client_id}&purpose={purpose}&file_name={file_name}"
-        headers = self._build_headers(client_id=client_id)
+        headers = client_utils.build_headers(
+            client_id=client_id, api_key=self.api_key, api_secret=self.api_secret
+        )
 
         try:
-            response_data = self._request(
+            response_data = client_utils.request(
                 "GET", url, headers=headers, success_codes=[200]
             )
             return response_data["response"]
@@ -405,7 +304,9 @@ class LabellerrClient:
             f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"email_id": self.api_key},
         )
@@ -425,7 +326,7 @@ class LabellerrClient:
             "data_type": params.data_type,
         }
 
-        self._request(
+        client_utils.request(
             "POST",
             test_connection_url,
             headers=headers,
@@ -448,7 +349,7 @@ class LabellerrClient:
             "credentials": aws_credentials_json,
         }
 
-        return self._request(
+        return client_utils.request(
             "POST",
             create_url,
             headers=headers,
@@ -497,7 +398,9 @@ class LabellerrClient:
             f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"email_id": self.api_key},
         )
@@ -518,7 +421,7 @@ class LabellerrClient:
                     "application/json",
                 )
             }
-            self._request(
+            client_utils.request(
                 "POST",
                 test_url,
                 headers=headers,
@@ -552,7 +455,7 @@ class LabellerrClient:
                     "application/json",
                 )
             }
-            return self._request(
+            return client_utils.request(
                 "POST",
                 create_url,
                 headers=headers,
@@ -568,12 +471,14 @@ class LabellerrClient:
             f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
         )
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=client_id,
             extra_headers={"email_id": self.api_key},
         )
 
-        return self._request(
+        return client_utils.request(
             "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
 
@@ -595,7 +500,9 @@ class LabellerrClient:
             f"?client_id={params.client_id}&uuid={request_uuid}"
         )
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
@@ -605,7 +512,7 @@ class LabellerrClient:
 
         payload = json.dumps({"connection_id": params.connection_id})
 
-        return self._request(
+        return client_utils.request(
             "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
         )
 
@@ -615,37 +522,19 @@ class LabellerrClient:
 
         :param client_id: The ID of the client.
         :param file_names: The list of file names.
+        :param connection_id: The ID of the connection.
         :return: The response from the API.
         """
         url = f"{constants.BASE_URL}/connectors/connect/local?client_id={client_id}"
-        headers = self._build_headers(client_id=client_id)
+        headers = client_utils.build_headers(
+            api_key=self.api_key, api_secret=self.api_secret, client_id=client_id
+        )
 
         body = {"file_names": file_names}
         if connection_id is not None:
             body["temporary_connection_id"] = connection_id
 
-        return self._request("POST", url, headers=headers, json=body)
-
-    def __process_batch(self, client_id, files_list, connection_id=None):
-        """
-        Processes a batch of files.
-        """
-        # Prepare files for upload
-        files = {}
-        for file_path in files_list:
-            file_name = os.path.basename(file_path)
-            files[file_name] = file_path
-
-        response = self.connect_local_files(
-            client_id, list(files.keys()), connection_id
-        )
-        resumable_upload_links = response["response"]["resumable_upload_links"]
-        for file_name in resumable_upload_links.keys():
-            gcs.upload_to_gcs_resumable(
-                resumable_upload_links[file_name], files[file_name]
-            )
-
-        return response
+        return client_utils.request("POST", url, headers=headers, json=body)
 
     @validate_params(client_id=str, files_list=(str, list))
     def upload_files(self, client_id: str, files_list: Union[str, List[str]]):
@@ -675,21 +564,48 @@ class LabellerrClient:
             logging.error(f"Failed to upload files: {str(e)}")
             raise
 
+    def __process_batch(self, client_id, files_list, connection_id=None):
+        """
+        Processes a batch of files for upload.
+
+        :param client_id: The ID of the client
+        :param files_list: List of file paths to process
+        :param connection_id: Optional connection ID
+        :return: Response from connect_local_files
+        """
+        # Prepare files for upload
+        files = {}
+        for file_path in files_list:
+            file_name = os.path.basename(file_path)
+            files[file_name] = file_path
+
+        response = self.connect_local_files(
+            client_id, list(files.keys()), connection_id
+        )
+        resumable_upload_links = response["response"]["resumable_upload_links"]
+        for file_name in resumable_upload_links.keys():
+            gcs.upload_to_gcs_resumable(
+                resumable_upload_links[file_name], files[file_name]
+            )
+
+        return response
+
     def get_dataset(self, workspace_id, dataset_id):
         """
         Retrieves a dataset from the Labellerr API.
 
         :param workspace_id: The ID of the workspace.
         :param dataset_id: The ID of the dataset.
-        :param project_id: The ID of the project.
         :return: The dataset as JSON.
         """
         url = f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={workspace_id}&uuid={str(uuid.uuid4())}"
-        headers = self._build_headers(
-            extra_headers={"Origin": constants.ALLOWED_ORIGINS}
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            extra_headers={"Origin": constants.ALLOWED_ORIGINS},
         )
 
-        return self._request("GET", url, headers=headers)
+        return client_utils.request("GET", url, headers=headers)
 
     def update_rotation_count(self):
         """
@@ -701,7 +617,9 @@ class LabellerrClient:
             unique_id = str(uuid.uuid4())
             url = f"{self.base_url}/projects/rotations/add?project_id={self.project_id}&client_id={self.client_id}&uuid={unique_id}"
 
-            headers = self._build_headers(
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
                 client_id=self.client_id,
                 extra_headers={"content-type": "application/json"},
             )
@@ -712,7 +630,7 @@ class LabellerrClient:
             response = requests.request("POST", url, headers=headers, data=payload)
 
             logging.info("Rotation configuration updated successfully.")
-            self._handle_response(response, unique_id)
+            client_utils.handle_response(response, unique_id)
 
             return {"msg": "project rotation configuration updated"}
         except LabellerrError as e:
@@ -780,143 +698,6 @@ class LabellerrClient:
             return result["response"].get("connection_id")
         return None
 
-    def create_dataset(
-        self,
-        dataset_config,
-        files_to_upload=None,
-        folder_to_upload=None,
-        connector_config=None,
-    ):
-        """
-        Creates a dataset with support for multiple data types and connectors.
-
-        :param dataset_config: A dictionary containing the configuration for the dataset.
-                              Required fields: client_id, dataset_name, data_type
-                              Optional fields: dataset_description, connector_type
-        :param files_to_upload: List of file paths to upload (for local connector)
-        :param folder_to_upload: Path to folder to upload (for local connector)
-        :param connector_config: Configuration for cloud connectors (GCP/AWS)
-        :return: A dictionary containing the response status and the ID of the created dataset.
-        """
-
-        try:
-            # Validate required fields
-            required_fields = ["client_id", "dataset_name", "data_type"]
-            for field in required_fields:
-                if field not in dataset_config:
-                    raise LabellerrError(
-                        f"Required field '{field}' missing in dataset_config"
-                    )
-
-            # Validate data_type
-            if dataset_config.get("data_type") not in constants.DATA_TYPES:
-                raise LabellerrError(
-                    f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
-                )
-
-            connector_type = dataset_config.get("connector_type", "local")
-            connection_id = None
-            path = connector_type
-
-            # Handle different connector types
-            if connector_type == "local":
-                if files_to_upload is not None:
-                    try:
-                        connection_id = self.upload_files(
-                            client_id=dataset_config["client_id"],
-                            files_list=files_to_upload,
-                        )
-                    except Exception as e:
-                        raise LabellerrError(
-                            f"Failed to upload files to dataset: {str(e)}"
-                        )
-
-                elif folder_to_upload is not None:
-                    try:
-                        result = self.upload_folder_files_to_dataset(
-                            {
-                                "client_id": dataset_config["client_id"],
-                                "folder_path": folder_to_upload,
-                                "data_type": dataset_config["data_type"],
-                            }
-                        )
-                        connection_id = result["connection_id"]
-                    except Exception as e:
-                        raise LabellerrError(
-                            f"Failed to upload folder files to dataset: {str(e)}"
-                        )
-                elif connector_config is None:
-                    # Create empty dataset for local connector
-                    connection_id = None
-
-            elif connector_type in ["gcp", "aws"]:
-                if connector_config is None:
-                    raise LabellerrError(
-                        f"connector_config is required for {connector_type} connector"
-                    )
-
-                try:
-                    connection_id = self._setup_cloud_connector(
-                        connector_type, dataset_config["client_id"], connector_config
-                    )
-                except Exception as e:
-                    raise LabellerrError(
-                        f"Failed to setup {connector_type} connector: {str(e)}"
-                    )
-            else:
-                raise LabellerrError(f"Unsupported connector type: {connector_type}")
-
-            unique_id = str(uuid.uuid4())
-            url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config['client_id']}&uuid={unique_id}"
-            headers = self._build_headers(
-                client_id=dataset_config["client_id"],
-                extra_headers={"content-type": "application/json"},
-            )
-
-            payload = json.dumps(
-                {
-                    "dataset_name": dataset_config["dataset_name"],
-                    "dataset_description": dataset_config.get(
-                        "dataset_description", ""
-                    ),
-                    "data_type": dataset_config["data_type"],
-                    "connection_id": connection_id,
-                    "path": path,
-                    "client_id": dataset_config["client_id"],
-                    "connector_type": connector_type,
-                }
-            )
-            response_data = self._request(
-                "POST", url, headers=headers, data=payload, request_id=unique_id
-            )
-            dataset_id = response_data["response"]["dataset_id"]
-
-            return {"response": "success", "dataset_id": dataset_id}
-
-        except LabellerrError as e:
-            logging.error(f"Failed to create dataset: {e}")
-            raise
-
-    def delete_dataset(self, client_id, dataset_id):
-        """
-        Deletes a dataset from the system.
-
-        :param client_id: The ID of the client
-        :param dataset_id: The ID of the dataset to delete
-        :return: Dictionary containing deletion status
-        :raises LabellerrError: If the deletion fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.DeleteDatasetParams(client_id=client_id, dataset_id=dataset_id)
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
-        headers = self._build_headers(
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        return self._request("DELETE", url, headers=headers, request_id=unique_id)
-
     def enable_multimodal_indexing(self, client_id, dataset_id, is_multimodal=True):
         """
         Enables or disables multimodal indexing for an existing dataset.
@@ -938,7 +719,9 @@ class LabellerrClient:
         url = (
             f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
         )
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -951,7 +734,7 @@ class LabellerrClient:
             }
         )
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -973,7 +756,9 @@ class LabellerrClient:
         url = (
             f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
         )
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -986,7 +771,7 @@ class LabellerrClient:
             }
         )
 
-        result = self._request("POST", url, headers=headers, data=payload)
+        result = client_utils.request("POST", url, headers=headers, data=payload)
 
         # If the response is null or empty, provide a meaningful default status
         if result.get("response") is None:
@@ -1016,12 +801,14 @@ class LabellerrClient:
         )
 
         url = f"{constants.BASE_URL}/projects/attach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
 
-        return self._request("POST", url, headers=headers)
+        return client_utils.request("POST", url, headers=headers)
 
     def detach_dataset_from_project(self, client_id, project_id, dataset_id):
         """
@@ -1039,12 +826,14 @@ class LabellerrClient:
         )
 
         url = f"{constants.BASE_URL}/projects/detach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
 
-        return self._request("POST", url, headers=headers)
+        return client_utils.request("POST", url, headers=headers)
 
     @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
     def get_all_datasets(
@@ -1071,12 +860,14 @@ class LabellerrClient:
             f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
             f"&project_id={params.project_id}&uuid={unique_id}"
         )
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
 
-        return self._request("GET", url, headers=headers, request_id=unique_id)
+        return client_utils.request("GET", url, headers=headers, request_id=unique_id)
 
     def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
         """
@@ -1163,56 +954,18 @@ class LabellerrClient:
             unique_id = str(uuid.uuid4())
             url = f"{self.base_url}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
 
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"content-type": "application/json"}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"content-type": "application/json"},
             )
 
             response = requests.request("GET", url, headers=headers, data={})
-            return self._handle_response(response, unique_id)
+            return client_utils.handle_response(response, unique_id)
         except Exception as e:
             logging.error(f"Failed to retrieve projects: {str(e)}")
             raise
-
-    def create_annotation_guideline(
-        self, client_id, questions, template_name, data_type
-    ):
-        """
-        Updates the annotation guideline for a project.
-
-        :param config: A dictionary containing the project ID, data type, client ID, autolabel status, and the annotation guideline.
-        :return: None
-        :raises LabellerrError: If the update fails.
-        """
-        unique_id = str(uuid.uuid4())
-
-        url = f"{constants.BASE_URL}/annotations/create_template?data_type={data_type}&client_id={client_id}&uuid={unique_id}"
-
-        guide_payload = json.dumps(
-            {"templateName": template_name, "questions": questions}
-        )
-
-        headers = self._build_headers(
-            client_id=client_id, extra_headers={"content-type": "application/json"}
-        )
-
-        try:
-            response = requests.request(
-                "POST", url, headers=headers, data=guide_payload
-            )
-            response_data = self._handle_response(response, unique_id)
-            return response_data["response"]["template_id"]
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Failed to update project annotation guideline: {str(e)}")
-            raise
-
-    def validate_rotation_config(self, rotation_config):
-        """
-        Validates a rotation configuration.
-
-        :param rotation_config: A dictionary containing the configuration for the rotations.
-        :raises LabellerrError: If the configuration is invalid.
-        """
-        client_utils.validate_rotation_config(rotation_config)
 
     def _upload_preannotation_sync(
         self, project_id, client_id, annotation_format, annotation_file
@@ -1263,8 +1016,11 @@ class LabellerrClient:
             #         'email_id': self.api_key
             #     }, data=payload, files=files)
             url += "&gcs_path=" + gcs_path
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"email_id": self.api_key}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"email_id": self.api_key},
             )
             response = requests.request("POST", url, headers=headers, data=payload)
             response_data = self._handle_upload_response(response, request_uuid)
@@ -1354,8 +1110,11 @@ class LabellerrClient:
                 #         'email_id': self.api_key
                 #     }, data=payload, files=files)
                 url += "&gcs_path=" + gcs_path
-                headers = self._build_headers(
-                    client_id=client_id, extra_headers={"email_id": self.api_key}
+                headers = client_utils.build_headers(
+                    api_key=self.api_key,
+                    api_secret=self.api_secret,
+                    client_id=client_id,
+                    extra_headers={"email_id": self.api_key},
                 )
                 response = requests.request("POST", url, headers=headers, data=payload)
                 response_data = self._handle_upload_response(response, request_uuid)
@@ -1366,10 +1125,12 @@ class LabellerrClient:
                 self.job_id = job_id
                 self.project_id = project_id
 
-                logging.info(f"Preannotation upload successful. Job ID: {job_id}")
+                logging.info(f"Pre annotation upload successful. Job ID: {job_id}")
 
                 # Now monitor the status
-                headers = self._build_headers(
+                headers = client_utils.build_headers(
+                    api_key=self.api_key,
+                    api_secret=self.api_secret,
                     client_id=self.client_id,
                     extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                 )
@@ -1412,7 +1173,9 @@ class LabellerrClient:
         """
 
         def check_status():
-            headers = self._build_headers(
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
                 client_id=self.client_id,
                 extra_headers={"Origin": constants.ALLOWED_ORIGINS},
             )
@@ -1481,8 +1244,11 @@ class LabellerrClient:
             payload = {}
             with open(annotation_file, "rb") as f:
                 files = [("file", (file_name, f, "application/octet-stream"))]
-                headers = self._build_headers(
-                    client_id=client_id, extra_headers={"email_id": self.api_key}
+                headers = client_utils.build_headers(
+                    api_key=self.api_key,
+                    api_secret=self.api_secret,
+                    client_id=client_id,
+                    extra_headers={"email_id": self.api_key},
                 )
                 response = requests.request(
                     "POST", url, headers=headers, data=payload, files=files
@@ -1527,14 +1293,16 @@ class LabellerrClient:
         export_config.update({"export_destination": "local", "question_ids": ["all"]})
 
         payload = json.dumps(export_config)
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
-            }
+            },
         )
 
-        return self._request(
+        return client_utils.request(
             "POST",
             f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
             headers=headers,
@@ -1544,8 +1312,11 @@ class LabellerrClient:
 
     def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"Content-Type": "application/json"}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"Content-Type": "application/json"},
             )
 
             response = requests.get(
@@ -1587,14 +1358,17 @@ class LabellerrClient:
             url = f"{constants.BASE_URL}/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
 
             # Headers
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"Content-Type": "application/json"}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"Content-Type": "application/json"},
             )
 
             payload = json.dumps({"report_ids": report_ids})
 
             response = requests.post(url, headers=headers, data=payload)
-            result = self._handle_response(response, request_uuid)
+            result = client_utils.handle_response(response, request_uuid)
 
             # Now process each report_id
             for status_item in result.get("status", []):
@@ -1621,387 +1395,6 @@ class LabellerrClient:
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise
 
-    def create_project(
-        self,
-        project_name,
-        data_type,
-        client_id,
-        attached_datasets,
-        annotation_template_id,
-        rotations,
-        use_ai=False,
-        created_by=None,
-    ):
-        """
-        Creates a project with the given configuration.
-
-        :param project_name: Name of the project
-        :param data_type: Type of data (image, video, etc.)
-        :param client_id: ID of the client
-        :param attached_datasets: List of dataset IDs to attach to the project
-        :param annotation_template_id: ID of the annotation template
-        :param rotations: Dictionary containing rotation configuration
-        :param use_ai: Boolean flag for AI usage (default: False)
-        :param created_by: Optional creator information
-        :return: Project creation response
-        :raises LabellerrError: If the creation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.CreateProjectParams(
-            project_name=project_name,
-            data_type=data_type,
-            client_id=client_id,
-            attached_datasets=attached_datasets,
-            annotation_template_id=annotation_template_id,
-            rotations=rotations,
-            use_ai=use_ai,
-            created_by=created_by,
-        )
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
-
-        payload = json.dumps(
-            {
-                "project_name": params.project_name,
-                "attached_datasets": params.attached_datasets,
-                "data_type": params.data_type,
-                "annotation_template_id": str(params.annotation_template_id),
-                "rotations": params.rotations.model_dump(),
-                "use_ai": params.use_ai,
-                "created_by": params.created_by,
-            }
-        )
-
-        headers = self._build_headers(
-            client_id=params.client_id,
-            extra_headers={
-                "Origin": constants.ALLOWED_ORIGINS,
-                "Content-Type": "application/json",
-            },
-        )
-
-        return self._request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
-        )
-
-    def initiate_create_project(self, payload):
-        """
-        Orchestrates project creation by handling dataset creation, annotation guidelines,
-        and final project setup.
-        """
-
-        try:
-            # validate all the parameters
-            required_params = [
-                "client_id",
-                "dataset_name",
-                "dataset_description",
-                "data_type",
-                "created_by",
-                "project_name",
-                # Either annotation_guide or annotation_template_id must be provided
-                "autolabel",
-            ]
-            for param in required_params:
-                if param not in payload:
-                    raise LabellerrError(f"Required parameter {param} is missing")
-
-                if param == "client_id":
-                    if (
-                        not isinstance(payload[param], str)
-                        or not payload[param].strip()
-                    ):
-                        raise LabellerrError("client_id must be a non-empty string")
-
-            # Validate created_by email format
-            created_by = payload.get("created_by")
-            if (
-                not isinstance(created_by, str)
-                or "@" not in created_by
-                or "." not in created_by.split("@")[-1]
-            ):
-                raise LabellerrError("Please enter email id in created_by")
-
-            # Ensure either annotation_guide or annotation_template_id is provided
-            if not payload.get("annotation_guide") and not payload.get(
-                "annotation_template_id"
-            ):
-                raise LabellerrError(
-                    "Please provide either annotation guide or annotation template id"
-                )
-
-            # If annotation_guide is provided, validate its entries
-            if payload.get("annotation_guide"):
-                for guide in payload["annotation_guide"]:
-                    if "option_type" not in guide:
-                        raise LabellerrError(
-                            "option_type is required in annotation_guide"
-                        )
-                    if guide["option_type"] not in constants.OPTION_TYPE_LIST:
-                        raise LabellerrError(
-                            f"option_type must be one of {constants.OPTION_TYPE_LIST}"
-                        )
-
-            if "folder_to_upload" in payload and "files_to_upload" in payload:
-                raise LabellerrError(
-                    "Cannot provide both files_to_upload and folder_to_upload"
-                )
-
-            if "folder_to_upload" not in payload and "files_to_upload" not in payload:
-                raise LabellerrError(
-                    "Either files_to_upload or folder_to_upload must be provided"
-                )
-
-            if (
-                isinstance(payload.get("files_to_upload"), list)
-                and len(payload["files_to_upload"]) == 0
-            ):
-                payload.pop("files_to_upload")
-
-            if "rotation_config" not in payload:
-                payload["rotation_config"] = {
-                    "annotation_rotation_count": 1,
-                    "review_rotation_count": 1,
-                    "client_review_rotation_count": 1,
-                }
-            self.validate_rotation_config(payload["rotation_config"])
-
-            if payload["data_type"] not in constants.DATA_TYPES:
-                raise LabellerrError(
-                    f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
-                )
-
-            logging.info("Rotation configuration validated . . .")
-
-            logging.info("Creating dataset . . .")
-            dataset_response = self.create_dataset(
-                {
-                    "client_id": payload["client_id"],
-                    "dataset_name": payload["dataset_name"],
-                    "data_type": payload["data_type"],
-                    "dataset_description": payload["dataset_description"],
-                },
-                files_to_upload=payload.get("files_to_upload"),
-                folder_to_upload=payload.get("folder_to_upload"),
-            )
-
-            dataset_id = dataset_response["dataset_id"]
-
-            def dataset_ready():
-                try:
-                    dataset_status = self.get_dataset(payload["client_id"], dataset_id)
-
-                    if isinstance(dataset_status, dict):
-
-                        if "response" in dataset_status:
-                            return (
-                                dataset_status["response"].get("status_code", 200)
-                                == 300
-                            )
-                        else:
-
-                            return True
-                    return False
-                except Exception as e:
-                    logging.error(f"Error checking dataset status: {e}")
-                    return False
-
-            utils.poll(
-                function=dataset_ready,
-                condition=lambda x: x is True,
-                interval=5,
-                timeout=60,
-            )
-
-            logging.info("Dataset created and ready for use")
-
-            if payload.get("annotation_template_id"):
-                annotation_template_id = payload["annotation_template_id"]
-            else:
-                annotation_template_id = self.create_annotation_guideline(
-                    payload["client_id"],
-                    payload["annotation_guide"],
-                    payload["project_name"],
-                    payload["data_type"],
-                )
-            logging.info("Annotation guidelines created")
-
-            project_response = self.create_project(
-                project_name=payload["project_name"],
-                data_type=payload["data_type"],
-                client_id=payload["client_id"],
-                attached_datasets=[dataset_id],
-                annotation_template_id=annotation_template_id,
-                rotations=payload["rotation_config"],
-                use_ai=payload.get("use_ai", False),
-                created_by=payload["created_by"],
-            )
-
-            return {
-                "status": "success",
-                "message": "Project created successfully",
-                "project_id": project_response,
-            }
-
-        except LabellerrError:
-            raise
-        except Exception:
-            logging.exception("Unexpected error in project creation")
-            raise
-
-    def upload_folder_files_to_dataset(self, data_config):
-        """
-        Uploads local files from a folder to a dataset using parallel processing.
-
-        :param data_config: A dictionary containing the configuration for the data.
-        :return: A dictionary containing the response status and the list of successfully uploaded files.
-        :raises LabellerrError: If there are issues with file limits, permissions, or upload process
-        """
-        try:
-            # Validate required fields in data_config
-            required_fields = ["client_id", "folder_path", "data_type"]
-            missing_fields = [
-                field for field in required_fields if field not in data_config
-            ]
-            if missing_fields:
-                raise LabellerrError(
-                    f"Missing required fields in data_config: {', '.join(missing_fields)}"
-                )
-
-            # Validate folder path exists and is accessible
-            if not os.path.exists(data_config["folder_path"]):
-                raise LabellerrError(
-                    f"Folder path does not exist: {data_config['folder_path']}"
-                )
-            if not os.path.isdir(data_config["folder_path"]):
-                raise LabellerrError(
-                    f"Path is not a directory: {data_config['folder_path']}"
-                )
-            if not os.access(data_config["folder_path"], os.R_OK):
-                raise LabellerrError(
-                    f"No read permission for folder: {data_config['folder_path']}"
-                )
-
-            success_queue = []
-            fail_queue = []
-
-            try:
-                # Get files from folder
-                total_file_count, total_file_volumn, filenames = (
-                    self.get_total_folder_file_count_and_total_size(
-                        data_config["folder_path"], data_config["data_type"]
-                    )
-                )
-            except Exception as e:
-                logging.error(f"Failed to analyze folder contents: {str(e)}")
-                raise
-
-            # Check file limits
-            if total_file_count > constants.TOTAL_FILES_COUNT_LIMIT_PER_DATASET:
-                raise LabellerrError(
-                    f"Total file count: {total_file_count} exceeds limit of {constants.TOTAL_FILES_COUNT_LIMIT_PER_DATASET} files"
-                )
-            if total_file_volumn > constants.TOTAL_FILES_SIZE_LIMIT_PER_DATASET:
-                raise LabellerrError(
-                    f"Total file size: {total_file_volumn/1024/1024:.1f}MB exceeds limit of {constants.TOTAL_FILES_SIZE_LIMIT_PER_DATASET/1024/1024:.1f}MB"
-                )
-
-            logging.info(f"Total file count: {total_file_count}")
-            logging.info(f"Total file size: {total_file_volumn/1024/1024:.1f} MB")
-
-            # Use generator for memory-efficient batch creation
-            def create_batches():
-                current_batch = []
-                current_batch_size = 0
-
-                for file_path in filenames:
-                    try:
-                        file_size = os.path.getsize(file_path)
-                        if (
-                            current_batch_size + file_size > constants.FILE_BATCH_SIZE
-                            or len(current_batch) >= constants.FILE_BATCH_COUNT
-                        ):
-                            if current_batch:
-                                yield current_batch
-                            current_batch = [file_path]
-                            current_batch_size = file_size
-                        else:
-                            current_batch.append(file_path)
-                            current_batch_size += file_size
-                    except OSError as e:
-                        logging.error(f"Error accessing file {file_path}: {str(e)}")
-                        fail_queue.append(file_path)
-                    except Exception as e:
-                        logging.error(
-                            f"Unexpected error processing {file_path}: {str(e)}"
-                        )
-                        fail_queue.append(file_path)
-
-                if current_batch:
-                    yield current_batch
-
-            # Convert generator to list for ThreadPoolExecutor
-            batches = list(create_batches())
-
-            if not batches:
-                raise LabellerrError(
-                    "No valid files found to upload in the specified folder"
-                )
-
-            logging.info(f"CPU count: {cpu_count()}, Batch Count: {len(batches)}")
-
-            # Calculate optimal number of workers based on CPU count and batch count
-            max_workers = min(
-                cpu_count(),  # Number of CPU cores
-                len(batches),  # Number of batches
-                20,
-            )
-            connection_id = str(uuid.uuid4())
-            # Process batches in parallel
-            with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                future_to_batch = {
-                    executor.submit(
-                        self.__process_batch,
-                        data_config["client_id"],
-                        batch,
-                        connection_id,
-                    ): batch
-                    for batch in batches
-                }
-
-                for future in as_completed(future_to_batch):
-                    batch = future_to_batch[future]
-                    try:
-                        result = future.result()
-                        if (
-                            isinstance(result, dict)
-                            and result.get("message") == "200: Success"
-                        ):
-                            success_queue.extend(batch)
-                        else:
-                            fail_queue.extend(batch)
-                    except Exception as e:
-                        logging.exception(e)
-                        logging.error(f"Batch upload failed: {str(e)}")
-                        fail_queue.extend(batch)
-
-            if not success_queue and fail_queue:
-                raise LabellerrError(
-                    "All file uploads failed. Check individual file errors above."
-                )
-
-            return {
-                "connection_id": connection_id,
-                "success": success_queue,
-                "fail": fail_queue,
-            }
-
-        except LabellerrError:
-            raise
-        except Exception as e:
-            logging.error(f"Failed to upload files: {str(e)}")
-            raise
-
     def create_template(self, client_id, data_type, template_name, questions):
         """
         Creates an annotation template with the given configuration.
@@ -2023,7 +1416,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/annotations/create_template?client_id={params.client_id}&data_type={params.data_type}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2035,7 +1430,7 @@ class LabellerrClient:
             }
         )
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2084,7 +1479,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/register?client_id={params.client_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
@@ -2107,7 +1504,7 @@ class LabellerrClient:
             }
         )
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2159,7 +1556,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/update?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
@@ -2193,7 +1592,7 @@ class LabellerrClient:
 
         payload = json.dumps(payload_data)
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2257,7 +1656,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/delete?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
@@ -2293,7 +1694,7 @@ class LabellerrClient:
 
         payload = json.dumps(payload_data)
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2318,7 +1719,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/add_user_to_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2329,7 +1732,7 @@ class LabellerrClient:
             payload_data["role_id"] = params.role_id
 
         payload = json.dumps(payload_data)
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2351,7 +1754,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/remove_user_from_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2359,7 +1764,7 @@ class LabellerrClient:
         payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         payload = json.dumps(payload_data)
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2385,7 +1790,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/change_user_role?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2397,7 +1804,7 @@ class LabellerrClient:
         }
 
         payload = json.dumps(payload_data)
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2416,7 +1823,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/search/project_files?project_id={params.project_id}&client_id={params.client_id}&uuid={unique_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2429,7 +1838,7 @@ class LabellerrClient:
             }
         )
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2445,7 +1854,9 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
 
-        headers = self._build_headers(
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -2457,7 +1868,7 @@ class LabellerrClient:
             }
         )
 
-        return self._request(
+        return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
 
@@ -2477,8 +1888,11 @@ class LabellerrClient:
         try:
             unique_id = str(uuid.uuid4())
             url = f"{self.base_url}/actions/add_update_keyframes?client_id={client_id}&uuid={unique_id}"
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"content-type": "application/json"}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"content-type": "application/json"},
             )
 
             body = {
@@ -2489,7 +1903,7 @@ class LabellerrClient:
                 ],
             }
 
-            return self._request(
+            return client_utils.request(
                 "POST", url, headers=headers, json=body, request_id=unique_id
             )
 
@@ -2510,13 +1924,100 @@ class LabellerrClient:
         try:
             unique_id = str(uuid.uuid4())
             url = f"{self.base_url}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
-            headers = self._build_headers(
-                client_id=client_id, extra_headers={"content-type": "application/json"}
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers={"content-type": "application/json"},
             )
 
-            return self._request("POST", url, headers=headers, request_id=unique_id)
+            return client_utils.request(
+                "POST", url, headers=headers, request_id=unique_id
+            )
 
         except LabellerrError as e:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to delete key frames: {str(e)}")
+
+    # ===== Dataset-related methods (delegated to DataSets) =====
+
+    def create_project(
+        self,
+        project_name,
+        data_type,
+        client_id,
+        attached_datasets,
+        annotation_template_id,
+        rotations,
+        use_ai=False,
+        created_by=None,
+    ):
+        """
+        Creates a project with the given configuration.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.create_project(
+            project_name,
+            data_type,
+            client_id,
+            attached_datasets,
+            annotation_template_id,
+            rotations,
+            use_ai,
+            created_by,
+        )
+
+    def initiate_create_project(self, payload):
+        """
+        Orchestrates project creation by handling dataset creation, annotation guidelines,
+        and final project setup. Delegates to the DataSets handler.
+        """
+        return self.datasets.initiate_create_project(payload)
+
+    def create_annotation_guideline(
+        self, client_id, questions, template_name, data_type
+    ):
+        """
+        Creates an annotation guideline for a project.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.create_annotation_guideline(
+            client_id, questions, template_name, data_type
+        )
+
+    def validate_rotation_config(self, rotation_config):
+        """
+        Validates a rotation configuration.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.validate_rotation_config(rotation_config)
+
+    def create_dataset(
+        self,
+        dataset_config,
+        files_to_upload=None,
+        folder_to_upload=None,
+        connector_config=None,
+    ):
+        """
+        Creates a dataset with support for multiple data types and connectors.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.create_dataset(
+            dataset_config, files_to_upload, folder_to_upload, connector_config
+        )
+
+    def delete_dataset(self, client_id, dataset_id):
+        """
+        Deletes a dataset from the system.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.delete_dataset(client_id, dataset_id)
+
+    def upload_folder_files_to_dataset(self, data_config):
+        """
+        Uploads local files from a folder to a dataset using parallel processing.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.upload_folder_files_to_dataset(data_config)

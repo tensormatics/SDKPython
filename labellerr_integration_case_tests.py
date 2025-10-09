@@ -6,9 +6,9 @@ import time
 import unittest
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
-from unittest.mock import patch
 
 import dotenv
+from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
 from labellerr.exceptions import LabellerrError
@@ -435,26 +435,17 @@ class LabelerIntegrationTests(unittest.TestCase):
             else:
                 actual_project_id = test_project_id
                 try:
-                    with patch.object(
-                        self.client, "preannotation_job_status", create=True
-                    ) as mock_status:
-                        mock_status.return_value = {
-                            "response": {"status": "completed", "job_id": "real-job-id"}
-                        }
+                    result = self.client._upload_preannotation_sync(
+                        project_id=actual_project_id,
+                        client_id=self.client_id,
+                        annotation_format=annotation_format,
+                        annotation_file=temp_annotation_file.name,
+                    )
 
-                        result = self.client._upload_preannotation_sync(
-                            project_id=actual_project_id,
-                            client_id=self.client_id,
-                            annotation_format=annotation_format,
-                            annotation_file=temp_annotation_file.name,
-                        )
-
-                        self.assertIsInstance(
-                            result, dict, "Upload should return a dictionary"
-                        )
-                        self.assertIn(
-                            "response", result, "Result should contain response"
-                        )
+                    self.assertIsInstance(
+                        result, dict, "Upload should return a dictionary"
+                    )
+                    self.assertIn("response", result, "Result should contain response")
 
                 except Exception as api_error:
                     raise api_error
@@ -611,24 +602,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             test_project_id = getattr(self, "created_project_id", "test-project-id")
 
-            with patch.object(
-                self.client, "preannotation_job_status", create=True
-            ) as mock_status:
-                mock_status.return_value = {
-                    "response": {
-                        "status": "completed",
-                        "job_id": f"job-json-{int(time.time())}",
-                    }
-                }
+            result = self.client._upload_preannotation_sync(
+                project_id=test_project_id,
+                client_id=self.client_id,
+                annotation_format="json",
+                annotation_file=temp_annotation_file.name,
+            )
 
-                result = self.client._upload_preannotation_sync(
-                    project_id=test_project_id,
-                    client_id=self.client_id,
-                    annotation_format="json",
-                    annotation_file=temp_annotation_file.name,
-                )
-
-                self.assertIsInstance(result, dict)
+            self.assertIsInstance(result, dict)
 
         finally:
             if temp_annotation_file:
@@ -712,7 +693,13 @@ class LabelerIntegrationTests(unittest.TestCase):
         for case in cases:
             with self.subTest(test_name=case.test_name):
                 if case.expect_error_substr is not None:
-                    with self.assertRaises(LabellerrError) as ctx:
+                    # Pydantic validation errors (like "at least 1 character") raise ValidationError
+                    error_type = (
+                        ValidationError
+                        if "at least 1 character" in case.expect_error_substr
+                        else LabellerrError
+                    )
+                    with self.assertRaises(error_type) as ctx:
                         self.client.create_aws_connection(
                             client_id=case.client_id,
                             aws_access_key=case.access_key,
@@ -929,7 +916,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         """Test dataset attachment with invalid dataset_id format"""
         test_project_id = "sunny_tough_blackbird_40468"
 
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
@@ -949,7 +936,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
         test_project_id = "sunny_tough_blackbird_40468"
 
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.attach_dataset_to_project(
                 client_id="",
                 project_id=test_project_id,
@@ -1029,7 +1016,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         """Test dataset detachment with invalid dataset_id format"""
         test_project_id = "sunny_tough_blackbird_40468"
 
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
@@ -1049,7 +1036,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
         test_project_id = "sunny_tough_blackbird_40468"
 
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.detach_dataset_from_project(
                 client_id="",
                 project_id=test_project_id,
@@ -1123,7 +1110,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_multimodal_indexing_invalid_dataset_id(self):
         """Test multimodal indexing with invalid dataset_id format"""
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.enable_multimodal_indexing(
                 client_id=self.client_id,
                 dataset_id="invalid-dataset-id",
@@ -1136,7 +1123,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         """Test multimodal indexing with missing client_id"""
         test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
 
-        with self.assertRaises(LabellerrError) as context:
+        with self.assertRaises(ValidationError) as context:
             self.client.enable_multimodal_indexing(
                 client_id="",
                 dataset_id=test_dataset_id,

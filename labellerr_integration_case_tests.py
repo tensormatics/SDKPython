@@ -119,7 +119,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             "TEST_PROJECT_ID", "sisely_serious_tarantula_26824"
         )
         self.test_dataset_id = os.getenv(
-            "TEST_DATASET_ID", "769a313a-ea7e-47f2-83de-e4a11befd048"
+            "TEST_DATASET_ID", "bfd09b6a-a593-4246-82f7-505a497a887c"
         )
 
         if (
@@ -1754,7 +1754,7 @@ if __name__ == "__main__":
     - CLIENT_ID: Your Labellerr client ID
     - TEST_EMAIL: Valid email address for testing
     - TEST_PROJECT_ID: (Optional) Project ID for attach/detach tests (default: "sunny_tough_blackbird_40468")
-    - TEST_DATASET_ID: (Optional) Dataset ID for attach/detach tests (default: "769a313a-ea7e-47f2-83de-e4a11befd048")
+    - TEST_DATASET_ID: (Optional) Dataset ID for attach/detach tests (default: "055fecfe-d80e-4b93-90dd-dbb3a02dc03a")
     - AWS_CONNECTION_VIDEO: AWS video connection id
     - AWS_CONNECTION_IMAGE: AWS image connection id
     - GCS_CONNECTION_VIDEO: JSON string with GCS video creds {"cred_file:"{}","gcs_path":"gs://bucket/path"}

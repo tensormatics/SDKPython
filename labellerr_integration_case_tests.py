@@ -114,6 +114,14 @@ class LabelerIntegrationTests(unittest.TestCase):
         self.connector_image_creds_gcs = os.getenv("GCS_CONNECTION_IMAGE")
         self.connector_video_creds_gcs = os.getenv("GCS_CONNECTION_VIDEO")
 
+        # Configurable test IDs for attach/detach operations
+        self.test_project_id = os.getenv(
+            "TEST_PROJECT_ID", "sunny_tough_blackbird_40468"
+        )
+        self.test_dataset_id = os.getenv(
+            "TEST_DATASET_ID", "769a313a-ea7e-47f2-83de-e4a11befd048"
+        )
+
         if (
             self.api_key == ""
             or self.api_secret == ""
@@ -936,13 +944,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_success(self):
         """Test successful dataset attachment to project"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-        test_project_id = "sunny_tough_blackbird_40468"
-
         result = self.client.initiate_attach_dataset_to_project(
             client_id=self.client_id,
-            project_id=test_project_id,
-            dataset_id=test_dataset_id,
+            project_id=self.test_project_id,
+            dataset_id=self.test_dataset_id,
         )
 
         self.assertIsInstance(result, dict)
@@ -951,13 +956,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_invalid_project_id(self):
         """Test dataset attachment with invalid project_id format"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
             )
 
         # The error should indicate the resource was not found or invalid
@@ -968,12 +971,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_invalid_dataset_id(self):
         """Test dataset attachment with invalid dataset_id format"""
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(ValidationError) as context:
             self.client.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
+                project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
             )
 
@@ -987,14 +988,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_missing_client_id(self):
         """Test dataset attachment with missing client_id"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(ValidationError) as context:
             self.client.initiate_attach_dataset_to_project(
                 client_id="",
-                project_id=test_project_id,
-                dataset_id=test_dataset_id,
+                project_id=self.test_project_id,
+                dataset_id=self.test_dataset_id,
             )
 
         error_msg = str(context.exception)
@@ -1004,13 +1002,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_nonexistent_project(self):
         """Test dataset attachment with non-existent project_id"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
             )
 
         error_msg = str(context.exception)
@@ -1020,12 +1016,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_nonexistent_dataset(self):
         """Test dataset attachment with non-existent dataset_id"""
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
+                project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
             )
 
@@ -1036,13 +1030,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_success(self):
         """Test successful dataset detachment from project"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-        test_project_id = "sunny_tough_blackbird_40468"
-
         result = self.client.initiate_detach_dataset_from_project(
             client_id=self.client_id,
-            project_id=test_project_id,
-            dataset_id=test_dataset_id,
+            project_id=self.test_project_id,
+            dataset_id=self.test_dataset_id,
         )
 
         self.assertIsInstance(result, dict)
@@ -1051,13 +1042,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_invalid_project_id(self):
         """Test dataset detachment with invalid project_id format"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
             )
 
         # The error should indicate the resource was not found or invalid
@@ -1068,12 +1057,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_invalid_dataset_id(self):
         """Test dataset detachment with invalid dataset_id format"""
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(ValidationError) as context:
             self.client.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
+                project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
             )
 
@@ -1087,14 +1074,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_missing_client_id(self):
         """Test dataset detachment with missing client_id"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(ValidationError) as context:
             self.client.initiate_detach_dataset_from_project(
                 client_id="",
-                project_id=test_project_id,
-                dataset_id=test_dataset_id,
+                project_id=self.test_project_id,
+                dataset_id=self.test_dataset_id,
             )
 
         error_msg = str(context.exception)
@@ -1104,13 +1088,11 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_nonexistent_project(self):
         """Test dataset detachment with non-existent project_id"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
             )
 
         error_msg = str(context.exception)
@@ -1120,12 +1102,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_nonexistent_dataset(self):
         """Test dataset detachment with non-existent dataset_id"""
-        test_project_id = "sunny_tough_blackbird_40468"
-
         with self.assertRaises(LabellerrError) as context:
             self.client.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
+                project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
             )
 
@@ -1134,13 +1114,81 @@ class LabelerIntegrationTests(unittest.TestCase):
             "Not Found" in error_msg or "not found" in error_msg or "404" in error_msg
         )
 
+    def test_attach_datasets_batch_success(self):
+        """Test successful batch attachment of multiple datasets to project"""
+        # For testing batch operations, we'll use a list with the same test dataset
+        # In production, you'd use multiple unique dataset IDs
+        test_dataset_ids = [self.test_dataset_id]
+
+        result = self.client.initiate_attach_datasets_to_project(
+            client_id=self.client_id,
+            project_id=self.test_project_id,
+            dataset_ids=test_dataset_ids,
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("response", result)
+        print(" Batch attach operation successful")
+
+    def test_attach_datasets_batch_invalid_dataset_id(self):
+        """Test batch attach with one invalid dataset_id format"""
+        # Mix of valid UUID and invalid string
+        test_dataset_ids = [self.test_dataset_id, "invalid-id"]
+
+        with self.assertRaises(ValidationError) as context:
+            self.client.initiate_attach_datasets_to_project(
+                client_id=self.client_id,
+                project_id=self.test_project_id,
+                dataset_ids=test_dataset_ids,
+            )
+
+        error_msg = str(context.exception)
+        self.assertTrue(
+            "valid UUID" in error_msg
+            or "Invalid" in error_msg
+            or "uuid" in error_msg.lower()
+        )
+
+    def test_detach_datasets_batch_success(self):
+        """Test successful batch detachment of multiple datasets from project"""
+        # For testing batch operations, we'll use a list with the same test dataset
+        # In production, you'd use multiple unique dataset IDs
+        test_dataset_ids = [self.test_dataset_id]
+
+        result = self.client.initiate_detach_datasets_from_project(
+            client_id=self.client_id,
+            project_id=self.test_project_id,
+            dataset_ids=test_dataset_ids,
+        )
+
+        self.assertIsInstance(result, dict)
+        self.assertIn("response", result)
+        print(" Batch detach operation successful")
+
+    def test_detach_datasets_batch_invalid_dataset_id(self):
+        """Test batch detach with one invalid dataset_id format"""
+        # Mix of valid UUID and invalid string
+        test_dataset_ids = [self.test_dataset_id, "invalid-id"]
+
+        with self.assertRaises(ValidationError) as context:
+            self.client.initiate_detach_datasets_from_project(
+                client_id=self.client_id,
+                project_id=self.test_project_id,
+                dataset_ids=test_dataset_ids,
+            )
+
+        error_msg = str(context.exception)
+        self.assertTrue(
+            "valid UUID" in error_msg
+            or "Invalid" in error_msg
+            or "uuid" in error_msg.lower()
+        )
+
     def test_enable_multimodal_indexing(self):
         """Test enabling multimodal indexing for a dataset"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         result = self.client.enable_multimodal_indexing(
             client_id=self.client_id,
-            dataset_id=test_dataset_id,
+            dataset_id=self.test_dataset_id,
             is_multimodal=True,
         )
 
@@ -1150,11 +1198,9 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_disable_multimodal_indexing(self):
         """Test disabling multimodal indexing for a dataset"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         result = self.client.enable_multimodal_indexing(
             client_id=self.client_id,
-            dataset_id=test_dataset_id,
+            dataset_id=self.test_dataset_id,
             is_multimodal=False,
         )
 
@@ -1175,12 +1221,10 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_multimodal_indexing_missing_client_id(self):
         """Test multimodal indexing with missing client_id"""
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         with self.assertRaises(ValidationError) as context:
             self.client.enable_multimodal_indexing(
                 client_id="",
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
                 is_multimodal=True,
             )
 
@@ -1188,27 +1232,15 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_detach_workflow_integration(self):
         """Integration test for attach/detach workflow using real project IDs"""
-
-        try:
-            projects_result = self.client.get_all_project_per_client_id(self.client_id)
-            if projects_result.get("response") and len(projects_result["response"]) > 0:
-                test_project_id = projects_result["response"][0]["project_id"]
-            else:
-                self.skipTest("No projects available for testing")
-        except Exception as e:
-            self.skipTest(f"Could not fetch projects: {e}")
-
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         try:
             # Step 1: Attach dataset to project
             print(
-                f"Step 1: Attaching dataset {test_dataset_id} to project {test_project_id}..."
+                f"Step 1: Attaching dataset {self.test_dataset_id} to project {self.test_project_id}..."
             )
             attach_result = self.client.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
-                dataset_id=test_dataset_id,
+                project_id=self.test_project_id,
+                dataset_id=self.test_dataset_id,
             )
             self.assertIsInstance(attach_result, dict)
             self.assertIn("response", attach_result)
@@ -1221,8 +1253,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             print("Step 3: Detaching dataset from project...")
             detach_result = self.client.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
-                project_id=test_project_id,
-                dataset_id=test_dataset_id,
+                project_id=self.test_project_id,
+                dataset_id=self.test_dataset_id,
             )
             self.assertIsInstance(detach_result, dict)
             self.assertIn("response", detach_result)
@@ -1237,16 +1269,13 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_multimodal_indexing_workflow_integration(self):
         """Integration test for complete multimodal indexing workflow"""
-
-        test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
         try:
             # Step 1: Enable multimodal indexing
             print("Step 1: Enabling multimodal indexing...")
 
             enable_result = self.client.enable_multimodal_indexing(
                 client_id=self.client_id,
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
                 is_multimodal=True,
             )
             self.assertIsInstance(enable_result, dict)
@@ -1261,7 +1290,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             disable_result = self.client.enable_multimodal_indexing(
                 client_id=self.client_id,
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
                 is_multimodal=False,
             )
             self.assertIsInstance(disable_result, dict)
@@ -1278,11 +1307,9 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_get_multimodal_indexing_status(self):
         """Test getting multimodal indexing status for a dataset"""
         try:
-            test_dataset_id = "769a313a-ea7e-47f2-83de-e4a11befd048"
-
             status_result = self.client.get_multimodal_indexing_status(
                 client_id=self.client_id,
-                dataset_id=test_dataset_id,
+                dataset_id=self.test_dataset_id,
             )
 
             self.assertIsInstance(status_result, dict)
@@ -1681,6 +1708,8 @@ if __name__ == "__main__":
     - API_SECRET: Your Labellerr API secret
     - CLIENT_ID: Your Labellerr client ID
     - TEST_EMAIL: Valid email address for testing
+    - TEST_PROJECT_ID: (Optional) Project ID for attach/detach tests (default: "sunny_tough_blackbird_40468")
+    - TEST_DATASET_ID: (Optional) Dataset ID for attach/detach tests (default: "769a313a-ea7e-47f2-83de-e4a11befd048")
     - AWS_CONNECTION_VIDEO: AWS video connection id
     - AWS_CONNECTION_IMAGE: AWS image connection id
     - GCS_CONNECTION_VIDEO: JSON string with GCS video creds {"cred_file:"{}","gcs_path":"gs://bucket/path"}
@@ -1692,6 +1721,12 @@ if __name__ == "__main__":
     - test_update_user_role_integration: User role updates with real API calls
     - test_project_user_management_integration: Project user management operations
     - test_user_management_error_handling: Error handling validation
+
+    New Batch Operation Tests Added:
+    - test_attach_datasets_batch_success: Test batch attachment of datasets
+    - test_attach_datasets_batch_invalid_dataset_id: Test batch attach with invalid IDs
+    - test_detach_datasets_batch_success: Test batch detachment of datasets
+    - test_detach_datasets_batch_invalid_dataset_id: Test batch detach with invalid IDs
 
     Run with:
     python labellerr_integration_case_tests.py

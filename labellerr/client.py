@@ -1945,7 +1945,21 @@ class LabellerrClient:
         Delegates to the DataSets handler.
         """
         return self.datasets.attach_dataset_to_project(
-            client_id, project_id, dataset_id
+            client_id, project_id, dataset_id=dataset_id
+        )
+
+    def initiate_attach_datasets_to_project(self, client_id, project_id, dataset_ids):
+        """
+        Orchestrates attaching multiple datasets to a project (batch operation).
+        Delegates to the DataSets handler.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_ids: List of dataset IDs to attach
+        :return: Dictionary containing attachment status
+        """
+        return self.datasets.attach_dataset_to_project(
+            client_id, project_id, dataset_ids=dataset_ids
         )
 
     def initiate_detach_dataset_from_project(self, client_id, project_id, dataset_id):
@@ -1954,5 +1968,19 @@ class LabellerrClient:
         Delegates to the DataSets handler.
         """
         return self.datasets.detach_dataset_from_project(
-            client_id, project_id, dataset_id
+            client_id, project_id, dataset_id=dataset_id
+        )
+
+    def initiate_detach_datasets_from_project(self, client_id, project_id, dataset_ids):
+        """
+        Orchestrates detaching multiple datasets from a project (batch operation).
+        Delegates to the DataSets handler.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_ids: List of dataset IDs to detach
+        :return: Dictionary containing detachment status
+        """
+        return self.datasets.detach_dataset_from_project(
+            client_id, project_id, dataset_ids=dataset_ids
         )

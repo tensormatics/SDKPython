@@ -10,6 +10,7 @@ import requests
 from labellerr import client_utils, gcs, schemas, utils
 from labellerr.core import constants
 from labellerr.exceptions import LabellerrError
+from labellerr.utils import validate_params
 
 
 class DataSets(object):
@@ -23,7 +24,7 @@ class DataSets(object):
 
         :param api_key: The API key for authentication
         :param api_secret: The API secret for authentication
-        :param client: Reference to the parent LabellerrClient instance for delegating certain operations
+        :param client: Reference to the parent Labellerr Client instance for delegating certain operations
         """
         self.api_key = api_key
         self.api_secret = api_secret
@@ -620,3 +621,87 @@ class DataSets(object):
             )
 
         return response
+
+    def attach_dataset_to_project(self, client_id, project_id, dataset_id):
+        """
+        Attaches a dataset to an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to attach
+        :return: Dictionary containing attachment status
+        :raises LabellerrError: If the operation fails
+        """
+        # Validate parameters using Pydantic
+        params = schemas.AttachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_id
+        )
+
+        url = f"{constants.BASE_URL}/projects/attach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request("POST", url, headers=headers)
+
+    def detach_dataset_from_project(self, client_id, project_id, dataset_id):
+        """
+        Detaches a dataset from an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to detach
+        :return: Dictionary containing detachment status
+        :raises LabellerrError: If the operation fails
+        """
+        # Validate parameters using Pydantic
+        params = schemas.DetachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_id
+        )
+
+        url = f"{constants.BASE_URL}/projects/detach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request("POST", url, headers=headers)
+
+    @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
+    def get_all_datasets(
+        self, client_id: str, datatype: str, project_id: str, scope: str
+    ):
+        """
+        Retrieves datasets by parameters.
+
+        :param client_id: The ID of the client.
+        :param datatype: The type of data for the dataset.
+        :param project_id: The ID of the project.
+        :param scope: The permission scope for the dataset.
+        :return: The dataset list as JSON.
+        """
+        # Validate parameters using Pydantic
+        params = schemas.GetAllDatasetParams(
+            client_id=client_id,
+            datatype=datatype,
+            project_id=project_id,
+            scope=scope,
+        )
+        unique_id = str(uuid.uuid4())
+        url = (
+            f"{constants.BASE_URL}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
+            f"&project_id={params.project_id}&uuid={unique_id}"
+        )
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request("GET", url, headers=headers, request_id=unique_id)

@@ -7,7 +7,6 @@ import os
 import time
 import uuid
 from dataclasses import dataclass
-from functools import wraps
 from typing import Any, Dict, List, Union
 
 import requests
@@ -17,6 +16,7 @@ from urllib3.util.retry import Retry
 from . import client_utils, constants, gcs, schemas
 from .core.datasets.datasets import DataSets
 from .exceptions import LabellerrError
+from .utils import validate_params
 from .validators import auto_log_and_handle_errors
 
 create_dataset_parameters: Dict[str, Any] = {}
@@ -43,49 +43,23 @@ class KeyFrame:
     source: str = "manual"
 
     def __post_init__(self):
+        # Validate frame_number
+        if not isinstance(self.frame_number, int):
+            raise ValueError("frame_number must be an integer")
         if self.frame_number < 0:
             raise ValueError("frame_number must be non-negative")
 
+        # Validate is_manual
+        if not isinstance(self.is_manual, bool):
+            raise ValueError("is_manual must be a boolean")
 
-def validate_params(**validations):
-    """
-    Decorator to validate method parameters based on type specifications.
+        # Validate method
+        if not isinstance(self.method, str):
+            raise ValueError("method must be a string")
 
-    Usage:
-    @validate_params(project_id=str, file_id=str, keyFrames=list)
-    def some_method(self, project_id, file_id, keyFrames):
-        ...
-    """
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            # Get function signature to map args to parameter names
-            import inspect
-
-            sig = inspect.signature(func)
-            bound = sig.bind(*args, **kwargs)
-            bound.apply_defaults()
-
-            # Validate each parameter
-            for param_name, expected_type in validations.items():
-                if param_name in bound.arguments:
-                    value = bound.arguments[param_name]
-                    if not isinstance(value, expected_type):
-                        from .exceptions import LabellerrError
-
-                        type_name = (
-                            " or ".join(t.__name__ for t in expected_type)
-                            if isinstance(expected_type, tuple)
-                            else expected_type.__name__
-                        )
-                        raise LabellerrError(f"{param_name} must be a {type_name}")
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
+        # Validate source
+        if not isinstance(self.source, str):
+            raise ValueError("source must be a string")
 
 
 class LabellerrClient:
@@ -240,6 +214,30 @@ class LabellerrClient:
         """
         return client_utils.request(method, url, **kwargs)
 
+    def _make_request(self, method, url, **kwargs):
+        """
+        Make an HTTP request using the configured session or requests library.
+
+        :param method: HTTP method (GET, POST, etc.)
+        :param url: Request URL
+        :param kwargs: Additional arguments to pass to requests
+        :return: Response object
+        """
+        if self._session:
+            return self._session.request(method, url, **kwargs)
+        else:
+            return requests.request(method, url, **kwargs)
+
+    def _handle_response(self, response, request_id=None):
+        """
+        Handle API response and extract data or raise errors.
+
+        :param response: requests.Response object
+        :param request_id: Optional request tracking ID
+        :return: Response data
+        """
+        return client_utils.handle_response(response, request_id)
+
     def get_direct_upload_url(self, file_name, client_id, purpose="pre-annotations"):
         """
         Get the direct upload URL for the given file names.
@@ -320,7 +318,7 @@ class LabellerrClient:
 
         test_request = {
             "credentials": aws_credentials_json,
-            "connector": "aws",
+            "connector": "s3",
             "path": params.s3_path,
             "connection_type": params.connection_type,
             "data_type": params.data_type,
@@ -341,7 +339,7 @@ class LabellerrClient:
 
         create_request = {
             "client_id": params.client_id,
-            "connector": "aws",
+            "connector": "s3",
             "name": params.name,
             "description": params.description,
             "connection_type": params.connection_type,
@@ -464,12 +462,17 @@ class LabellerrClient:
                 request_id=request_uuid,
             )
 
-    def list_connection(self, client_id: str, connection_type: str):
+    def list_connection(
+        self, client_id: str, connection_type: str, connector: str = None
+    ):
         request_uuid = str(uuid.uuid4())
         list_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/list"
             f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
         )
+
+        if connector:
+            list_connection_url += f"&connector={connector}"
 
         headers = client_utils.build_headers(
             api_key=self.api_key,
@@ -641,14 +644,14 @@ class LabellerrClient:
         self, connector_type: str, client_id: str, connector_config: dict
     ):
         """
-        Internal method to setup cloud connector (AWS or GCP).
+        Internal method to set up cloud connector (AWS or GCP).
 
         :param connector_type: Type of connector ('aws' or 'gcp')
         :param client_id: The ID of the client
         :param connector_config: Configuration dictionary for the connector
         :return: connection_id from the created connection
         """
-        if connector_type == "aws":
+        if connector_type == "s3":
             # AWS connector configuration
             aws_access_key = connector_config.get("aws_access_key")
             aws_secrets_key = connector_config.get("aws_secrets_key")
@@ -785,90 +788,6 @@ class LabellerrClient:
 
         return result
 
-    def attach_dataset_to_project(self, client_id, project_id, dataset_id):
-        """
-        Attaches a dataset to an existing project.
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param dataset_id: The ID of the dataset to attach
-        :return: Dictionary containing attachment status
-        :raises LabellerrError: If the operation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.AttachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_id
-        )
-
-        url = f"{constants.BASE_URL}/projects/attach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        return client_utils.request("POST", url, headers=headers)
-
-    def detach_dataset_from_project(self, client_id, project_id, dataset_id):
-        """
-        Detaches a dataset from an existing project.
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param dataset_id: The ID of the dataset to detach
-        :return: Dictionary containing detachment status
-        :raises LabellerrError: If the operation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.DetachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_id
-        )
-
-        url = f"{constants.BASE_URL}/projects/detach?project_id={params.project_id}&client_id={params.client_id}&dataset_id={params.dataset_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        return client_utils.request("POST", url, headers=headers)
-
-    @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
-    def get_all_datasets(
-        self, client_id: str, datatype: str, project_id: str, scope: str
-    ):
-        """
-        Retrieves datasets by parameters.
-
-        :param client_id: The ID of the client.
-        :param datatype: The type of data for the dataset.
-        :param project_id: The ID of the project.
-        :param scope: The permission scope for the dataset.
-        :return: The dataset list as JSON.
-        """
-        # Validate parameters using Pydantic
-        params = schemas.GetAllDatasetParams(
-            client_id=client_id,
-            datatype=datatype,
-            project_id=project_id,
-            scope=scope,
-        )
-        unique_id = str(uuid.uuid4())
-        url = (
-            f"{self.base_url}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
-            f"&project_id={params.project_id}&uuid={unique_id}"
-        )
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        return client_utils.request("GET", url, headers=headers, request_id=unique_id)
-
     def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
         """
         Retrieves the total count and size of files in a folder using memory-efficient iteration.
@@ -926,7 +845,7 @@ class LabellerrClient:
             if file_path is None:
                 continue
             try:
-                # check if the file extention matching based on datatype
+                # check if the file extension matching based on datatype
                 if not any(
                     file_path.endswith(ext)
                     for ext in constants.DATA_TYPE_FILE_EXT[data_type]
@@ -1903,9 +1822,8 @@ class LabellerrClient:
                 ],
             }
 
-            return client_utils.request(
-                "POST", url, headers=headers, json=body, request_id=unique_id
-            )
+            response = self._make_request("POST", url, headers=headers, json=body)
+            return self._handle_response(response, unique_id)
 
         except LabellerrError as e:
             raise e
@@ -1931,9 +1849,8 @@ class LabellerrClient:
                 extra_headers={"content-type": "application/json"},
             )
 
-            return client_utils.request(
-                "POST", url, headers=headers, request_id=unique_id
-            )
+            response = self._make_request("POST", url, headers=headers)
+            return self._handle_response(response, unique_id)
 
         except LabellerrError as e:
             raise e
@@ -2021,3 +1938,21 @@ class LabellerrClient:
         Delegates to the DataSets handler.
         """
         return self.datasets.upload_folder_files_to_dataset(data_config)
+
+    def initiate_attach_dataset_to_project(self, client_id, project_id, dataset_id):
+        """
+        Orchestrates attaching a dataset to a project.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.attach_dataset_to_project(
+            client_id, project_id, dataset_id
+        )
+
+    def initiate_detach_dataset_from_project(self, client_id, project_id, dataset_id):
+        """
+        Orchestrates detaching a dataset from a project.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.detach_dataset_from_project(
+            client_id, project_id, dataset_id
+        )

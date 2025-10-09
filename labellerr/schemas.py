@@ -220,7 +220,7 @@ class CreateProjectParams(BaseModel):
     data_type: Literal["image", "video", "audio", "document", "text"]
     client_id: str = Field(min_length=1)
     attached_datasets: List[str] = Field(min_length=1)
-    annotation_template_id: UUID
+    annotation_template_id: str
     rotations: RotationConfig
     use_ai: bool = False
     created_by: Optional[str] = None

@@ -965,6 +965,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                     except OSError:
                         pass
 
+    # TODO: as attach detach process is linked merged these test to detach then attach project
     def test_attach_dataset_success(self):
         """Test successful dataset attachment to project"""
         result = self.client.initiate_attach_dataset_to_project(

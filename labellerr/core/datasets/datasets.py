@@ -237,7 +237,7 @@ class DataSets(object):
                     payload["project_name"],
                     payload["data_type"],
                 )
-            logging.info("Annotation guidelines created")
+            logging.info(f"Annotation guidelines created {annotation_template_id}")
 
             project_response = self.create_project(
                 project_name=payload["project_name"],

@@ -29,6 +29,7 @@ class LabellerrClient:
         self,
         api_key,
         api_secret,
+        client_id,
         enable_connection_pooling=True,
         pool_connections=10,
         pool_maxsize=20,
@@ -38,12 +39,14 @@ class LabellerrClient:
 
         :param api_key: The API key for authentication.
         :param api_secret: The API secret for authentication.
+        :param client_id: The client ID for the Labellerr account.
         :param enable_connection_pooling: Whether to enable connection pooling
         :param pool_connections: Number of connection pools to cache
         :param pool_maxsize: Maximum number of connections to save in the pool
         """
         self.api_key = api_key
         self.api_secret = api_secret
+        self.client_id = client_id
         self.base_url = constants.BASE_URL
         self._session = None
         self._enable_pooling = enable_connection_pooling
@@ -1335,3 +1338,30 @@ class LabellerrClient:
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to upload files: {str(e)}")
+        
+    def make_api_request(self, client_id, url, params=None, unique_id=None):
+        """
+        Make an API request using the client's session and response handling.
+        
+        Args:
+            client_id: Client identifier for authentication
+            url: The endpoint URL to make the request to
+            params: Optional query parameters for the request
+            unique_id: Optional unique identifier for request tracking
+        
+        Returns:
+            The processed response from the API
+        """
+        headers = self._build_headers(
+            client_id=client_id,
+            extra_headers={
+                "Content-Type": "application/json",
+                "Origin": constants.ALLOWED_ORIGINS 
+            }
+        )
+        
+        # Make request using client's session if available
+        response = self._make_request("GET", url, headers=headers, params=params)
+        
+        # Use client's response handler
+        return self._handle_response(response, request_id=unique_id)

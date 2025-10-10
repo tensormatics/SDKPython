@@ -69,3 +69,5 @@ site/
 
 # Test data
 tests/test_data
+download
+labellerr/__pycache__/

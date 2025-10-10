@@ -638,7 +638,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 )
 
                 self.assertIsInstance(result, dict)
-                print(" Pre-annotation upload successful")
+                print("Pre-annotation upload successful")
             except TimeoutError as e:
                 self.fail(
                     f"Test timed out: {e}\n"
@@ -1047,7 +1047,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             self.assertIsInstance(single_attach_result, dict)
             self.assertIn("response", single_attach_result)
-            print("✓ Single dataset attached successfully")
+            print("Single dataset attached successfully")
         except LabellerrError as e:
             # Handle "already attached" as a success case
             error_str = str(e)
@@ -1072,9 +1072,9 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             self.assertIsInstance(batch_detach_result, dict)
             self.assertIn("response", batch_detach_result)
-            print("✓ Batch datasets detached successfully")
+            print("Batch datasets detached successfully")
         except Exception as e:
-            print(f"⚠ Batch detach skipped: {str(e)[:100]}")
+            print(f"Batch detach skipped: {str(e)[:100]}")
 
         # Step 4: Attach batch datasets
         print("Step 4: Attaching batch datasets...")
@@ -1086,19 +1086,19 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             self.assertIsInstance(batch_attach_result, dict)
             self.assertIn("response", batch_attach_result)
-            print("✓ Batch datasets attached successfully")
+            print(" Batch datasets attached successfully")
         except LabellerrError as e:
             # Handle "already attached" as a success case
             error_str = str(e)
             if "already been attached" in error_str or "already attached" in error_str:
-                print("✓ Batch datasets already attached (treating as success)")
+                print(" Batch datasets already attached (treating as success)")
             else:
                 self.fail(f"Failed to attach batch datasets: {e}")
         except Exception as e:
             self.fail(f"Failed to attach batch datasets: {e}")
 
         print(
-            "\n✓✓✓ Complete attach/detach workflow successful (single & batch operations)"
+            "\n Complete attach/detach workflow successful (single & batch operations)"
         )
 
     def test_attach_dataset_invalid_project_id(self):

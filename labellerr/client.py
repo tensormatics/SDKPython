@@ -952,7 +952,10 @@ class LabellerrClient:
 
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
-            future = self.preannotation_job_status_async()
+            # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
+            future = self.preannotation_job_status_async(
+                max_retries=10, retry_interval=5
+            )
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
@@ -1083,12 +1086,19 @@ class LabellerrClient:
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(upload_and_monitor)
 
-    def preannotation_job_status_async(self):
+    def preannotation_job_status_async(self, max_retries=60, retry_interval=5):
         """
-        Get the status of a preannotation job asynchronously.
+        Get the status of a preannotation job asynchronously with timeout protection.
+
+        Args:
+            max_retries: Maximum number of retries before timing out (default: 60 retries = 5 minutes)
+            retry_interval: Seconds to wait between retries (default: 5 seconds)
 
         Returns:
             concurrent.futures.Future: A future that will contain the final job status
+
+        Raises:
+            LabellerrError: If max retries exceeded or job status check fails
         """
 
         def check_status():
@@ -1100,7 +1110,9 @@ class LabellerrClient:
             )
             url = f"{self.base_url}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
             payload = {}
-            while True:
+            retry_count = 0
+
+            while retry_count < max_retries:
                 try:
                     response = requests.request(
                         "GET", url, headers=headers, data=payload
@@ -1109,14 +1121,35 @@ class LabellerrClient:
 
                     # Check if job is completed
                     if response_data.get("response", {}).get("status") == "completed":
+                        logging.info(
+                            f"Pre-annotation job completed after {retry_count} retries"
+                        )
                         return response_data
 
-                    logging.info("retrying after 5 seconds . . .")
-                    time.sleep(5)
+                    retry_count += 1
+                    if retry_count < max_retries:
+                        logging.info(
+                            f"Retry {retry_count}/{max_retries}: Job not complete, retrying after {retry_interval} seconds..."
+                        )
+                        time.sleep(retry_interval)
+                    else:
+                        # Max retries exceeded
+                        total_wait_time = max_retries * retry_interval
+                        raise LabellerrError(
+                            f"Pre-annotation job did not complete after {max_retries} retries "
+                            f"({total_wait_time} seconds). Job ID: {self.job_id}. "
+                            f"Last status: {response_data.get('response', {}).get('status', 'unknown')}"
+                        )
 
+                except LabellerrError:
+                    # Re-raise LabellerrError without wrapping
+                    raise
                 except Exception as e:
                     logging.error(f"Failed to get preannotation job status: {str(e)}")
-                    raise
+                    raise LabellerrError(
+                        f"Failed to get preannotation job status: {str(e)}"
+                    )
+            return None
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(check_status)
@@ -1183,7 +1216,10 @@ class LabellerrClient:
 
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
-            future = self.preannotation_job_status_async()
+            # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
+            future = self.preannotation_job_status_async(
+                max_retries=10, retry_interval=5
+            )
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")

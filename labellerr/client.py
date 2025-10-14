@@ -71,6 +71,7 @@ class LabellerrClient:
         self,
         api_key,
         api_secret,
+        client_id,
         enable_connection_pooling=True,
         pool_connections=10,
         pool_maxsize=20,
@@ -80,12 +81,14 @@ class LabellerrClient:
 
         :param api_key: The API key for authentication.
         :param api_secret: The API secret for authentication.
+        :param client_id: The client ID for the Labellerr account.
         :param enable_connection_pooling: Whether to enable connection pooling
         :param pool_connections: Number of connection pools to cache
         :param pool_maxsize: Maximum number of connections to save in the pool
         """
         self.api_key = api_key
         self.api_secret = api_secret
+        self.client_id = client_id
         self.base_url = constants.BASE_URL
         self._session = None
         self._enable_pooling = enable_connection_pooling

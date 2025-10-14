@@ -13,7 +13,7 @@ from labellerr.exceptions import LabellerrError
 from labellerr.utils import validate_params
 
 
-class DataSets(object):
+class Datasets(object):
     """
     Handles dataset-related operations for the Labellerr API.
     """

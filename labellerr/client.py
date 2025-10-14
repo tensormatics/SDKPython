@@ -14,7 +14,7 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from . import client_utils, constants, gcs, schemas
-from .core.datasets.datasets import DataSets
+from .core.datasets.datasets import Datasets
 from .exceptions import LabellerrError
 from .utils import validate_params
 from .validators import auto_log_and_handle_errors
@@ -96,7 +96,7 @@ class LabellerrClient:
             self._setup_session()
 
         # Initialize DataSets handler for dataset-related operations
-        self.datasets = DataSets(api_key, api_secret, self)
+        self.datasets = Datasets(api_key, api_secret, self)
 
     def _setup_session(self):
         """

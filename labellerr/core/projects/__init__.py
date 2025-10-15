@@ -1,3 +1,5 @@
-"""
-This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc.
-"""
+from .projects import LabellerrProject
+from .image_project import ImageProject as LabellerrImageProject
+from .video_project import VideoProject as LabellerrVideoProject    
+
+__all__ = ['LabellerrImageProject', 'LabellerrVideoProject', 'LabellerrProject']

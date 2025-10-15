@@ -5,7 +5,7 @@ import cv2
 from pydantic import BaseModel, Field
 from typing import List
 import json
-from labellerr.base.singleton import Singleton
+from labellerr.core.base.singleton import Singleton
 
 
 class SceneFrame(BaseModel):

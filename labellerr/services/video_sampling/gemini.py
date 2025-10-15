@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import json
 from google.cloud import videointelligence
-from labellerr.base.singleton import Singleton
+from labellerr.core.base.singleton import Singleton
 
 
 class SceneFrame(BaseModel):

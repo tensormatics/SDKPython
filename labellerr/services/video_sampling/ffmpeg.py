@@ -3,7 +3,7 @@ import os
 import json
 from pydantic import BaseModel, Field
 from typing import List
-from labellerr.base.singleton import Singleton
+from labellerr.core.base.singleton import Singleton
 
 
 class SceneFrame(BaseModel):

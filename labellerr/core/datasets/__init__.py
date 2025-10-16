@@ -1,7 +1,5 @@
-"""This module will contain all CRUD for datasets. Example, create, list datasets, get dataset, delete dataset, update dataset, etc.
-"""
-from labellerr.core.datasets.base import LabellerrDataset
+from .base import LabellerrDataset
+from .image_dataset import ImageDataset as LabellerrImageDataset
+from .video_dataset import VideoDataset as LabellerrVideoDataset    
 
-__all__ = [
-    'LabellerrDataset'
-    ]
+__all__ = ['LabellerrImageDataset', 'LabellerrVideoDataset', 'LabellerrDataset']

@@ -1,6 +1,6 @@
-from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
-from labellerr import constants
+from ..client import LabellerrClient
+from ..exceptions import LabellerrError
+from .. import constants
 import uuid
 import os
 import subprocess

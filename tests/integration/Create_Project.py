@@ -1,18 +1,12 @@
 import os
 import sys
-
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "SDKPython"))
-)
+import uuid
 
 # Add the root directory to Python path
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(root_dir)
 
-import uuid
-
-from SDKPython.labellerr.client import LabellerrClient
-from SDKPython.labellerr.exceptions import LabellerrError
+from labellerr import LabellerrClient, LabellerrError
 
 
 def create_project_all_option_type(

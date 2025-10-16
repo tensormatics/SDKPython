@@ -1,16 +1,12 @@
 import os
 import sys
 
-sys.path.append(
-    os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "SDKPython"))
-)
-
 # Add the root directory to Python path
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(root_dir)
 
-from SDKPython.labellerr.client import LabellerrClient
-from SDKPython.labellerr.exceptions import LabellerrError
+from labellerr.client import LabellerrClient
+from labellerr.exceptions import LabellerrError
 
 
 def export_project(api_key, api_secret, client_id, project_id):

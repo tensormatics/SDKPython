@@ -423,5 +423,319 @@ class TestListAndBulkAssignFiles:
             )
 
 
+class TestBulkAssignFiles:
+    """Comprehensive tests for bulk_assign_files method"""
+
+    def test_bulk_assign_files_invalid_client_id_type(self, client):
+        """Test error handling for invalid client_id type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id=12345,  # Not a string
+                project_id="project_123",
+                file_ids=["file1", "file2"],
+                new_status="completed",
+            )
+        assert "client_id" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_empty_client_id(self, client):
+        """Test error handling for empty client_id"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="",
+                project_id="project_123",
+                file_ids=["file1", "file2"],
+                new_status="completed",
+            )
+        assert "client_id" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_invalid_project_id_type(self, client):
+        """Test error handling for invalid project_id type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id=12345,  # Not a string
+                file_ids=["file1", "file2"],
+                new_status="completed",
+            )
+        assert "project_id" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_empty_project_id(self, client):
+        """Test error handling for empty project_id"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="",
+                file_ids=["file1", "file2"],
+                new_status="completed",
+            )
+        assert "project_id" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_empty_file_ids_list(self, client):
+        """Test error handling for empty file_ids list"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=[],  # Empty list
+                new_status="completed",
+            )
+        assert "file_ids" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_invalid_file_ids_type(self, client):
+        """Test error handling for invalid file_ids type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids="file1,file2",  # Not a list
+                new_status="completed",
+            )
+        assert "file_ids" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_file_ids_with_non_string(self, client):
+        """Test error handling for file_ids containing non-string values"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=["file1", 123, "file3"],  # Contains integer
+                new_status="completed",
+            )
+        assert "file_ids" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_invalid_new_status_type(self, client):
+        """Test error handling for invalid new_status type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=["file1", "file2"],
+                new_status=123,  # Not a string
+            )
+        assert "new_status" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_empty_new_status(self, client):
+        """Test error handling for empty new_status"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=["file1", "file2"],
+                new_status="",
+            )
+        assert "new_status" in str(exc_info.value).lower()
+
+    def test_bulk_assign_files_single_file(self, client):
+        """Test bulk assign with a single file"""
+        # This should not raise validation errors
+        try:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=["file1"],
+                new_status="completed",
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass for single file")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_bulk_assign_files_multiple_files(self, client):
+        """Test bulk assign with multiple files"""
+        # This should not raise validation errors
+        try:
+            client.bulk_assign_files(
+                client_id="12345",
+                project_id="project_123",
+                file_ids=["file1", "file2", "file3", "file4", "file5"],
+                new_status="in_progress",
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass for multiple files")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_bulk_assign_files_special_characters_in_ids(self, client):
+        """Test bulk assign with special characters in IDs"""
+        try:
+            client.bulk_assign_files(
+                client_id="client-123_test",
+                project_id="project-456_test",
+                file_ids=["file-1_test", "file-2_test"],
+                new_status="pending",
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass for IDs with special characters")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+
+class TestListFile:
+    """Comprehensive tests for list_file method"""
+
+    def test_list_file_invalid_client_id_type(self, client):
+        """Test error handling for invalid client_id type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id=12345,  # Not a string
+                project_id="project_123",
+                search_queries={"status": "completed"},
+            )
+        assert "client_id" in str(exc_info.value).lower()
+
+    def test_list_file_empty_client_id(self, client):
+        """Test error handling for empty client_id"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+            )
+        assert "client_id" in str(exc_info.value).lower()
+
+    def test_list_file_invalid_project_id_type(self, client):
+        """Test error handling for invalid project_id type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id=12345,  # Not a string
+                search_queries={"status": "completed"},
+            )
+        assert "project_id" in str(exc_info.value).lower()
+
+    def test_list_file_empty_project_id(self, client):
+        """Test error handling for empty project_id"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id="",
+                search_queries={"status": "completed"},
+            )
+        assert "project_id" in str(exc_info.value).lower()
+
+    def test_list_file_invalid_search_queries_type(self, client):
+        """Test error handling for invalid search_queries type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries="status:completed",  # Not a dict
+            )
+        assert "search_queries" in str(exc_info.value).lower()
+
+    def test_list_file_invalid_size_type(self, client):
+        """Test error handling for invalid size type"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+                size="invalid",  # Non-numeric string
+            )
+        assert "size" in str(exc_info.value).lower()
+
+    def test_list_file_negative_size(self, client):
+        """Test error handling for negative size"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+                size=-1,
+            )
+        assert "size" in str(exc_info.value).lower()
+
+    def test_list_file_zero_size(self, client):
+        """Test error handling for zero size"""
+        with pytest.raises(ValidationError) as exc_info:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+                size=0,
+            )
+        assert "size" in str(exc_info.value).lower()
+
+    def test_list_file_with_default_size(self, client):
+        """Test list_file with default size parameter"""
+        try:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass with default size")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_list_file_with_custom_size(self, client):
+        """Test list_file with custom size parameter"""
+        try:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+                size=50,
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass with custom size")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_list_file_with_next_search_after(self, client):
+        """Test list_file with next_search_after for pagination"""
+        try:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={"status": "completed"},
+                size=10,
+                next_search_after="some_cursor_value",
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass with next_search_after")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_list_file_complex_search_queries(self, client):
+        """Test list_file with complex search queries"""
+        try:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={
+                    "status": "completed",
+                    "created_at": {"gte": "2024-01-01"},
+                    "tags": ["tag1", "tag2"],
+                },
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass with complex search queries")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+    def test_list_file_empty_search_queries(self, client):
+        """Test list_file with empty search queries dict"""
+        try:
+            client.list_file(
+                client_id="12345",
+                project_id="project_123",
+                search_queries={},  # Empty dict
+            )
+        except ValidationError:
+            pytest.fail("Validation should pass with empty search queries")
+        except Exception:
+            # API call will fail but validation should pass
+            pass
+
+
 if __name__ == "__main__":
     pytest.main()

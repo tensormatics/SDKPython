@@ -2021,3 +2021,30 @@ class LabellerrClient:
         return self.datasets.detach_dataset_from_project(
             client_id, project_id, dataset_ids=dataset_ids
         )
+
+    def sync_datasets(
+        self,
+        client_id,
+        project_id,
+        dataset_id,
+        path,
+        data_type,
+        email_id,
+        connection_id,
+    ):
+        """
+        Syncs datasets with the backend.
+        Delegates to the DataSets handler.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to sync
+        :param path: The path to sync
+        :param data_type: Type of data (image, video, audio, document, text)
+        :param email_id: Email ID of the user
+        :param connection_id: The connection ID
+        :return: Dictionary containing sync status
+        """
+        return self.datasets.sync_datasets(
+            client_id, project_id, dataset_id, path, data_type, email_id, connection_id
+        )

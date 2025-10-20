@@ -41,16 +41,16 @@ def test_list_files_by_status(api_key, api_secret, client_id, project_id):
             client_id=client_id, project_id=project_id, search_queries={}, size=10
         )
 
-        print(f"   ✓ Successfully retrieved files")
+        print("Successfully retrieved files")
         if "files" in result:
-            print(f"   ✓ Found {len(result.get('files', []))} files")
+            print("Found {len(result.get('files', []))} files")
         else:
-            print(f"   ✓ Response: {result}")
+            print("Response: {result}")
 
         return result
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return None
 
 
@@ -74,14 +74,14 @@ def test_list_files_with_pagination(api_key, api_secret, client_id, project_id):
             client_id=client_id, project_id=project_id, search_queries={}, size=5
         )
 
-        print(f"   ✓ Page 1 retrieved successfully")
+        print("Page 1 retrieved successfully")
         if "files" in result_page1:
-            print(f"   ✓ Page 1 contains {len(result_page1.get('files', []))} files")
+            print("Page 1 contains {len(result_page1.get('files', []))} files")
 
         # Check if there's a next page cursor
         next_cursor = result_page1.get("next_search_after")
         if next_cursor:
-            print(f"\n2. Next page cursor found, fetching second page...")
+            print("\n2. Next page cursor found, fetching second page...")
             result_page2 = client.list_file(
                 client_id=client_id,
                 project_id=project_id,
@@ -89,18 +89,16 @@ def test_list_files_with_pagination(api_key, api_secret, client_id, project_id):
                 size=5,
                 next_search_after=next_cursor,
             )
-            print(f"   ✓ Page 2 retrieved successfully")
+            print("Page 2 retrieved successfully")
             if "files" in result_page2:
-                print(
-                    f"   ✓ Page 2 contains {len(result_page2.get('files', []))} files"
-                )
+                print("Page 2 contains {len(result_page2.get('files', []))} files")
         else:
             print("   ℹ No more pages available")
 
         return result_page1
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return None
 
 
@@ -129,7 +127,7 @@ def test_bulk_assign_files(
 
     try:
         print(f"\n1. Bulk assigning {len(file_ids)} files to status: {new_status}")
-        print(f"   File IDs: {file_ids[:3]}{'...' if len(file_ids) > 3 else ''}")
+        print("File IDs: {file_ids[:3]}{'...' if len(file_ids) > 3 else ''}")
 
         result = client.bulk_assign_files(
             client_id=client_id,
@@ -138,13 +136,13 @@ def test_bulk_assign_files(
             new_status=new_status,
         )
 
-        print(f"   ✓ Bulk assign successful")
-        print(f"   ✓ Response: {result}")
+        print("Bulk assign successful")
+        print("Response: {result}")
 
         return result
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return None
 
 
@@ -181,20 +179,20 @@ def test_list_then_bulk_assign_workflow(
             size=5,  # Limit to 5 for testing
         )
 
-        print(f"   ✓ Files listed successfully")
+        print("Files listed successfully")
 
         # Extract file IDs from result
         files = list_result.get("files", [])
         if not files:
-            print(f"   ℹ No files found with status: {target_status}")
+            print("ℹ No files found with status: {target_status}")
             return None
 
         file_ids = [f["id"] for f in files if "id" in f]
         if not file_ids:
-            print(f"   ℹ No file IDs found in response")
+            print("ℹ No file IDs found in response")
             return None
 
-        print(f"   ✓ Found {len(file_ids)} files to process")
+        print("Found {len(file_ids)} files to process")
 
         # Step 2: Bulk assign to new status
         print(f"\n2. Bulk assigning {len(file_ids)} files to status: {new_status}")
@@ -205,8 +203,8 @@ def test_list_then_bulk_assign_workflow(
             new_status=new_status,
         )
 
-        print(f"   ✓ Bulk assign successful")
-        print(f"   ✓ Workflow completed successfully!")
+        print("Bulk assign successful")
+        print("Workflow completed successfully!")
 
         # Step 3: Verify the change (optional)
         print(f"\n3. Verifying files now have status: {new_status}")
@@ -218,7 +216,7 @@ def test_list_then_bulk_assign_workflow(
             size=len(file_ids) + 5,
         )
 
-        print(f"   ✓ Verification query successful")
+        print("Verification query successful")
 
         return {
             "list_result": list_result,
@@ -227,7 +225,7 @@ def test_list_then_bulk_assign_workflow(
         }
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f" Error: {str(e)}")
         return None
 
 
@@ -255,7 +253,7 @@ def test_bulk_assign_single_file(
 
     try:
         print(f"\n1. Bulk assigning single file: {file_id}")
-        print(f"   New status: {new_status}")
+        print("New status: {new_status}")
 
         result = client.bulk_assign_files(
             client_id=client_id,
@@ -264,13 +262,13 @@ def test_bulk_assign_single_file(
             new_status=new_status,
         )
 
-        print(f"   ✓ Single file bulk assign successful")
-        print(f"   ✓ Response: {result}")
+        print("Single file bulk assign successful")
+        print("Response: {result}")
 
         return result
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f"Error: {str(e)}")
         return None
 
 
@@ -296,7 +294,7 @@ def test_search_with_filters(api_key, api_secret, client_id, project_id):
             search_queries={"status": "pending"},
             size=10,
         )
-        print(f"   ✓ Simple filter search successful")
+        print("Simple filter search successful")
 
         # Test 2: Multiple filters (if supported)
         print("\n2. Searching with multiple filters...")
@@ -309,12 +307,12 @@ def test_search_with_filters(api_key, api_secret, client_id, project_id):
             },
             size=10,
         )
-        print(f"   ✓ Multiple filter search successful")
+        print("Multiple filter search successful")
 
         return {"simple_filter": result1, "multiple_filters": result2}
 
     except LabellerrError as e:
-        print(f"   ✗ Error: {str(e)}")
+        print(f" Error: {str(e)}")
         return None
 
 
@@ -336,41 +334,16 @@ def run_all_tests(api_key, api_secret, client_id, project_id):
     print("\n" + "=" * 80)
 
     # Test 1: List files
-    print("\n\n▶ Running Test Suite: LIST FILES")
-    result1 = test_list_files_by_status(api_key, api_secret, client_id, project_id)
+    print("\n\n Running Test Suite: LIST FILES")
+    test_list_files_by_status(api_key, api_secret, client_id, project_id)
 
     # Test 2: Pagination
-    print("\n\n▶ Running Test Suite: PAGINATION")
-    result2 = test_list_files_with_pagination(
-        api_key, api_secret, client_id, project_id
-    )
+    print("\n\n Running Test Suite: PAGINATION")
+    test_list_files_with_pagination(api_key, api_secret, client_id, project_id)
 
     # Test 3: Search with filters
-    print("\n\n▶ Running Test Suite: SEARCH FILTERS")
-    result3 = test_search_with_filters(api_key, api_secret, client_id, project_id)
-
-    # Note: Bulk assign tests require actual file IDs
-    # These should be run with real file IDs from your project
-    print("\n\n" + "=" * 80)
-    print(" BULK ASSIGN TESTS (Requires Real File IDs)")
-    print("=" * 80)
-    print("\nTo test bulk assign operations, you need to:")
-    print("1. Get file IDs from your project (using list_file)")
-    print("2. Call test_bulk_assign_files() with actual file IDs")
-    print("3. Call test_list_then_bulk_assign_workflow() for end-to-end testing")
-    print("\nExample:")
-    print("  # Get file IDs from list result")
-    print("  files = result1.get('files', [])")
-    print("  file_ids = [f['id'] for f in files[:3]]")
-    print("  ")
-    print("  # Test bulk assign")
-    print("  test_bulk_assign_files(api_key, api_secret, client_id, project_id,")
-    print("                          file_ids, 'annotation')")
-
-    print("\n" + "=" * 80)
-    print(" INTEGRATION TESTS COMPLETED")
-    print("=" * 80)
-    print("\n")
+    print("\n\n Running Test Suite: SEARCH FILTERS")
+    test_search_with_filters(api_key, api_secret, client_id, project_id)
 
 
 if __name__ == "__main__":

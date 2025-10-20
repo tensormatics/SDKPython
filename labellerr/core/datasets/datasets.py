@@ -763,3 +763,63 @@ class DataSets(object):
         )
 
         return client_utils.request("GET", url, headers=headers, request_id=unique_id)
+
+    def sync_datasets(
+        self,
+        client_id,
+        project_id,
+        dataset_id,
+        path,
+        data_type,
+        email_id,
+        connection_id,
+    ):
+        """
+        Syncs datasets with the backend.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to sync
+        :param path: The path to sync
+        :param data_type: Type of data (image, video, audio, document, text)
+        :param email_id: Email ID of the user
+        :param connection_id: The connection ID
+        :return: Dictionary containing sync status
+        :raises LabellerrError: If the sync fails
+        """
+        # Validate parameters using Pydantic
+        params = schemas.SyncDataSetParams(
+            client_id=client_id,
+            project_id=project_id,
+            dataset_id=dataset_id,
+            path=path,
+            data_type=data_type,
+            email_id=email_id,
+            connection_id=connection_id,
+        )
+
+        unique_id = str(uuid.uuid4())
+        url = f"https://api-gateway-722091373895.us-central1.run.app/connectors/datasets/sync?uuid={unique_id}&client_id={params.client_id}"
+
+        payload = json.dumps(
+            {
+                "client_id": params.client_id,
+                "project_id": params.project_id,
+                "dataset_id": params.dataset_id,
+                "path": params.path,
+                "data_type": params.data_type,
+                "email_id": params.email_id,
+                "connection_id": params.connection_id,
+            }
+        )
+
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )

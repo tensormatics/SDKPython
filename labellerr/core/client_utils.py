@@ -251,19 +251,13 @@ def request(method, url, request_id=None, success_codes=None, **kwargs):
             return response.json()
         except ValueError:
             # Handle cases where response is successful but not JSON
-            raise LabellerrError(
-                f"Expected JSON response but got: {response.text} for request url: {url}, args: {kwargs}"
-            )
+            raise LabellerrError(f"Expected JSON response but got: {response.text}")
     elif 400 <= response.status_code < 500:
         try:
             error_data = response.json()
-            raise LabellerrError(
-                {"error": error_data, "code": response.status_code, "url": url}
-            )
+            raise LabellerrError({"error": error_data, "code": response.status_code})
         except ValueError:
-            raise LabellerrError(
-                {"error": response.text, "code": response.status_code, "url": url}
-            )
+            raise LabellerrError({"error": response.text, "code": response.status_code})
     else:
         raise LabellerrError(
             {

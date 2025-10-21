@@ -1,7 +1,5 @@
-"""
-This module will contain all connectors for the SDK.
-Example, GCSConnector, S3Connector, etc.
-Create separate files for each connector.
+from .connections import LabellerrConnection
+from .gcs_connection import GCSConnection as LabellerrGCSConnection
+from .s3_connection import S3Connection as LabellerrS3Connection
 
-We can manage the connections also in this module.
-"""
+__all__ = ["LabellerrGCSConnection", "LabellerrConnection", "LabellerrS3Connection"]

@@ -26,3 +26,6 @@ wheels/
 .DS_Store
 .claude
 tests/test_data
+download
+labellerr/__pycache__/
+env.dev

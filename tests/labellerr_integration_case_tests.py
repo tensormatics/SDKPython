@@ -10,8 +10,8 @@ from typing import Any, Dict, List, Optional
 import dotenv
 from pydantic import ValidationError
 
+from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
 
 dotenv.load_dotenv()
 

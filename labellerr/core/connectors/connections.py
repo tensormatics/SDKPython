@@ -3,15 +3,16 @@
 
 import uuid
 from abc import ABCMeta, abstractmethod
+from typing import Dict
 
 from .. import client_utils, constants
 from ..client import LabellerrClient
-from ..exceptions import InvalidConnectionError
+from ..exceptions import InvalidConnectionError, InvalidDatasetIDError
 
 
 class LabellerrConnectionMeta(ABCMeta):
     # Class-level registry for connection types
-    _registry = {}
+    _registry: Dict[str, type] = {}
 
     @classmethod
     def register(cls, connection_type, connection_class):
@@ -52,7 +53,7 @@ class LabellerrConnectionMeta(ABCMeta):
             return instance
         connection_data = cls.get_connection(client, connection_id)
         if connection_data is None:
-            raise InvalidConnectionError(f"Connection not found: {connection_id}")
+            raise InvalidDatasetIDError(f"Connection not found: {connection_id}")
         connection_type = connection_data.get("connection_type")
         if connection_type not in constants.CONNECTION_TYPES:
             raise InvalidConnectionError(

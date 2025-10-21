@@ -17,3 +17,11 @@ class InvalidProjectError(Exception):
     """Custom exception for invalid project errors."""
 
     pass
+
+
+class InvalidDatasetIDError(Exception):
+    pass
+
+
+class InvalidConnectionError(Exception):
+    pass

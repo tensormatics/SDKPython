@@ -55,7 +55,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 "Missing environment variables: API_KEY, API_SECRET, CLIENT_ID"
             )
 
-        self.client = LabellerrClient(self.api_key, self.api_secret)
+        self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
 
         # Shared configuration (used by both AWS and GCS tests)
         self.project_id = "gabrila_artificial_duck_74237"  # Same project for both tests

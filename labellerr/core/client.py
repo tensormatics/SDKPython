@@ -13,7 +13,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
 from . import client_utils, constants, gcs, schemas
+
+# Initialize DataSets handler for dataset-related operations
+from .datasets.datasets import DataSets
 from .exceptions import LabellerrError
+
+# Initialize Projects handler for project-related operations
+from .projects.base import LabellerrProject
 from .utils import validate_params
 from .validators import auto_log_and_handle_errors
 
@@ -96,10 +102,19 @@ class LabellerrClient:
         if enable_connection_pooling:
             self._setup_session()
 
-        # Initialize DataSets handler for dataset-related operations
-        from .datasets.datasets_legacy import Datasets
+        self.datasets = DataSets(api_key, api_secret, self)
 
-        self.datasets = Datasets(api_key, api_secret, self)
+        self.projects = LabellerrProject.__new__(LabellerrProject)
+        self.projects.api_key = api_key
+        self.projects.api_secret = api_secret
+        self.projects.client = self
+
+        # Initialize Users handler for user-related operations
+        from .users.base import LabellerrUsers
+
+        self.users = LabellerrUsers()
+        self.users.api_key = api_key
+        self.users.api_secret = api_secret
 
     def _setup_session(self):
         """
@@ -991,3 +1006,149 @@ class LabellerrClient:
         Delegates to the DataSets handler.
         """
         return self.datasets.validate_rotation_config(rotation_config)
+
+    def sync_datasets(
+        self,
+        client_id,
+        project_id,
+        dataset_id,
+        path,
+        data_type,
+        email_id,
+        connection_id,
+    ):
+        """
+        Syncs datasets from cloud storage (AWS S3 or GCS) to the Labellerr platform.
+        Delegates to the DataSets handler.
+        """
+        return self.datasets.sync_datasets(
+            client_id,
+            project_id,
+            dataset_id,
+            path,
+            data_type,
+            email_id,
+            connection_id,
+        )
+
+    # ===== Project-related methods (delegated to Projects) =====
+
+    def initiate_create_project(self, payload):
+        """
+        Orchestrates project creation by handling dataset creation, annotation guidelines,
+        and final project setup.
+        Delegates to the Projects handler.
+        """
+        return self.projects.initiate_create_project(payload)
+
+    def list_file(
+        self, client_id, project_id, search_queries, size=10, next_search_after=None
+    ):
+        """
+        Lists files in a project with optional filtering and pagination.
+        Delegates to the Projects handler.
+        """
+        return self.projects.list_file(
+            client_id, project_id, search_queries, size, next_search_after
+        )
+
+    def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
+        """
+        Bulk assigns status to multiple files in a project.
+        Delegates to the Projects handler.
+        """
+        return self.projects.bulk_assign_files(
+            client_id, project_id, file_ids, new_status
+        )
+
+    # ===== User-related methods (delegated to Users) =====
+
+    def create_user(
+        self,
+        client_id,
+        first_name,
+        last_name,
+        email_id,
+        projects,
+        roles,
+        work_phone="",
+        job_title="",
+        language="en",
+        timezone="GMT",
+    ):
+        """
+        Creates a new user in the system.
+        Delegates to the Users handler.
+        """
+        return self.users.create_user(
+            client_id,
+            first_name,
+            last_name,
+            email_id,
+            projects,
+            roles,
+            work_phone,
+            job_title,
+            language,
+            timezone,
+        )
+
+    def update_user_role(
+        self,
+        client_id,
+        project_id,
+        email_id,
+        roles,
+        first_name=None,
+        last_name=None,
+        work_phone="",
+        job_title="",
+        language="en",
+        timezone="GMT",
+        profile_image="",
+    ):
+        """
+        Updates a user's role and profile information.
+        Delegates to the Users handler.
+        """
+        return self.users.update_user_role(
+            client_id,
+            project_id,
+            email_id,
+            roles,
+            first_name,
+            last_name,
+            work_phone,
+            job_title,
+            language,
+            timezone,
+            profile_image,
+        )
+
+    def delete_user(self, client_id, project_id, email_id, user_id):
+        """
+        Deletes a user from the system.
+        Delegates to the Users handler.
+        """
+        return self.users.delete_user(client_id, project_id, email_id, user_id)
+
+    def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
+        """
+        Adds a user to a project.
+        Delegates to the Users handler.
+        """
+        return self.users.add_user_to_project(client_id, project_id, email_id, role_id)
+
+    def remove_user_from_project(self, client_id, project_id, email_id):
+        """
+        Removes a user from a project.
+        Delegates to the Users handler.
+        """
+        return self.users.remove_user_from_project(client_id, project_id, email_id)
+
+    def change_user_role(self, client_id, project_id, email_id, new_role_id):
+        """
+        Changes a user's role in a project.
+        Delegates to the Users handler.
+        """
+        return self.users.change_user_role(client_id, project_id, email_id, new_role_id)

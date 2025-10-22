@@ -7,10 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from labellerr import client_utils, gcs, schemas, utils
-from labellerr.core import constants
-from labellerr.exceptions import LabellerrError
-from labellerr.utils import validate_params
+from labellerr.core import client_utils, constants, gcs, schemas, utils
+from labellerr.core.exceptions import LabellerrError
+from labellerr.core.utils import validate_params
 
 
 class DataSets(object):

@@ -7,14 +7,16 @@ import os
 import uuid
 from abc import ABCMeta
 from datetime import time
-from typing import List
+from typing import TYPE_CHECKING, List
 
 import requests
 
 from .. import client_utils, constants, gcs, schemas, utils
-from ..client import LabellerrClient
 from ..exceptions import InvalidProjectError, LabellerrError
 from ..utils import validate_params
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrProjectMeta(ABCMeta):
@@ -27,7 +29,7 @@ class LabellerrProjectMeta(ABCMeta):
         cls._registry[data_type] = project_class
 
     @staticmethod
-    def get_project(client: LabellerrClient, project_id: str):
+    def get_project(client: "LabellerrClient", project_id: str):
         """Get project from Labellerr API"""
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
@@ -75,7 +77,7 @@ class LabellerrProjectMeta(ABCMeta):
 class LabellerrProject(metaclass=LabellerrProjectMeta):
     """Base class for all Labellerr projects with factory behavior"""
 
-    def __init__(self, client: LabellerrClient, project_id: str, **kwargs):
+    def __init__(self, client: "LabellerrClient", project_id: str, **kwargs):
         self.client = client
         self.project_id = project_id
         self.project_data = kwargs["project_data"]

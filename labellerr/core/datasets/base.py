@@ -7,12 +7,15 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from asyncio import as_completed
 from concurrent.futures import ThreadPoolExecutor
+from typing import TYPE_CHECKING
 
 from ... import schemas
 from .. import client_utils, constants
-from ..client import LabellerrClient
 from ..exceptions import InvalidDatasetError, LabellerrError
 from ..utils import validate_params
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrDatasetMeta(ABCMeta):
@@ -25,7 +28,7 @@ class LabellerrDatasetMeta(ABCMeta):
         cls._registry[data_type] = dataset_class
 
     @staticmethod
-    def get_dataset(client: LabellerrClient, dataset_id: str):
+    def get_dataset(client: "LabellerrClient", dataset_id: str):
         """Get dataset from Labellerr API"""
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
@@ -73,7 +76,7 @@ class LabellerrDatasetMeta(ABCMeta):
 class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     """Base class for all Labellerr files with factory behavior"""
 
-    def __init__(self, client: LabellerrClient, dataset_id: str, **kwargs):
+    def __init__(self, client: "LabellerrClient", dataset_id: str, **kwargs):
         self.client = client
         self.dataset_id = dataset_id
         self.dataset_data = kwargs["dataset_data"]

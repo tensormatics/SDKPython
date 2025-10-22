@@ -1,4 +1,4 @@
-from .projects import LabellerrProject, LabellerrProjectMeta
+from .base import LabellerrProject, LabellerrProjectMeta
 
 
 class ImageProject(LabellerrProject):

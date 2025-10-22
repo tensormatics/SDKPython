@@ -1,4 +1,4 @@
-from .projects import LabellerrProject
+from .base import LabellerrProject
 
 
 class VideoProject(LabellerrProject):

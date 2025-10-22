@@ -3,11 +3,13 @@
 
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 from .. import client_utils, constants
-from ..client import LabellerrClient
 from ..exceptions import InvalidConnectionError, InvalidDatasetIDError
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrConnectionMeta(ABCMeta):
@@ -20,7 +22,7 @@ class LabellerrConnectionMeta(ABCMeta):
         cls._registry[connection_type] = connection_class
 
     @staticmethod
-    def get_connection(client: LabellerrClient, connection_id: str):
+    def get_connection(client: "LabellerrClient", connection_id: str):
         """Get connection from Labellerr API"""
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
@@ -70,7 +72,7 @@ class LabellerrConnectionMeta(ABCMeta):
 class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     """Base class for all Labellerr connections with factory behavior"""
 
-    def __init__(self, client: LabellerrClient, connection_id: str, **kwargs):
+    def __init__(self, client: "LabellerrClient", connection_id: str, **kwargs):
         self.client = client
         self.connection_id = connection_id
         self.connection_data = kwargs["connection_data"]

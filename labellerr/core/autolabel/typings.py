@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 from pydantic import BaseModel
 
@@ -9,7 +9,7 @@ class Hyperparameters(BaseModel):
 
 class TrainingRequest(BaseModel):
     model_id: str
-    projects: Optional[list[str]] = None
+    projects: Optional[List[str]] = None
     hyperparameters: Optional[Hyperparameters] = Hyperparameters()
     slice_id: Optional[str] = None
     min_samples_per_class: Optional[int] = 100

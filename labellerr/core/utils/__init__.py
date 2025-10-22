@@ -128,7 +128,7 @@ def validate_params(**validations):
                 if param_name in bound.arguments:
                     value = bound.arguments[param_name]
                     if not isinstance(value, expected_type):
-                        from exceptions import LabellerrError
+                        from ..exceptions import LabellerrError
 
                         type_name = (
                             " or ".join(t.__name__ for t in expected_type)

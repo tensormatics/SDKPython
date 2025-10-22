@@ -1,14 +1,11 @@
-"""This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc.
-"""
+"""This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc."""
 
 import json
 import logging
 import uuid
 from abc import ABCMeta
 
-import utils
-
-from .. import client_utils, constants, schemas
+from .. import client_utils, constants, schemas, utils
 from ..client import LabellerrClient
 from ..exceptions import InvalidProjectError, LabellerrError
 

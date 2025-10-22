@@ -311,7 +311,7 @@ class LabellerrVideoFile(LabellerrFile):
             print(f"\n{'='*60}")
             print("Processing complete!")
             print(f"Video saved to: {video_output_path}")
-            print(f"{'='*60}\n")
+            print("{'='*60}\n")
 
             return result
 

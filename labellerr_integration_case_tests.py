@@ -11,7 +11,7 @@ import dotenv
 from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
+from labellerr.core.exceptions import LabellerrError
 
 dotenv.load_dotenv()
 
@@ -136,7 +136,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "LABELLERR_API_KEY, LABELLERR_API_SECRET, LABELLERR_CLIENT_ID, LABELLERR_TEST_EMAIL, AWS_CONNECTION_VIDEO, AWS_CONNECTION_IMAGE"
             )
 
-        self.client = LabellerrClient(self.api_key, self.api_secret)
+        self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
 
         self.test_project_name = f"SDK_Test_Project_{int(time.time())}"
         self.test_dataset_name = f"SDK_Test_Dataset_{int(time.time())}"

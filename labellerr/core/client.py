@@ -99,7 +99,9 @@ class LabellerrClient:
             self._setup_session()
 
         # Initialize DataSets handler for dataset-related operations
-        # self.datasets = Datasets(api_key, api_secret, self)
+        from .datasets.datasets_legacy import Datasets
+
+        self.datasets = Datasets(api_key, api_secret, self)
 
     def _setup_session(self):
         """

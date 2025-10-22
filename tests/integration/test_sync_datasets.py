@@ -19,8 +19,8 @@ from typing import Optional
 
 import dotenv
 
+from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
 
 dotenv.load_dotenv()
 

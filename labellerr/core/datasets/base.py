@@ -2,12 +2,17 @@
 
 import json
 import logging
+import os
 import uuid
 from abc import ABCMeta, abstractmethod
+from asyncio import as_completed
+from concurrent.futures import ThreadPoolExecutor
 
+from ... import schemas
 from .. import client_utils, constants
 from ..client import LabellerrClient
 from ..exceptions import InvalidDatasetError, LabellerrError
+from ..utils import validate_params
 
 
 class LabellerrDatasetMeta(ABCMeta):
@@ -81,6 +86,148 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     def fetch_files(self):
         """Each file type must implement its own download logic"""
         pass
+
+    def attach_dataset_to_project(
+        self, client_id, project_id, dataset_id=None, dataset_ids=None
+    ):
+        """
+        Attaches one or more datasets to an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of a single dataset to attach (for backward compatibility)
+        :param dataset_ids: List of dataset IDs to attach (for batch operations)
+        :return: Dictionary containing attachment status
+        :raises LabellerrError: If the operation fails or if neither dataset_id nor dataset_ids is provided
+        """
+        # Handle both single and batch operations
+        if dataset_id is None and dataset_ids is None:
+            raise LabellerrError("Either dataset_id or dataset_ids must be provided")
+
+        if dataset_id is not None and dataset_ids is not None:
+            raise LabellerrError(
+                "Cannot provide both dataset_id and dataset_ids. Use dataset_ids for batch operations."
+            )
+
+        # Convert single dataset_id to list for uniform processing
+        if dataset_id is not None:
+            dataset_ids = [dataset_id]
+
+        # Validate parameters using Pydantic for each dataset
+        validated_dataset_ids = []
+        for ds_id in dataset_ids:
+            params = schemas.AttachDatasetParams(
+                client_id=client_id, project_id=project_id, dataset_id=ds_id
+            )
+            validated_dataset_ids.append(str(params.dataset_id))
+
+        # Use the first params validation for client_id and project_id
+        params = schemas.AttachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
+        )
+
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/actions/jobs/add_datasets_to_project?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        payload = json.dumps({"attached_datasets": validated_dataset_ids})
+
+        return client_utils.request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
+
+    def detach_dataset_from_project(
+        self, client_id, project_id, dataset_id=None, dataset_ids=None
+    ):
+        """
+        Detaches one or more datasets from an existing project.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of a single dataset to detach (for backward compatibility)
+        :param dataset_ids: List of dataset IDs to detach (for batch operations)
+        :return: Dictionary containing detachment status
+        :raises LabellerrError: If the operation fails or if neither dataset_id nor dataset_ids is provided
+        """
+        # Handle both single and batch operations
+        if dataset_id is None and dataset_ids is None:
+            raise LabellerrError("Either dataset_id or dataset_ids must be provided")
+
+        if dataset_id is not None and dataset_ids is not None:
+            raise LabellerrError(
+                "Cannot provide both dataset_id and dataset_ids. Use dataset_ids for batch operations."
+            )
+
+        # Convert single dataset_id to list for uniform processing
+        if dataset_id is not None:
+            dataset_ids = [dataset_id]
+
+        # Validate parameters using Pydantic for each dataset
+        validated_dataset_ids = []
+        for ds_id in dataset_ids:
+            params = schemas.DetachDatasetParams(
+                client_id=client_id, project_id=project_id, dataset_id=ds_id
+            )
+            validated_dataset_ids.append(str(params.dataset_id))
+
+        # Use the first params validation for client_id and project_id
+        params = schemas.DetachDatasetParams(
+            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
+        )
+
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/actions/jobs/delete_datasets_from_project?project_id={params.project_id}&uuid={unique_id}"
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        payload = json.dumps({"attached_datasets": validated_dataset_ids})
+
+        return client_utils.request(
+            "POST", url, headers=headers, data=payload, request_id=unique_id
+        )
+
+    @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
+    def get_all_datasets(
+        self, client_id: str, datatype: str, project_id: str, scope: str
+    ):
+        """
+        Retrieves datasets by parameters.
+
+        :param client_id: The ID of the client.
+        :param datatype: The type of data for the dataset.
+        :param project_id: The ID of the project.
+        :param scope: The permission scope for the dataset.
+        :return: The dataset list as JSON.
+        """
+        # Validate parameters using Pydantic
+        params = schemas.GetAllDatasetParams(
+            client_id=client_id,
+            datatype=datatype,
+            project_id=project_id,
+            scope=scope,
+        )
+        unique_id = str(uuid.uuid4())
+        url = (
+            f"{constants.BASE_URL}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
+            f"&project_id={params.project_id}&uuid={unique_id}"
+        )
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request("GET", url, headers=headers, request_id=unique_id)
 
     def create_dataset(
         self,
@@ -199,4 +346,181 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
         except LabellerrError as e:
             logging.error(f"Failed to create dataset: {e}")
+            raise
+
+    def delete_dataset(self, client_id, dataset_id):
+        """
+        Deletes a dataset from the system.
+
+        :param client_id: The ID of the client
+        :param dataset_id: The ID of the dataset to delete
+        :return: Dictionary containing deletion status
+        :raises LabellerrError: If the deletion fails
+        """
+        # Validate parameters using Pydantic
+        params = schemas.DeleteDatasetParams(client_id=client_id, dataset_id=dataset_id)
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+        )
+
+        return client_utils.request(
+            "DELETE", url, headers=headers, request_id=unique_id
+        )
+
+    def upload_folder_files_to_dataset(self, data_config):
+        """
+        Uploads local files from a folder to a dataset using parallel processing.
+
+        :param data_config: A dictionary containing the configuration for the data.
+        :return: A dictionary containing the response status and the list of successfully uploaded files.
+        :raises LabellerrError: If there are issues with file limits, permissions, or upload process
+        """
+        try:
+            # Validate required fields in data_config
+            required_fields = ["client_id", "folder_path", "data_type"]
+            missing_fields = [
+                field for field in required_fields if field not in data_config
+            ]
+            if missing_fields:
+                raise LabellerrError(
+                    f"Missing required fields in data_config: {', '.join(missing_fields)}"
+                )
+
+            # Validate folder path exists and is accessible
+            if not os.path.exists(data_config["folder_path"]):
+                raise LabellerrError(
+                    f"Folder path does not exist: {data_config['folder_path']}"
+                )
+            if not os.path.isdir(data_config["folder_path"]):
+                raise LabellerrError(
+                    f"Path is not a directory: {data_config['folder_path']}"
+                )
+            if not os.access(data_config["folder_path"], os.R_OK):
+                raise LabellerrError(
+                    f"No read permission for folder: {data_config['folder_path']}"
+                )
+
+            success_queue = []
+            fail_queue = []
+
+            try:
+                # Get files from folder
+                total_file_count, total_file_volumn, filenames = (
+                    self.client.get_total_folder_file_count_and_total_size(
+                        data_config["folder_path"], data_config["data_type"]
+                    )
+                )
+            except Exception as e:
+                logging.error(f"Failed to analyze folder contents: {str(e)}")
+                raise
+
+            # Check file limits
+            if total_file_count > constants.TOTAL_FILES_COUNT_LIMIT_PER_DATASET:
+                raise LabellerrError(
+                    f"Total file count: {total_file_count} exceeds limit of {constants.TOTAL_FILES_COUNT_LIMIT_PER_DATASET} files"
+                )
+            if total_file_volumn > constants.TOTAL_FILES_SIZE_LIMIT_PER_DATASET:
+                raise LabellerrError(
+                    f"Total file size: {total_file_volumn/1024/1024:.1f}MB exceeds limit of {constants.TOTAL_FILES_SIZE_LIMIT_PER_DATASET/1024/1024:.1f}MB"
+                )
+
+            logging.info(f"Total file count: {total_file_count}")
+            logging.info(f"Total file size: {total_file_volumn/1024/1024:.1f} MB")
+
+            # Use generator for memory-efficient batch creation
+            def create_batches():
+                current_batch = []
+                current_batch_size = 0
+
+                for file_path in filenames:
+                    try:
+                        file_size = os.path.getsize(file_path)
+                        if (
+                            current_batch_size + file_size > constants.FILE_BATCH_SIZE
+                            or len(current_batch) >= constants.FILE_BATCH_COUNT
+                        ):
+                            if current_batch:
+                                yield current_batch
+                            current_batch = [file_path]
+                            current_batch_size = file_size
+                        else:
+                            current_batch.append(file_path)
+                            current_batch_size += file_size
+                    except OSError as e:
+                        logging.error(f"Error accessing file {file_path}: {str(e)}")
+                        fail_queue.append(file_path)
+                    except Exception as e:
+                        logging.error(
+                            f"Unexpected error processing {file_path}: {str(e)}"
+                        )
+                        fail_queue.append(file_path)
+
+                if current_batch:
+                    yield current_batch
+
+            # Convert generator to list for ThreadPoolExecutor
+            batches = list(create_batches())
+
+            if not batches:
+                raise LabellerrError(
+                    "No valid files found to upload in the specified folder"
+                )
+
+            logging.info(f"CPU count: {os.cpu_count()}, Batch Count: {len(batches)}")
+
+            # Calculate optimal number of workers based on CPU count and batch count
+            max_workers = min(
+                os.cpu_count(),  # Number of CPU cores
+                len(batches),  # Number of batches
+                20,
+            )
+            connection_id = str(uuid.uuid4())
+            # Process batches in parallel
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_to_batch = {
+                    executor.submit(
+                        self.__process_batch,
+                        data_config["client_id"],
+                        batch,
+                        connection_id,
+                    ): batch
+                    for batch in batches
+                }
+
+                for future in as_completed(future_to_batch):
+                    batch = future_to_batch[future]
+                    try:
+                        result = future.result()
+                        if (
+                            isinstance(result, dict)
+                            and result.get("message") == "200: Success"
+                        ):
+                            success_queue.extend(batch)
+                        else:
+                            fail_queue.extend(batch)
+                    except Exception as e:
+                        logging.exception(e)
+                        logging.error(f"Batch upload failed: {str(e)}")
+                        fail_queue.extend(batch)
+
+            if not success_queue and fail_queue:
+                raise LabellerrError(
+                    "All file uploads failed. Check individual file errors above."
+                )
+
+            return {
+                "connection_id": connection_id,
+                "success": success_queue,
+                "fail": fail_queue,
+            }
+
+        except LabellerrError:
+            raise
+        except Exception as e:
+            logging.error(f"Failed to upload files: {str(e)}")
             raise

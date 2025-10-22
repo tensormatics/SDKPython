@@ -2,8 +2,10 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from labellerr.client import KeyFrame, LabellerrClient, validate_params
-from labellerr.exceptions import LabellerrError
+from labellerr.client import LabellerrClient
+from labellerr.core.client import KeyFrame
+from labellerr.core.utils import validate_params
+from labellerr.core.exceptions import LabellerrError
 
 
 class TestKeyFrame:
@@ -175,7 +177,7 @@ class TestValidateParamsDecorator:
 @pytest.fixture
 def mock_client():
     """Create a mock client for testing"""
-    client = LabellerrClient("test_api_key", "test_api_secret")
+    client = LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
     client.base_url = "https://api.labellerr.com"
     return client
 
@@ -183,8 +185,8 @@ def mock_client():
 class TestLinkKeyFrameMethod:
     """Unit tests for link_key_frame method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    @patch("labellerr.client.LabellerrClient._handle_response")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._handle_response")
     def test_link_key_frame_success(
         self, mock_handle_response, mock_make_request, mock_client
     ):
@@ -320,7 +322,7 @@ class TestLinkKeyFrameMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_client.link_key_frame(client_id, project_id, file_id, keyframes)
 
-    @patch("labellerr.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
     def test_link_key_frame_api_error(self, mock_make_request, mock_client):
         """Test link_key_frame when API call fails"""
         mock_make_request.side_effect = Exception("API Error")
@@ -333,8 +335,8 @@ class TestLinkKeyFrameMethod:
                 "test_client", "test_project", "test_file", keyframes
             )
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    @patch("labellerr.client.LabellerrClient._handle_response")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._handle_response")
     def test_link_key_frame_with_dict_keyframes(
         self, mock_handle_response, mock_make_request, mock_client
     ):
@@ -369,8 +371,8 @@ class TestLinkKeyFrameMethod:
 class TestDeleteKeyFramesMethod:
     """Unit tests for delete_key_frames method"""
 
-    @patch("labellerr.client.LabellerrClient._make_request")
-    @patch("labellerr.client.LabellerrClient._handle_response")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._handle_response")
     def test_delete_key_frames_success(
         self, mock_handle_response, mock_make_request, mock_client
     ):
@@ -416,7 +418,7 @@ class TestDeleteKeyFramesMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_client.delete_key_frames(client_id, project_id)
 
-    @patch("labellerr.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
     def test_delete_key_frames_api_error(self, mock_make_request, mock_client):
         """Test delete_key_frames when API call fails"""
         mock_make_request.side_effect = Exception("API Error")
@@ -426,7 +428,7 @@ class TestDeleteKeyFramesMethod:
         ):
             mock_client.delete_key_frames("test_client", "test_project")
 
-    @patch("labellerr.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient._make_request")
     def test_delete_key_frames_labellerr_error(self, mock_make_request, mock_client):
         """Test delete_key_frames when LabellerrError is raised"""
         mock_make_request.side_effect = LabellerrError("Custom error")

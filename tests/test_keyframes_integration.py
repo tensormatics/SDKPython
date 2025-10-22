@@ -2,8 +2,9 @@ import os
 
 import pytest
 
-from labellerr.client import KeyFrame, LabellerrClient
-from labellerr.exceptions import LabellerrError
+from labellerr.client import LabellerrClient
+from labellerr.core.client import KeyFrame
+from labellerr.core.exceptions import LabellerrError
 
 
 @pytest.fixture
@@ -11,7 +12,8 @@ def client():
     """Create a client for integration testing"""
     api_key = os.environ.get("LABELLERR_API_KEY", "test_api_key")
     api_secret = os.environ.get("LABELLERR_API_SECRET", "test_api_secret")
-    return LabellerrClient(api_key, api_secret)
+    client_id = os.environ.get("LABELLERR_CLIENT_ID", "test_client_id")
+    return LabellerrClient(api_key, api_secret, client_id)
 
 
 class TestKeyFrameBusinessScenarios:

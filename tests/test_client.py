@@ -4,13 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
+from labellerr.core.exceptions import LabellerrError
 
 
 @pytest.fixture
 def client():
     """Create a test client with mock credentials"""
-    return LabellerrClient("test_api_key", "test_api_secret")
+    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
 
 
 @pytest.fixture

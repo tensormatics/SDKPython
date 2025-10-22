@@ -1,15 +1,20 @@
-"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc."""
+"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc.
+"""
 
-from abc import ABCMeta, abstractmethod
-from ..client import LabellerrClient
-from .. import constants, client_utils
-from ..exceptions import InvalidConnectionError
 import uuid
+from abc import ABCMeta, abstractmethod
+from typing import TYPE_CHECKING, Dict
+
+from .. import client_utils, constants
+from ..exceptions import InvalidConnectionError, InvalidDatasetIDError
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrConnectionMeta(ABCMeta):
     # Class-level registry for connection types
-    _registry = {}
+    _registry: Dict[str, type] = {}
 
     @classmethod
     def register(cls, connection_type, connection_class):
@@ -17,7 +22,7 @@ class LabellerrConnectionMeta(ABCMeta):
         cls._registry[connection_type] = connection_class
 
     @staticmethod
-    def get_connection(client: LabellerrClient, connection_id: str):
+    def get_connection(client: "LabellerrClient", connection_id: str):
         """Get connection from Labellerr API"""
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
@@ -50,7 +55,7 @@ class LabellerrConnectionMeta(ABCMeta):
             return instance
         connection_data = cls.get_connection(client, connection_id)
         if connection_data is None:
-            raise InvalidConnectionError(f"Connection not found: {connection_id}")
+            raise InvalidDatasetIDError(f"Connection not found: {connection_id}")
         connection_type = connection_data.get("connection_type")
         if connection_type not in constants.CONNECTION_TYPES:
             raise InvalidConnectionError(
@@ -67,7 +72,7 @@ class LabellerrConnectionMeta(ABCMeta):
 class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     """Base class for all Labellerr connections with factory behavior"""
 
-    def __init__(self, client: LabellerrClient, connection_id: str, **kwargs):
+    def __init__(self, client: "LabellerrClient", connection_id: str, **kwargs):
         self.client = client
         self.connection_id = connection_id
         self.connection_data = kwargs["connection_data"]

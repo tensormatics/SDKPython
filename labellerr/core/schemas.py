@@ -339,3 +339,15 @@ class BulkAssignFilesParams(BaseModel):
     project_id: str = Field(min_length=1)
     file_ids: List[str] = Field(min_length=1)
     new_status: str = Field(min_length=1)
+
+
+class SyncDataSetParams(BaseModel):
+    """Parameters for syncing datasets from cloud storage."""
+
+    client_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    dataset_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    data_type: str = Field(min_length=1)
+    email_id: str = Field(min_length=1)
+    connection_id: str = Field(min_length=1)

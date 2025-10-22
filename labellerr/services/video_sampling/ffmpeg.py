@@ -1,8 +1,10 @@
-import subprocess
-import os
 import json
-from pydantic import BaseModel, Field
+import os
+import subprocess
 from typing import List
+
+from pydantic import BaseModel, Field
+
 from labellerr.core.base.singleton import Singleton
 
 

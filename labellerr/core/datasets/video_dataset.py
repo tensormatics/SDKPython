@@ -1,8 +1,9 @@
-from .. import constants
-from ..files import LabellerrFile
-from ..exceptions import LabellerrError
-from .base import LabellerrDataset, LabellerrDatasetMeta
 import uuid
+
+from .. import constants
+from ..exceptions import LabellerrError
+from ..files import LabellerrFile
+from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
 class VideoDataset(LabellerrDataset):

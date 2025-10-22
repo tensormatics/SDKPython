@@ -1,11 +1,13 @@
+import json
 import os
+from typing import List
+
 import cv2
 import numpy as np
 from PIL import Image
 from pydantic import BaseModel, Field
-from typing import List
-import json
 from skimage.metrics import structural_similarity as ssim
+
 from labellerr.core.base.singleton import Singleton
 
 

@@ -1,10 +1,9 @@
+import os
+
+from dotenv import load_dotenv
+
 from labellerr.client import LabellerrClient
 from labellerr.core.datasets import LabellerrDataset
-
-# from labellerr.core.autolabel import LabellerrAutoLabel
-# from labellerr.core.autolabel.typings import TrainingRequest
-from dotenv import load_dotenv
-import os
 
 load_dotenv()
 

@@ -1,8 +1,12 @@
-from abc import ABCMeta
-from ..client import LabellerrClient
-from .typings import TrainingRequest
-from .. import constants, client_utils
 import uuid
+from abc import ABCMeta
+from typing import TYPE_CHECKING
+
+from .. import client_utils, constants
+from .typings import TrainingRequest
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrAutoLabelMeta(ABCMeta):
@@ -10,7 +14,7 @@ class LabellerrAutoLabelMeta(ABCMeta):
 
 
 class LabellerrAutoLabel(metaclass=LabellerrAutoLabelMeta):
-    def __init__(self, client: LabellerrClient):
+    def __init__(self, client: "LabellerrClient"):
         self.client = client
 
     def train(self, training_request: TrainingRequest):

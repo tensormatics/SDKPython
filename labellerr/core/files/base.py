@@ -1,8 +1,12 @@
-from ..client import LabellerrClient
-from ..exceptions import LabellerrError
-from .. import constants
 import uuid
 from abc import ABCMeta
+from typing import TYPE_CHECKING
+
+from .. import constants
+from ..exceptions import LabellerrError
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrFileMeta(ABCMeta):
@@ -83,7 +87,7 @@ class LabellerrFile(metaclass=LabellerrFileMeta):
 
     def __init__(
         self,
-        client: LabellerrClient,
+        client: "LabellerrClient",
         file_id: str,
         project_id: str,
         dataset_id: str | None = None,

@@ -1,14 +1,20 @@
-from ..client import LabellerrClient
-from ..exceptions import LabellerrError
-from .. import constants
-import uuid
 import os
-import subprocess
-import requests
 import shutil
+import subprocess
+import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
+from typing import TYPE_CHECKING
+
+import requests
+
 from labellerr.core.files.base import LabellerrFile, LabellerrFileMeta
+
+from .. import constants
+from ..exceptions import LabellerrError
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 class LabellerrVideoFile(LabellerrFile):
@@ -16,7 +22,7 @@ class LabellerrVideoFile(LabellerrFile):
 
     def __init__(
         self,
-        client: LabellerrClient,
+        client: "LabellerrClient",
         file_id: str,
         project_id: str,
         dataset_id: str | None = None,
@@ -305,8 +311,8 @@ class LabellerrVideoFile(LabellerrFile):
                 "failed_frames_info": download_result["failed_frames"],
             }
 
-            print("\n{'='*60}")
-            print("✓ Processing complete!")
+            print(f"\n{'='*60}")
+            print("Processing complete!")
             print(f"Video saved to: {video_output_path}")
             print("{'='*60}\n")
 

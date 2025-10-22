@@ -1,10 +1,12 @@
-import os
-from scenedetect import detect, AdaptiveDetector
-from PIL import Image
-import cv2
-from pydantic import BaseModel, Field
-from typing import List
 import json
+import os
+from typing import List
+
+import cv2
+from PIL import Image
+from pydantic import BaseModel, Field
+from scenedetect import AdaptiveDetector, detect
+
 from labellerr.core.base.singleton import Singleton
 
 

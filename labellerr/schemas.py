@@ -328,7 +328,7 @@ class ListFileParams(BaseModel):
     client_id: str = Field(min_length=1)
     project_id: str = Field(min_length=1)
     search_queries: Dict[str, Any]
-    size: int = 10
+    size: int = Field(default=10, gt=0)
     next_search_after: Optional[Any] = None
 
 
@@ -339,3 +339,15 @@ class BulkAssignFilesParams(BaseModel):
     project_id: str = Field(min_length=1)
     file_ids: List[str] = Field(min_length=1)
     new_status: str = Field(min_length=1)
+
+
+class SyncDataSetParams(BaseModel):
+    """Parameters for syncing datasets."""
+
+    client_id: str = Field(min_length=1)
+    project_id: str = Field(min_length=1)
+    dataset_id: str = Field(min_length=1)
+    path: str = Field(min_length=1)
+    data_type: Literal["image", "video", "audio", "document", "text"]
+    email_id: str = Field(min_length=1)
+    connection_id: str = Field(min_length=1)

@@ -1,6 +1,8 @@
 import os
 import sys
 
+from labellerr import LabellerrError
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "SDKPython"))
 )
@@ -9,8 +11,7 @@ sys.path.append(
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(root_dir)
 
-from SDKPython.labellerr.client import LabellerrClient
-from SDKPython.labellerr.exceptions import LabellerrError
+from labellerr.client import LabellerrClient
 
 
 def export_project(api_key, api_secret, client_id, project_id):

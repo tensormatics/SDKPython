@@ -1,4 +1,5 @@
 import cred
+from bulk_assign_operations import run_all_tests as test_bulk_assign_operations
 from Create_Project import (
     create_project_all_option_type,
     create_project_boundingbox_dropdown_input,
@@ -67,6 +68,12 @@ def test_pre_annotation_uploading(project_id, annotation_format, annotation_file
         api_key, api_secret, client_id, project_id, annotation_format, annotation_file
     )
     print("\n Pre-annotation uploading completed.")
+
+
+def test_bulk_assign_and_list_operations(project_id):
+    print("\n TESTING BULK ASSIGN AND LIST FILE OPERATIONS")
+    test_bulk_assign_operations(api_key, api_secret, client_id, project_id)
+    print("\n Bulk assign and list operations testing completed.")
 
 
 if __name__ == "__main__":

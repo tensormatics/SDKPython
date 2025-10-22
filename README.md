@@ -420,10 +420,10 @@ The Labellerr SDK uses **class-level decorators** to automatically apply logging
 
 ### Benefits
 
-✓ **No Boilerplate**: You don't need to add logging or error handling code in every method
-✓ **Consistency**: All methods follow the same logging pattern
-✓ **Maintainability**: Changes to logging or error handling are centralized
-✓ **Debugging**: Comprehensive logs help troubleshoot issues quickly
+**No Boilerplate**: You don't need to add logging or error handling code in every method
+**Consistency**: All methods follow the same logging pattern
+**Maintainability**: Changes to logging or error handling are centralized
+**Debugging**: Comprehensive logs help troubleshoot issues quickly
 
 ### How It Works
 

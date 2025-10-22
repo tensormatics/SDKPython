@@ -1,10 +1,12 @@
+import json
 import os
+from typing import List, Optional
+
 import cv2
+from google.cloud import videointelligence
 from PIL import Image
 from pydantic import BaseModel, Field
-from typing import List, Optional
-import json
-from google.cloud import videointelligence
+
 from labellerr.core.base.singleton import Singleton
 
 

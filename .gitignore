@@ -25,8 +25,6 @@ wheels/
 .env
 .DS_Store
 .claude
-
-# Test data
 tests/test_data
 download
 labellerr/__pycache__/

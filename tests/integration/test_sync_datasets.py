@@ -118,13 +118,10 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 self.gcs_path != "gs://",
             ]
         ):
-            self.skipTest(
-                "GCS credentials not provided. Please fill in GCS configuration in setUp method."
-            )
 
-        print("\n" + "=" * 60)
-        print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
-        print("=" * 60)
+            print("\n" + "=" * 60)
+            print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
+            print("=" * 60)
 
         try:
             print("\n1. Syncing dataset from GCS...")

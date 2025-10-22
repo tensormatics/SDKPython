@@ -180,7 +180,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.info("Rotation configuration validated . . .")
 
             logging.info("Creating dataset . . .")
-            dataset_response = self.create_dataset(
+            dataset_response = self.client.datasets.create_dataset(
                 {
                     "client_id": payload["client_id"],
                     "dataset_name": payload["dataset_name"],
@@ -226,7 +226,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             if payload.get("annotation_template_id"):
                 annotation_template_id = payload["annotation_template_id"]
             else:
-                annotation_template_id = self.create_annotation_guideline(
+                annotation_template_id = self.client.create_annotation_guideline(
                     payload["client_id"],
                     payload["annotation_guide"],
                     payload["project_name"],
@@ -309,8 +309,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         )
 
         headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
             client_id=params.client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
@@ -330,12 +330,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         try:
             unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/projects/rotations/add?project_id={self.project_id}&client_id={self.client_id}&uuid={unique_id}"
+            url = f"{constants.BASE_URL}/projects/rotations/add?project_id={self.project_id}&client_id={self.client.client_id}&uuid={unique_id}"
 
             headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
-                client_id=self.client_id,
+                api_key=self.client.api_key,
+                api_secret=self.client.api_secret,
+                client_id=self.client.client_id,
                 extra_headers={"content-type": "application/json"},
             )
 
@@ -362,11 +362,11 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         try:
             unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
+            url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
 
             headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
+                api_key=self.client.api_key,
+                api_secret=self.client.api_secret,
                 client_id=client_id,
                 extra_headers={"content-type": "application/json"},
             )
@@ -404,12 +404,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             client_utils.validate_annotation_format(annotation_format, annotation_file)
 
             request_uuid = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+            url = (
+                f"{constants.BASE_URL}/actions/upload_answers?project_id={project_id}"
+                f"&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+            )
             file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url
             gcs_path = f"{project_id}/{annotation_format}-{file_name}"
             logging.info("Uploading your file to Labellerr. Please wait...")
-            direct_upload_url = self.get_direct_upload_url(gcs_path, client_id)
+            direct_upload_url = self.client.get_direct_upload_url(gcs_path, client_id)
             # Now let's wait for the file to be uploaded to the gcs
             gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
             payload = {}
@@ -427,13 +430,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             #     }, data=payload, files=files)
             url += "&gcs_path=" + gcs_path
             headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
+                api_key=self.client.api_key,
+                api_secret=self.client.api_secret,
                 client_id=client_id,
-                extra_headers={"email_id": self.api_key},
+                extra_headers={"email_id": self.client.api_key},
             )
             response = requests.request("POST", url, headers=headers, data=payload)
-            response_data = self._handle_upload_response(response, request_uuid)
+            response_data = self.client._handle_upload_response(response, request_uuid)
 
             # read job_id from the response
             job_id = response_data["response"]["job_id"]
@@ -486,7 +489,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
                 request_uuid = str(uuid.uuid4())
                 url = (
-                    f"{self.base_url}/actions/upload_answers?"
+                    f"{constants.BASE_URL}/actions/upload_answers?"
                     f"project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
                 )
 
@@ -506,7 +509,9 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 # get the direct upload url
                 gcs_path = f"{project_id}/{annotation_format}-{file_name}"
                 logging.info("Uploading your file to Labellerr. Please wait...")
-                direct_upload_url = self.get_direct_upload_url(gcs_path, client_id)
+                direct_upload_url = self.client.get_direct_upload_url(
+                    gcs_path, client_id
+                )
                 # Now let's wait for the file to be uploaded to the gcs
                 gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
                 payload = {}
@@ -524,13 +529,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 #     }, data=payload, files=files)
                 url += "&gcs_path=" + gcs_path
                 headers = client_utils.build_headers(
-                    api_key=self.api_key,
-                    api_secret=self.api_secret,
+                    api_key=self.client.api_key,
+                    api_secret=self.client.api_secret,
                     client_id=client_id,
-                    extra_headers={"email_id": self.api_key},
+                    extra_headers={"email_id": self.client.api_key},
                 )
                 response = requests.request("POST", url, headers=headers, data=payload)
-                response_data = self._handle_upload_response(response, request_uuid)
+                response_data = self.client._handle_upload_response(
+                    response, request_uuid
+                )
 
                 # read job_id from the response
                 job_id = response_data["response"]["job_id"]
@@ -542,12 +549,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
                 # Now monitor the status
                 headers = client_utils.build_headers(
-                    api_key=self.api_key,
-                    api_secret=self.api_secret,
+                    api_key=self.client.api_key,
+                    api_secret=self.client.api_secret,
                     client_id=self.client_id,
                     extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                 )
-                status_url = f"{self.base_url}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
+                status_url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
                 while True:
                     try:
                         response = requests.request(
@@ -594,12 +601,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         def check_status():
             headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
+                api_key=self.client.api_key,
+                api_secret=self.client.api_secret,
                 client_id=self.client_id,
                 extra_headers={"Origin": constants.ALLOWED_ORIGINS},
             )
-            url = f"{self.base_url}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
+            url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
             payload = {}
             retry_count = 0
 
@@ -676,7 +683,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 )
 
             request_uuid = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+            url = (
+                f"{constants.BASE_URL}/actions/upload_answers?project_id={project_id}"
+                f"&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+            )
 
             # validate if the file exist then extract file name from the path
             if os.path.exists(annotation_file):
@@ -688,15 +698,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             with open(annotation_file, "rb") as f:
                 files = [("file", (file_name, f, "application/octet-stream"))]
                 headers = client_utils.build_headers(
-                    api_key=self.api_key,
-                    api_secret=self.api_secret,
+                    api_key=self.client.api_key,
+                    api_secret=self.client.api_secret,
                     client_id=client_id,
-                    extra_headers={"email_id": self.api_key},
+                    extra_headers={"email_id": self.client.api_key},
                 )
                 response = requests.request(
                     "POST", url, headers=headers, data=payload, files=files
                 )
-            response_data = self._handle_upload_response(response, request_uuid)
+            response_data = self.client._handle_upload_response(response, request_uuid)
             logging.debug(f"response_data: {response_data}")
 
             # read job_id from the response
@@ -740,8 +750,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         payload = json.dumps(export_config)
         headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
@@ -750,7 +760,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         return client_utils.request(
             "POST",
-            f"{self.base_url}/sdk/export/files?project_id={project_id}&client_id={client_id}",
+            f"{constants.BASE_URL}/sdk/export/files?project_id={project_id}&client_id={client_id}",
             headers=headers,
             data=payload,
             request_id=unique_id,
@@ -772,8 +782,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
             # Headers
             headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
+                api_key=self.client.api_key,
+                api_secret=self.client.api_secret,
                 client_id=client_id,
                 extra_headers={"Content-Type": "application/json"},
             )
@@ -791,7 +801,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 ):
                     # Download URL if job completed
                     download_url = (  # noqa E999 todo check use of that
-                        self.fetch_download_url(
+                        self.client.fetch_download_url(
                             project_id=project_id,
                             uuid=request_uuid,
                             export_id=status_item["report_id"],
@@ -824,8 +834,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         url = f"{constants.BASE_URL}/search/project_files?project_id={params.project_id}&client_id={params.client_id}&uuid={unique_id}"
 
         headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -855,8 +865,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
 
         headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
         )
@@ -871,3 +881,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return client_utils.request(
             "POST", url, headers=headers, data=payload, request_id=unique_id
         )
+
+    def validate_rotation_config(self, rotation_config):
+        """
+        Validates a rotation configuration.
+
+        :param rotation_config: A dictionary containing the configuration for the rotations.
+        :raises LabellerrError: If the configuration is invalid.
+        """
+        client_utils.validate_rotation_config(rotation_config)

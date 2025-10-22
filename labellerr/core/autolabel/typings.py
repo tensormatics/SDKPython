@@ -1,8 +1,10 @@
 from pydantic import BaseModel
 from typing import Optional
 
+
 class Hyperparameters(BaseModel):
     epochs: int = 10
+
 
 class TrainingRequest(BaseModel):
     model_id: str

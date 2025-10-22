@@ -8,6 +8,7 @@ import uuid
 class LabellerrAutoLabelMeta(ABCMeta):
     pass
 
+
 class LabellerrAutoLabel(metaclass=LabellerrAutoLabelMeta):
     def __init__(self, client: LabellerrClient):
         self.client = client
@@ -26,9 +27,15 @@ class LabellerrAutoLabel(metaclass=LabellerrAutoLabelMeta):
             extra_headers={"content-type": "application/json"},
         )
 
-        response = client_utils.request("POST", url, headers=headers, request_id=unique_id, json=training_request.model_dump())
-        return response.get('response', None)
-    
+        response = client_utils.request(
+            "POST",
+            url,
+            headers=headers,
+            request_id=unique_id,
+            json=training_request.model_dump(),
+        )
+        return response.get("response", None)
+
     def list_training_jobs(self):
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
@@ -43,5 +50,7 @@ class LabellerrAutoLabel(metaclass=LabellerrAutoLabelMeta):
             extra_headers={"content-type": "application/json"},
         )
 
-        response = client_utils.request("GET", url, headers=headers, request_id=unique_id)
-        return response.get('response', None)
+        response = client_utils.request(
+            "GET", url, headers=headers, request_id=unique_id
+        )
+        return response.get("response", None)

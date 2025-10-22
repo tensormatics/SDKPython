@@ -1,5 +1,5 @@
-"""This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc.
-"""
+"""This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc."""
+
 from abc import ABCMeta
 from ..client import LabellerrClient
 from .. import constants, client_utils
@@ -9,11 +9,13 @@ from ..exceptions import LabellerrError
 import logging
 import utils
 from .. import schemas
+import json
+
 
 class LabellerrProjectMeta(ABCMeta):
     # Class-level registry for project types
     _registry = {}
-    
+
     @classmethod
     def register(cls, data_type, project_class):
         """Register a project type handler"""
@@ -35,14 +37,17 @@ class LabellerrProjectMeta(ABCMeta):
             extra_headers={"content-type": "application/json"},
         )
 
-        response = client_utils.request("GET", url, headers=headers, request_id=unique_id)
-        return response.get('response', None)
+        response = client_utils.request(
+            "GET", url, headers=headers, request_id=unique_id
+        )
+        return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
-    
+
     """Metaclass that combines ABC functionality with factory pattern"""
+
     def __call__(cls, client, project_id, **kwargs):
         # Only intercept calls to the base LabellerrProject class
-        if cls.__name__ != 'LabellerrProject':
+        if cls.__name__ != "LabellerrProject":
             # For subclasses, use normal instantiation
             instance = cls.__new__(cls)
             if isinstance(instance, cls):
@@ -51,32 +56,33 @@ class LabellerrProjectMeta(ABCMeta):
         project_data = cls.get_project(client, project_id)
         if project_data is None:
             raise InvalidProjectError(f"Project not found: {project_id}")
-        data_type = project_data.get('data_type')
+        data_type = project_data.get("data_type")
         if data_type not in constants.DATA_TYPES:
             raise InvalidProjectError(f"Data type not supported: {data_type}")
-        
+
         project_class = cls._registry.get(data_type)
         if project_class is None:
             raise InvalidProjectError(f"Unknown data type: {data_type}")
-        kwargs['project_data'] = project_data
+        kwargs["project_data"] = project_data
         return project_class(client, project_id, **kwargs)
+
 
 class LabellerrProject(metaclass=LabellerrProjectMeta):
     """Base class for all Labellerr projects with factory behavior"""
+
     def __init__(self, client: LabellerrClient, project_id: str, **kwargs):
         self.client = client
         self.project_id = project_id
-        self.project_data = kwargs['project_data']
-    
+        self.project_data = kwargs["project_data"]
+
     @property
     def data_type(self):
-        return self.project_data.get('data_type')
-    
+        return self.project_data.get("data_type")
+
     @property
     def attached_datasets(self):
-        return self.project_data.get('attached_datasets')
+        return self.project_data.get("attached_datasets")
 
-    
     def initiate_create_project(self, payload):
         """
         Orchestrates project creation by handling dataset creation, annotation guidelines,
@@ -243,7 +249,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         except Exception:
             logging.exception("Unexpected error in project creation")
             raise
-    
+
     def create_project(
         self,
         project_name,

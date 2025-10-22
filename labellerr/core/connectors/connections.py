@@ -1,15 +1,16 @@
-"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc.
-"""
+"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc."""
+
 from abc import ABCMeta, abstractmethod
 from ..client import LabellerrClient
 from .. import constants, client_utils
 from ..exceptions import InvalidConnectionError
 import uuid
 
+
 class LabellerrConnectionMeta(ABCMeta):
     # Class-level registry for connection types
     _registry = {}
-    
+
     @classmethod
     def register(cls, connection_type, connection_class):
         """Register a connection type handler"""
@@ -31,14 +32,17 @@ class LabellerrConnectionMeta(ABCMeta):
             extra_headers={"content-type": "application/json"},
         )
 
-        response = client_utils.request("GET", url, headers=headers, request_id=unique_id)
-        return response.get('response', None)
+        response = client_utils.request(
+            "GET", url, headers=headers, request_id=unique_id
+        )
+        return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
-    
+
     """Metaclass that combines ABC functionality with factory pattern"""
+
     def __call__(cls, client, connection_id, **kwargs):
         # Only intercept calls to the base LabellerrConnection class
-        if cls.__name__ != 'LabellerrConnection':
+        if cls.__name__ != "LabellerrConnection":
             # For subclasses, use normal instantiation
             instance = cls.__new__(cls)
             if isinstance(instance, cls):
@@ -47,29 +51,32 @@ class LabellerrConnectionMeta(ABCMeta):
         connection_data = cls.get_connection(client, connection_id)
         if connection_data is None:
             raise InvalidConnectionError(f"Connection not found: {connection_id}")
-        connection_type = connection_data.get('connection_type')
+        connection_type = connection_data.get("connection_type")
         if connection_type not in constants.CONNECTION_TYPES:
-            raise InvalidConnectionError(f"Connection type not supported: {connection_type}")
-        
+            raise InvalidConnectionError(
+                f"Connection type not supported: {connection_type}"
+            )
+
         connection_class = cls._registry.get(connection_type)
         if connection_class is None:
             raise InvalidConnectionError(f"Unknown connection type: {connection_type}")
-        kwargs['connection_data'] = connection_data
+        kwargs["connection_data"] = connection_data
         return connection_class(client, connection_id, **kwargs)
+
 
 class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     """Base class for all Labellerr connections with factory behavior"""
+
     def __init__(self, client: LabellerrClient, connection_id: str, **kwargs):
         self.client = client
         self.connection_id = connection_id
-        self.connection_data = kwargs['connection_data']
-    
+        self.connection_data = kwargs["connection_data"]
+
     @property
     def connection_type(self):
-        return self.connection_data.get('connection_type')
-    
+        return self.connection_data.get("connection_type")
+
     @abstractmethod
     def test_connection(self):
         """Each connection type must implement its own connection testing logic"""
         pass
-    

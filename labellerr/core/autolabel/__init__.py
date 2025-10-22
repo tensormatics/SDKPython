@@ -1,5 +1,5 @@
-"""Inference core wrappers go here.
-"""
+"""Inference core wrappers go here."""
+
 from .base import LabellerrAutoLabel
 
-__all__ = ['LabellerrAutoLabel']
+__all__ = ["LabellerrAutoLabel"]

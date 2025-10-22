@@ -6,10 +6,12 @@ class LabellerrError(Exception):
 
     pass
 
+
 class InvalidDatasetError(Exception):
     """Custom exception for invalid dataset errors."""
 
     pass
+
 
 class InvalidProjectError(Exception):
     """Custom exception for invalid project errors."""

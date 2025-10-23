@@ -43,81 +43,6 @@ class LabellerrConnectionMeta(ABCMeta):
         return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
 
-    @staticmethod
-    def list_connections(
-        client: "LabellerrClient",
-        client_id: str,
-        connection_type: str,
-        connector: str = None,
-    ):
-        """
-        List connections for a client
-        :param client: LabellerrClient instance
-        :param client_id: The ID of the client
-        :param connection_type: Type of connection (import/export)
-        :param connector: Optional connector type filter (s3, gcs, etc.)
-        :return: List of connections
-        """
-        request_uuid = str(uuid.uuid4())
-        list_connection_url = (
-            f"{constants.BASE_URL}/connectors/connections/list"
-            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
-        )
-
-        if connector:
-            list_connection_url += f"&connector={connector}"
-
-        headers = client_utils.build_headers(
-            api_key=client.api_key,
-            api_secret=client.api_secret,
-            client_id=client_id,
-            extra_headers={"email_id": client.api_key},
-        )
-
-        return client_utils.request(
-            "GET", list_connection_url, headers=headers, request_id=request_uuid
-        )
-
-    @staticmethod
-    def delete_connection(
-        client: "LabellerrClient", client_id: str, connection_id: str
-    ):
-        """
-        Deletes a connector connection by ID.
-        :param client: LabellerrClient instance
-        :param client_id: The ID of the client
-        :param connection_id: The ID of the connection to delete
-        :return: Parsed JSON response
-        """
-        import json
-
-        from ... import schemas
-
-        # Validate parameters using Pydantic
-        params = schemas.DeleteConnectionParams(
-            client_id=client_id, connection_id=connection_id
-        )
-        request_uuid = str(uuid.uuid4())
-        delete_url = (
-            f"{constants.BASE_URL}/connectors/connections/delete"
-            f"?client_id={params.client_id}&uuid={request_uuid}"
-        )
-
-        headers = client_utils.build_headers(
-            api_key=client.api_key,
-            api_secret=client.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "content-type": "application/json",
-                "email_id": client.api_key,
-            },
-        )
-
-        payload = json.dumps({"connection_id": params.connection_id})
-
-        return client_utils.request(
-            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
-        )
 
     @staticmethod
     def create_connection(
@@ -206,3 +131,75 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     def test_connection(self):
         """Each connection type must implement its own connection testing logic"""
         pass
+
+    def list_connections(
+        self,
+        client_id: str,
+        connection_type: str,
+        connector: str = None,
+    ) -> list:
+        """
+        List connections for a client
+        :param client_id: The ID of the client
+        :param connection_type: Type of connection (import/export)
+        :param connector: Optional connector type filter (s3, gcs, etc.)
+        :return: List of connections
+        """
+        request_uuid = str(uuid.uuid4())
+        list_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/list"
+            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
+        )
+
+        if connector:
+            list_connection_url += f"&connector={connector}"
+
+        headers = client_utils.build_headers(
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
+            client_id=self.client.client_id,
+            extra_headers={"email_id": self.client.api_key},
+        )
+
+        return client_utils.request(
+            "GET", list_connection_url, headers=headers, request_id=request_uuid
+        )
+
+    def delete_connection(
+        self, client_id: str, connection_id: str
+    ):
+        """
+        Deletes a connector connection by ID.
+        :param client_id: The ID of the client
+        :param connection_id: The ID of the connection to delete
+        :return: Parsed JSON response
+        """
+        import json
+
+        from ... import schemas
+
+        # Validate parameters using Pydantic
+        params = schemas.DeleteConnectionParams(
+            client_id=client_id, connection_id=connection_id
+        )
+        request_uuid = str(uuid.uuid4())
+        delete_url = (
+            f"{constants.BASE_URL}/connectors/connections/delete"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
+        )
+
+        headers = client_utils.build_headers(
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "email_id": self.client.api_key,
+            },
+        )
+
+        payload = json.dumps({"connection_id": params.connection_id})
+
+        return client_utils.request(
+            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
+        )

@@ -15,11 +15,10 @@ from urllib3.util.retry import Retry
 from . import client_utils, constants, gcs, schemas
 
 # Initialize DataSets handler for dataset-related operations
-from .datasets.datasets import DataSets
 from .exceptions import LabellerrError
 
 # Initialize Projects handler for project-related operations
-from .projects.base import LabellerrProject
+# from .projects.base import LabellerrProject
 from .utils import validate_params
 from .validators import auto_log_and_handle_errors
 
@@ -102,20 +101,20 @@ class LabellerrClient:
         if enable_connection_pooling:
             self._setup_session()
 
-        self.datasets = DataSets(api_key, api_secret, self)
+        # self.datasets = DataSets(api_key, api_secret, self)
 
-        self.projects = LabellerrProject.__new__(LabellerrProject)
-        self.projects.api_key = api_key
-        self.projects.api_secret = api_secret
-        self.projects.client = self
+        # self.projects = LabellerrProject.__new__(LabellerrProject)
+        # self.projects.api_key = api_key
+        # self.projects.api_secret = api_secret
+        # self.projects.client = self
 
         # Initialize Users handler for user-related operations
-        from .users.base import LabellerrUsers
+        # from .users.base import LabellerrUsers
 
-        self.users = LabellerrUsers()
-        self.users.api_key = api_key
-        self.users.api_secret = api_secret
-        self.users.client = self
+        # self.users = LabellerrUsers()
+        # self.users.api_key = api_key
+        # self.users.api_secret = api_secret
+        # self.users.client = self
 
     def _setup_session(self):
         """
@@ -420,79 +419,7 @@ class LabellerrClient:
 
         return LabellerrConnectionMeta.delete_connection(self, client_id, connection_id)
 
-    def connect_local_files(self, client_id, file_names, connection_id=None):
-        """
-        Connects local files to the API.
-
-        :param client_id: The ID of the client.
-        :param file_names: The list of file names.
-        :param connection_id: The ID of the connection.
-        :return: The response from the API.
-        """
-        url = f"{constants.BASE_URL}/connectors/connect/local?client_id={client_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key, api_secret=self.api_secret, client_id=client_id
-        )
-
-        body = {"file_names": file_names}
-        if connection_id is not None:
-            body["temporary_connection_id"] = connection_id
-
-        return client_utils.request("POST", url, headers=headers, json=body)
-
-    @validate_params(client_id=str, files_list=(str, list))
-    def upload_files(self, client_id: str, files_list: Union[str, List[str]]):
-        """
-        Uploads files to the API.
-
-        :param client_id: The ID of the client.
-        :param files_list: The list of files to upload or a comma-separated string of file paths.
-        :return: The connection ID from the API.
-        :raises LabellerrError: If the upload fails.
-        """
-        # Validate parameters using Pydantic
-        params = schemas.UploadFilesParams(client_id=client_id, files_list=files_list)
-        try:
-            # Use validated files_list from Pydantic
-            files_list = params.files_list
-
-            if len(files_list) == 0:
-                raise LabellerrError("No files to upload")
-
-            response = self.__process_batch(client_id, files_list)
-            connection_id = response["response"]["temporary_connection_id"]
-            return connection_id
-        except LabellerrError:
-            raise
-        except Exception as e:
-            logging.error(f"Failed to upload files: {str(e)}")
-            raise
-
-    def __process_batch(self, client_id, files_list, connection_id=None):
-        """
-        Processes a batch of files for upload.
-
-        :param client_id: The ID of the client
-        :param files_list: List of file paths to process
-        :param connection_id: Optional connection ID
-        :return: Response from connect_local_files
-        """
-        # Prepare files for upload
-        files = {}
-        for file_path in files_list:
-            file_name = os.path.basename(file_path)
-            files[file_name] = file_path
-
-        response = self.connect_local_files(
-            client_id, list(files.keys()), connection_id
-        )
-        resumable_upload_links = response["response"]["resumable_upload_links"]
-        for file_name in resumable_upload_links.keys():
-            gcs.upload_to_gcs_resumable(
-                resumable_upload_links[file_name], files[file_name]
-            )
-
-        return response
+    
 
     def get_dataset(self, workspace_id, dataset_id):
         """
@@ -599,79 +526,6 @@ class LabellerrClient:
             }
 
         return result
-
-    def get_total_folder_file_count_and_total_size(self, folder_path, data_type):
-        """
-        Retrieves the total count and size of files in a folder using memory-efficient iteration.
-
-        :param folder_path: The path to the folder.
-        :param data_type: The type of data for the files.
-        :return: The total count and size of the files.
-        """
-        total_file_count = 0
-        total_file_size = 0
-        files_list = []
-
-        # Use os.scandir for better performance and memory efficiency
-        def scan_directory(directory):
-            nonlocal total_file_count, total_file_size
-            try:
-                with os.scandir(directory) as entries:
-                    for entry in entries:
-                        if entry.is_file():
-                            file_path = entry.path
-                            # Check if the file extension matches based on datatype
-                            if not any(
-                                file_path.endswith(ext)
-                                for ext in constants.DATA_TYPE_FILE_EXT[data_type]
-                            ):
-                                continue
-                            try:
-                                file_size = entry.stat().st_size
-                                files_list.append(file_path)
-                                total_file_count += 1
-                                total_file_size += file_size
-                            except OSError as e:
-                                logging.error(f"Error reading {file_path}: {str(e)}")
-                        elif entry.is_dir():
-                            # Recursively scan subdirectories
-                            scan_directory(entry.path)
-            except OSError as e:
-                logging.error(f"Error scanning directory {directory}: {str(e)}")
-
-        scan_directory(folder_path)
-        return total_file_count, total_file_size, files_list
-
-    def get_total_file_count_and_total_size(self, files_list, data_type):
-        """
-        Retrieves the total count and size of files in a list.
-
-        :param files_list: The list of file paths.
-        :param data_type: The type of data for the files.
-        :return: The total count and size of the files.
-        """
-        total_file_count = 0
-        total_file_size = 0
-        # for root, dirs, files in os.walk(folder_path):
-        for file_path in files_list:
-            if file_path is None:
-                continue
-            try:
-                # check if the file extension matching based on datatype
-                if not any(
-                    file_path.endswith(ext)
-                    for ext in constants.DATA_TYPE_FILE_EXT[data_type]
-                ):
-                    continue
-                file_size = os.path.getsize(file_path)
-                total_file_count += 1
-                total_file_size += file_size
-            except OSError as e:
-                logging.error(f"Error reading {file_path}: {str(e)}")
-            except Exception as e:
-                logging.error(f"Unexpected error reading {file_path}: {str(e)}")
-
-        return total_file_count, total_file_size, files_list
 
     def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:

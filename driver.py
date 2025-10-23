@@ -3,8 +3,8 @@ import os
 from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
-from labellerr.core.datasets import LabellerrDataset
-
+from labellerr.core.datasets import LabellerrDataset, create_dataset
+from labellerr.core import schemas
 load_dotenv()
 
 client = LabellerrClient(
@@ -17,6 +17,17 @@ dataset = LabellerrDataset(
     client=client, dataset_id="6d04253c-0895-4c5c-aa91-825df42ce986"
 )
 
+response = create_dataset(
+    client=client,
+    dataset_config=schemas.DatasetConfig(
+        client_id=os.getenv("CLIENT_ID"),
+        dataset_name="Dataset new Ximi",
+        data_type="image",
+    ),
+    folder_to_upload='images',
+
+)
+print(response.dataset_data)
 # autolabel = LabellerrAutoLabel(client=client)
 
 

@@ -351,3 +351,12 @@ class SyncDataSetParams(BaseModel):
     data_type: str = Field(min_length=1)
     email_id: str = Field(min_length=1)
     connection_id: str = Field(min_length=1)
+
+class DatasetConfig(BaseModel):
+    """Configuration for creating a dataset."""
+
+    client_id: str = Field(min_length=1)
+    dataset_name: str = Field(min_length=1)
+    data_type: Literal["image", "video", "audio", "document", "text"]
+    dataset_description: str = ""
+    connector_type: Literal["local", "aws", "gcp"] = "local"

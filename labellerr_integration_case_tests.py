@@ -842,7 +842,6 @@ class LabelerIntegrationTests(unittest.TestCase):
                             raise
 
     def test_data_set_connection_gcs(self):
-        # Read per-type GCS secrets from env (JSON strings): GCS_CONNECTION_IMAGE, GCS_CONNECTION_VIDEO
         image_secret_json = os.getenv("GCS_CONNECTION_IMAGE")
         video_secret_json = os.getenv("GCS_CONNECTION_VIDEO")
 

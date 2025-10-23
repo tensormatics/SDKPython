@@ -30,24 +30,20 @@ class LabellerrDatasetMeta(ABCMeta):
     @staticmethod
     def get_dataset(client: "LabellerrClient", dataset_id: str):
         """Get dataset from Labellerr API"""
-        # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
         url = (
             f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={client.client_id}"
             f"&uuid={unique_id}"
         )
-        headers = client_utils.build_headers(
-            api_key=client.api_key,
-            api_secret=client.api_secret,
+
+        response = client._make_request(
+            "GET",
+            url,
             client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
-        )
-
-        response = client_utils.request(
-            "GET", url, headers=headers, request_id=unique_id
+            request_id=unique_id,
         )
         return response.get("response", None)
-        # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
 
     """Metaclass that combines ABC functionality with factory pattern"""
 
@@ -131,17 +127,16 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/jobs/add_datasets_to_project?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
 
         payload = json.dumps({"attached_datasets": validated_dataset_ids})
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     def detach_dataset_from_project(
@@ -185,17 +180,16 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/jobs/delete_datasets_from_project?project_id={params.project_id}&uuid={unique_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
 
         payload = json.dumps({"attached_datasets": validated_dataset_ids})
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
@@ -223,20 +217,21 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             f"{constants.BASE_URL}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
             f"&project_id={params.project_id}&uuid={unique_id}"
         )
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+
+        return self.client._make_request(
+            "GET",
+            url,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
         )
-
-        return client_utils.request("GET", url, headers=headers, request_id=unique_id)
 
     def create_dataset(
         self,
         dataset_config,
         files_to_upload=None,
         folder_to_upload=None,
+        connection_id=None,
         connector_config=None,
     ):
         """
@@ -245,103 +240,130 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         :param dataset_config: A dictionary containing the configuration for the dataset.
                               Required fields: client_id, dataset_name, data_type
                               Optional fields: dataset_description, connector_type
+                              Can also be a DatasetConfig Pydantic model instance.
         :param files_to_upload: List of file paths to upload (for local connector)
         :param folder_to_upload: Path to folder to upload (for local connector)
+        :param connection_id: Pre-existing connection ID to use for the dataset.
+                             Either connection_id or connector_config can be provided, but not both.
         :param connector_config: Configuration for cloud connectors (GCP/AWS)
+                                Can be a dict or AWSConnectorConfig/GCPConnectorConfig model instance.
+                                Either connection_id or connector_config can be provided, but not both.
         :return: A dictionary containing the response status and the ID of the created dataset.
+        :raises LabellerrError: If both connection_id and connector_config are provided.
         """
 
         try:
-            # Validate required fields
-            required_fields = ["client_id", "dataset_name", "data_type"]
-            for field in required_fields:
-                if field not in dataset_config:
-                    raise LabellerrError(
-                        f"Required field '{field}' missing in dataset_config"
-                    )
-
-            # Validate data_type
-            if dataset_config.get("data_type") not in constants.DATA_TYPES:
+            # Validate that both connection_id and connector_config are not provided
+            if connection_id is not None and connector_config is not None:
                 raise LabellerrError(
-                    f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
+                    "Cannot provide both connection_id and connector_config. "
+                    "Use connection_id for existing connections or connector_config to create a new connection."
                 )
 
-            connector_type = dataset_config.get("connector_type", "local")
-            connection_id = None
+            # Validate dataset_config using Pydantic model
+            if not isinstance(dataset_config, schemas.DatasetConfig):
+                config = schemas.DatasetConfig(**dataset_config)
+            else:
+                config = dataset_config
+
+            connector_type = config.connector_type
+            # Use provided connection_id or set to None (will be created later if needed)
+            final_connection_id = connection_id
             path = connector_type
 
-            # Handle different connector types
-            if connector_type == "local":
-                if files_to_upload is not None:
+            # Handle different connector types only if connection_id is not provided
+            if final_connection_id is None:
+                if connector_type == "local":
+                    if files_to_upload is not None:
+                        try:
+                            final_connection_id = self.client.upload_files(
+                                client_id=config.client_id,
+                                files_list=files_to_upload,
+                            )
+                        except Exception as e:
+                            raise LabellerrError(
+                                f"Failed to upload files to dataset: {str(e)}"
+                            )
+
+                    elif folder_to_upload is not None:
+                        try:
+                            result = self.upload_folder_files_to_dataset(
+                                {
+                                    "client_id": config.client_id,
+                                    "folder_path": folder_to_upload,
+                                    "data_type": config.data_type,
+                                }
+                            )
+                            final_connection_id = result["connection_id"]
+                        except Exception as e:
+                            raise LabellerrError(
+                                f"Failed to upload folder files to dataset: {str(e)}"
+                            )
+                    elif connector_config is None:
+                        # Create empty dataset for local connector
+                        final_connection_id = None
+
+                elif connector_type in ["gcp", "aws"]:
+                    if connector_config is None:
+                        raise LabellerrError(
+                            f"connector_config is required for {connector_type} connector when connection_id is not provided"
+                        )
+
+                    # Validate connector_config using Pydantic models
+                    if connector_type == "aws":
+                        if not isinstance(connector_config, schemas.AWSConnectorConfig):
+                            validated_connector = schemas.AWSConnectorConfig(
+                                **connector_config
+                            )
+                        else:
+                            validated_connector = connector_config
+                    else:  # gcp
+                        if not isinstance(connector_config, schemas.GCPConnectorConfig):
+                            validated_connector = schemas.GCPConnectorConfig(
+                                **connector_config
+                            )
+                        else:
+                            validated_connector = connector_config
+
                     try:
-                        connection_id = self.client.upload_files(
-                            client_id=dataset_config["client_id"],
-                            files_list=files_to_upload,
+                        from ..connectors.connections import LabellerrConnectionMeta
+
+                        final_connection_id = LabellerrConnectionMeta.create_connection(
+                            self.client,
+                            connector_type,
+                            config.client_id,
+                            validated_connector.model_dump(),
                         )
                     except Exception as e:
                         raise LabellerrError(
-                            f"Failed to upload files to dataset: {str(e)}"
+                            f"Failed to setup {connector_type} connector: {str(e)}"
                         )
-
-                elif folder_to_upload is not None:
-                    try:
-                        result = self.upload_folder_files_to_dataset(
-                            {
-                                "client_id": dataset_config["client_id"],
-                                "folder_path": folder_to_upload,
-                                "data_type": dataset_config["data_type"],
-                            }
-                        )
-                        connection_id = result["connection_id"]
-                    except Exception as e:
-                        raise LabellerrError(
-                            f"Failed to upload folder files to dataset: {str(e)}"
-                        )
-                elif connector_config is None:
-                    # Create empty dataset for local connector
-                    connection_id = None
-
-            elif connector_type in ["gcp", "aws"]:
-                if connector_config is None:
+                else:
                     raise LabellerrError(
-                        f"connector_config is required for {connector_type} connector"
+                        f"Unsupported connector type: {connector_type}"
                     )
-
-                try:
-                    connection_id = self.client._setup_cloud_connector(
-                        connector_type, dataset_config["client_id"], connector_config
-                    )
-                except Exception as e:
-                    raise LabellerrError(
-                        f"Failed to setup {connector_type} connector: {str(e)}"
-                    )
-            else:
-                raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
             unique_id = str(uuid.uuid4())
-            url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config['client_id']}&uuid={unique_id}"
-            headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
-                client_id=dataset_config["client_id"],
-                extra_headers={"content-type": "application/json"},
-            )
+            url = f"{constants.BASE_URL}/datasets/create?client_id={config.client_id}&uuid={unique_id}"
 
             payload = json.dumps(
                 {
-                    "dataset_name": dataset_config["dataset_name"],
-                    "dataset_description": dataset_config.get(
-                        "dataset_description", ""
-                    ),
-                    "data_type": dataset_config["data_type"],
-                    "connection_id": connection_id,
+                    "dataset_name": config.dataset_name,
+                    "dataset_description": config.dataset_description,
+                    "data_type": config.data_type,
+                    "connection_id": final_connection_id,
                     "path": path,
-                    "client_id": dataset_config["client_id"],
+                    "client_id": config.client_id,
                     "connector_type": connector_type,
                 }
             )
-            response_data = client_utils.request(
-                "POST", url, headers=headers, data=payload, request_id=unique_id
+            response_data = self.client._make_request(
+                "POST",
+                url,
+                client_id=config.client_id,
+                extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
+                data=payload,
             )
             dataset_id = response_data["response"]["dataset_id"]
 
@@ -364,15 +386,13 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         params = schemas.DeleteDatasetParams(client_id=client_id, dataset_id=dataset_id)
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+
+        return self.client._make_request(
+            "DELETE",
+            url,
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
-        )
-
-        return client_utils.request(
-            "DELETE", url, headers=headers, request_id=unique_id
+            request_id=unique_id,
         )
 
     def upload_folder_files_to_dataset(self, data_config):

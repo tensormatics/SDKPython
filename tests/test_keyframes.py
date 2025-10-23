@@ -4,8 +4,8 @@ import pytest
 
 from labellerr.client import LabellerrClient
 from labellerr.core.client import KeyFrame
-from labellerr.core.utils import validate_params
 from labellerr.core.exceptions import LabellerrError
+from labellerr.core.utils import validate_params
 
 
 class TestKeyFrame:
@@ -186,15 +186,10 @@ class TestLinkKeyFrameMethod:
     """Unit tests for link_key_frame method"""
 
     @patch("labellerr.core.client.LabellerrClient._make_request")
-    @patch("labellerr.core.client.LabellerrClient._handle_response")
-    def test_link_key_frame_success(
-        self, mock_handle_response, mock_make_request, mock_client
-    ):
+    def test_link_key_frame_success(self, mock_make_request, mock_client):
         """Test successful key frame linking"""
         # Arrange
-        mock_response = Mock()
-        mock_make_request.return_value = mock_response
-        mock_handle_response.return_value = {"status": "success"}
+        mock_make_request.return_value = {"status": "success"}
 
         keyframes = [
             KeyFrame(frame_number=0),
@@ -214,7 +209,8 @@ class TestLinkKeyFrameMethod:
         assert args[0] == "POST"
         assert "/actions/add_update_keyframes" in args[1]
         assert "client_id=test_client" in args[1]
-        assert kwargs["headers"]["content-type"] == "application/json"
+        assert kwargs["client_id"] == "test_client"
+        assert kwargs["extra_headers"]["content-type"] == "application/json"
 
         expected_body = {
             "project_id": "test_project",
@@ -336,14 +332,9 @@ class TestLinkKeyFrameMethod:
             )
 
     @patch("labellerr.core.client.LabellerrClient._make_request")
-    @patch("labellerr.core.client.LabellerrClient._handle_response")
-    def test_link_key_frame_with_dict_keyframes(
-        self, mock_handle_response, mock_make_request, mock_client
-    ):
+    def test_link_key_frame_with_dict_keyframes(self, mock_make_request, mock_client):
         """Test link_key_frame with dictionary keyframes instead of KeyFrame objects"""
-        mock_response = Mock()
-        mock_make_request.return_value = mock_response
-        mock_handle_response.return_value = {"status": "success"}
+        mock_make_request.return_value = {"status": "success"}
 
         keyframes = [
             {
@@ -372,15 +363,10 @@ class TestDeleteKeyFramesMethod:
     """Unit tests for delete_key_frames method"""
 
     @patch("labellerr.core.client.LabellerrClient._make_request")
-    @patch("labellerr.core.client.LabellerrClient._handle_response")
-    def test_delete_key_frames_success(
-        self, mock_handle_response, mock_make_request, mock_client
-    ):
+    def test_delete_key_frames_success(self, mock_make_request, mock_client):
         """Test successful key frame deletion"""
         # Arrange
-        mock_response = Mock()
-        mock_make_request.return_value = mock_response
-        mock_handle_response.return_value = {"status": "deleted"}
+        mock_make_request.return_value = {"status": "deleted"}
 
         # Act
         result = mock_client.delete_key_frames("test_client", "test_project")
@@ -388,13 +374,15 @@ class TestDeleteKeyFramesMethod:
         # Assert
         assert result == {"status": "deleted"}
         mock_make_request.assert_called_once()
-        args, _ = mock_make_request.call_args
+        args, kwargs = mock_make_request.call_args
 
         assert args[0] == "POST"
         assert "/actions/delete_keyframes" in args[1]
         assert "project_id=test_project" in args[1]
         assert "client_id=test_client" in args[1]
         assert "uuid=" in args[1]
+        assert kwargs["client_id"] == "test_client"
+        assert kwargs["extra_headers"]["content-type"] == "application/json"
 
     @pytest.mark.parametrize(
         "client_id,project_id,expected_error",

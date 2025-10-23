@@ -20,7 +20,7 @@ class LabellerrConnectionMeta(ABCMeta):
     def register(cls, connection_type, connection_class):
         """Register a connection type handler"""
         cls._registry[connection_type] = connection_class
-    
+
     @staticmethod
     def get_connection(client: "LabellerrClient", connection_id: str):
         """Get connection from Labellerr API"""
@@ -42,6 +42,123 @@ class LabellerrConnectionMeta(ABCMeta):
         )
         return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
+
+    @staticmethod
+    def list_connections(
+        client: "LabellerrClient",
+        client_id: str,
+        connection_type: str,
+        connector: str = None,
+    ):
+        """
+        List connections for a client
+        :param client: LabellerrClient instance
+        :param client_id: The ID of the client
+        :param connection_type: Type of connection (import/export)
+        :param connector: Optional connector type filter (s3, gcs, etc.)
+        :return: List of connections
+        """
+        request_uuid = str(uuid.uuid4())
+        list_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/list"
+            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
+        )
+
+        if connector:
+            list_connection_url += f"&connector={connector}"
+
+        headers = client_utils.build_headers(
+            api_key=client.api_key,
+            api_secret=client.api_secret,
+            client_id=client_id,
+            extra_headers={"email_id": client.api_key},
+        )
+
+        return client_utils.request(
+            "GET", list_connection_url, headers=headers, request_id=request_uuid
+        )
+
+    @staticmethod
+    def delete_connection(
+        client: "LabellerrClient", client_id: str, connection_id: str
+    ):
+        """
+        Deletes a connector connection by ID.
+        :param client: LabellerrClient instance
+        :param client_id: The ID of the client
+        :param connection_id: The ID of the connection to delete
+        :return: Parsed JSON response
+        """
+        import json
+
+        from ... import schemas
+
+        # Validate parameters using Pydantic
+        params = schemas.DeleteConnectionParams(
+            client_id=client_id, connection_id=connection_id
+        )
+        request_uuid = str(uuid.uuid4())
+        delete_url = (
+            f"{constants.BASE_URL}/connectors/connections/delete"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
+        )
+
+        headers = client_utils.build_headers(
+            api_key=client.api_key,
+            api_secret=client.api_secret,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "email_id": client.api_key,
+            },
+        )
+
+        payload = json.dumps({"connection_id": params.connection_id})
+
+        return client_utils.request(
+            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
+        )
+
+    @staticmethod
+    def create_connection(
+        client: "LabellerrClient",
+        connector_type: str,
+        client_id: str,
+        connector_config: dict,
+    ) -> str:
+        """
+        Sets up cloud connector (GCP/AWS) for dataset creation using factory pattern.
+
+        :param client: LabellerrClient instance
+        :param connector_type: Type of connector ('gcp' or 'aws')
+        :param client_id: Client ID
+        :param connector_config: Configuration dictionary for the connector
+        :return: Connection ID for the cloud connector
+        """
+        import logging
+
+        from ..exceptions import InvalidConnectionError
+
+        try:
+            if connector_type == "gcp":
+                from .gcs_connection import GCSConnection
+
+                return GCSConnection.create_connection(
+                    client, client_id, connector_config
+                )
+            elif connector_type == "aws":
+                from .s3_connection import S3Connection
+
+                return S3Connection.create_connection(
+                    client, client_id, connector_config
+                )
+            else:
+                raise InvalidConnectionError(
+                    f"Unsupported connector type: {connector_type}"
+                )
+        except Exception as e:
+            logging.error(f"Failed to setup {connector_type} connector: {e}")
+            raise
 
     """Metaclass that combines ABC functionality with factory pattern"""
 

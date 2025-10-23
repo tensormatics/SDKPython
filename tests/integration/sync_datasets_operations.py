@@ -62,7 +62,7 @@ def test_sync_datasets(
         print(f"Path: {path}")
         print(f"Connection ID: {connection_id}")
 
-        result = client.sync_datasets(
+        result = client.datasets.sync_datasets(
             client_id=client_id,
             project_id=project_id,
             dataset_id=dataset_id,
@@ -113,7 +113,7 @@ def test_sync_datasets_with_different_data_types(
     for data_type in data_types:
         try:
             print(f"\n{data_type.upper()} - Syncing dataset...")
-            result = client.sync_datasets(
+            result = client.datasets.sync_datasets(
                 client_id=client_id,
                 project_id=project_id,
                 dataset_id=dataset_id,
@@ -161,7 +161,7 @@ def test_sync_datasets_validation(api_key, api_secret):
     # Test 1: Invalid data_type
     print("\n1. Testing invalid data_type...")
     try:
-        client.sync_datasets(
+        client.datasets.sync_datasets(
             client_id="test_client",
             project_id="test_project",
             dataset_id="test_dataset",
@@ -177,7 +177,7 @@ def test_sync_datasets_validation(api_key, api_secret):
     # Test 2: Empty required field
     print("\n2. Testing empty required fields...")
     try:
-        client.sync_datasets(
+        client.datasets.sync_datasets(
             client_id="",  # Empty
             project_id="test_project",
             dataset_id="test_dataset",
@@ -194,7 +194,7 @@ def test_sync_datasets_validation(api_key, api_secret):
     print("\n3. Testing valid parameters...")
     try:
         # This will fail at API level but should pass validation
-        client.sync_datasets(
+        client.datasets.sync_datasets(
             client_id="test_client",
             project_id="test_project",
             dataset_id="test_dataset",

@@ -115,6 +115,7 @@ class LabellerrClient:
         self.users = LabellerrUsers()
         self.users.api_key = api_key
         self.users.api_secret = api_secret
+        self.users.client = self
 
     def _setup_session(self):
         """
@@ -232,19 +233,53 @@ class LabellerrClient:
         """
         return client_utils.request(method, url, **kwargs)
 
-    def _make_request(self, method, url, **kwargs):
+    def _make_request(
+        self,
+        method,
+        url,
+        client_id=None,
+        extra_headers=None,
+        request_id=None,
+        handle_response=True,
+        **kwargs,
+    ):
         """
         Make an HTTP request using the configured session or requests library.
+        Automatically builds headers and handles response parsing.
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: Request URL
+        :param client_id: Optional client ID for header authentication
+        :param extra_headers: Optional extra headers to include
+        :param request_id: Optional request tracking ID
+        :param handle_response: Whether to parse response (default True)
         :param kwargs: Additional arguments to pass to requests
-        :return: Response object
+        :return: Parsed response data if handle_response=True, otherwise Response object
         """
+        # Build headers if client_id is provided
+        if client_id is not None:
+            headers = client_utils.build_headers(
+                api_key=self.api_key,
+                api_secret=self.api_secret,
+                client_id=client_id,
+                extra_headers=extra_headers,
+            )
+            # Merge with any existing headers in kwargs
+            if "headers" in kwargs:
+                headers.update(kwargs["headers"])
+            kwargs["headers"] = headers
+
+        # Make the request
         if self._session:
-            return self._session.request(method, url, **kwargs)
+            response = self._session.request(method, url, **kwargs)
         else:
-            return requests.request(method, url, **kwargs)
+            response = requests.request(method, url, **kwargs)
+
+        # Handle response if requested
+        if handle_response:
+            return self._handle_response(response, request_id)
+        else:
+            return response
 
     def _handle_response(self, response, request_id=None):
         """
@@ -300,78 +335,22 @@ class LabellerrClient:
         :param name: The name of the connection.
         :param description: The description.
         :param connection_type: The connection type.
-
+        :return: Parsed JSON response
         """
-        # Validate parameters using Pydantic
-        params = schemas.AWSConnectionParams(
-            client_id=client_id,
-            aws_access_key=aws_access_key,
-            aws_secrets_key=aws_secrets_key,
-            s3_path=s3_path,
-            data_type=data_type,
-            name=name,
-            description=description,
-            connection_type=connection_type,
-        )
+        from .connectors.s3_connection import S3Connection
 
-        request_uuid = str(uuid.uuid4())
-        test_connection_url = (
-            f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={params.client_id}&uuid={request_uuid}"
-        )
-
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"email_id": self.api_key},
-        )
-
-        aws_credentials_json = json.dumps(
-            {
-                "access_key_id": params.aws_access_key,
-                "secret_access_key": params.aws_secrets_key,
-            }
-        )
-
-        test_request = {
-            "credentials": aws_credentials_json,
-            "connector": "s3",
-            "path": params.s3_path,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
+        connection_config = {
+            "client_id": client_id,
+            "aws_access_key": aws_access_key,
+            "aws_secrets_key": aws_secrets_key,
+            "s3_path": s3_path,
+            "data_type": data_type,
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
         }
 
-        client_utils.request(
-            "POST",
-            test_connection_url,
-            headers=headers,
-            data=test_request,
-            request_id=request_uuid,
-        )
-
-        create_url = (
-            f"{constants.BASE_URL}/connectors/connections/create"
-            f"?uuid={request_uuid}&client_id={params.client_id}"
-        )
-
-        create_request = {
-            "client_id": params.client_id,
-            "connector": "s3",
-            "name": params.name,
-            "description": params.description,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
-            "credentials": aws_credentials_json,
-        }
-
-        return client_utils.request(
-            "POST",
-            create_url,
-            headers=headers,
-            data=create_request,
-            request_id=request_uuid,
-        )
+        return S3Connection.setup_full_connection(self, connection_config)
 
     def create_gcs_connection(
         self,
@@ -396,111 +375,37 @@ class LabellerrClient:
         :param credentials: Credential type (default: svc_account_json)
         :return: Parsed JSON response
         """
-        # Validate parameters using Pydantic
-        params = schemas.GCSConnectionParams(
-            client_id=client_id,
-            gcs_cred_file=gcs_cred_file,
-            gcs_path=gcs_path,
-            data_type=data_type,
-            name=name,
-            description=description,
-            connection_type=connection_type,
-            credentials=credentials,
-        )
+        from .connectors.gcs_connection import GCSConnection
 
-        request_uuid = str(uuid.uuid4())
-        test_url = (
-            f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={params.client_id}&uuid={request_uuid}"
-        )
-
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"email_id": self.api_key},
-        )
-
-        test_request = {
-            "credentials": params.credentials,
-            "connector": "gcs",
-            "path": params.gcs_path,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
+        connection_config = {
+            "client_id": client_id,
+            "gcs_cred_file": gcs_cred_file,
+            "gcs_path": gcs_path,
+            "data_type": data_type,
+            "name": name,
+            "description": description,
+            "connection_type": connection_type,
+            "credentials": credentials,
+            "api_key": self.api_key,
+            "api_secret": self.api_secret,
         }
 
-        with open(params.gcs_cred_file, "rb") as fp:
-            test_files = {
-                "attachment_files": (
-                    os.path.basename(params.gcs_cred_file),
-                    fp,
-                    "application/json",
-                )
-            }
-            client_utils.request(
-                "POST",
-                test_url,
-                headers=headers,
-                data=test_request,
-                files=test_files,
-                request_id=request_uuid,
-            )
-
-        # If test passed, create/save the connection
-        # use same uuid to track request
-        create_url = (
-            f"{constants.BASE_URL}/connectors/connections/create"
-            f"?uuid={request_uuid}&client_id={params.client_id}"
-        )
-
-        create_request = {
-            "client_id": params.client_id,
-            "connector": "gcs",
-            "name": params.name,
-            "description": params.description,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
-            "credentials": params.credentials,
-        }
-
-        with open(params.gcs_cred_file, "rb") as fp:
-            create_files = {
-                "attachment_files": (
-                    os.path.basename(params.gcs_cred_file),
-                    fp,
-                    "application/json",
-                )
-            }
-            return client_utils.request(
-                "POST",
-                create_url,
-                headers=headers,
-                data=create_request,
-                files=create_files,
-                request_id=request_uuid,
-            )
+        return GCSConnection.setup_full_connection(self, connection_config)
 
     def list_connection(
         self, client_id: str, connection_type: str, connector: str = None
     ):
-        request_uuid = str(uuid.uuid4())
-        list_connection_url = (
-            f"{constants.BASE_URL}/connectors/connections/list"
-            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
-        )
+        """
+        List connections for a client
+        :param client_id: The ID of the client
+        :param connection_type: Type of connection (import/export)
+        :param connector: Optional connector type filter (s3, gcs, etc.)
+        :return: List of connections
+        """
+        from .connectors.connections import LabellerrConnectionMeta
 
-        if connector:
-            list_connection_url += f"&connector={connector}"
-
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=client_id,
-            extra_headers={"email_id": self.api_key},
-        )
-
-        return client_utils.request(
-            "GET", list_connection_url, headers=headers, request_id=request_uuid
+        return LabellerrConnectionMeta.list_connections(
+            self, client_id, connection_type, connector
         )
 
     def delete_connection(self, client_id: str, connection_id: str):
@@ -511,31 +416,9 @@ class LabellerrClient:
         :param connection_id: The ID of the connection to delete.
         :return: Parsed JSON response
         """
-        # Validate parameters using Pydantic
-        params = schemas.DeleteConnectionParams(
-            client_id=client_id, connection_id=connection_id
-        )
-        request_uuid = str(uuid.uuid4())
-        delete_url = (
-            f"{constants.BASE_URL}/connectors/connections/delete"
-            f"?client_id={params.client_id}&uuid={request_uuid}"
-        )
+        from .connectors.connections import LabellerrConnectionMeta
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "content-type": "application/json",
-                "email_id": self.api_key,
-            },
-        )
-
-        payload = json.dumps({"connection_id": params.connection_id})
-
-        return client_utils.request(
-            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
-        )
+        return LabellerrConnectionMeta.delete_connection(self, client_id, connection_id)
 
     def connect_local_files(self, client_id, file_names, connection_id=None):
         """
@@ -619,75 +502,16 @@ class LabellerrClient:
         :param dataset_id: The ID of the dataset.
         :return: The dataset as JSON.
         """
-        url = f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={workspace_id}&uuid={str(uuid.uuid4())}"
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={workspace_id}&uuid={unique_id}"
+
+        return self._make_request(
+            "GET",
+            url,
+            client_id=workspace_id,
             extra_headers={"Origin": constants.ALLOWED_ORIGINS},
+            request_id=unique_id,
         )
-
-        return client_utils.request("GET", url, headers=headers)
-
-    def _setup_cloud_connector(
-        self, connector_type: str, client_id: str, connector_config: dict
-    ):
-        """
-        Internal method to set up cloud connector (AWS or GCP).
-
-        :param connector_type: Type of connector ('aws' or 'gcp')
-        :param client_id: The ID of the client
-        :param connector_config: Configuration dictionary for the connector
-        :return: connection_id from the created connection
-        """
-        if connector_type == "s3":
-            # AWS connector configuration
-            aws_access_key = connector_config.get("aws_access_key")
-            aws_secrets_key = connector_config.get("aws_secrets_key")
-            s3_path = connector_config.get("s3_path")
-            data_type = connector_config.get("data_type")
-
-            if not all([aws_access_key, aws_secrets_key, s3_path, data_type]):
-                raise ValueError("Missing required AWS connector configuration")
-
-            result = self.create_aws_connection(
-                client_id=client_id,
-                aws_access_key=str(aws_access_key),
-                aws_secrets_key=str(aws_secrets_key),
-                s3_path=str(s3_path),
-                data_type=str(data_type),
-                name=connector_config.get("name", f"aws_connector_{int(time.time())}"),
-                description=connector_config.get(
-                    "description", "Auto-created AWS connector"
-                ),
-                connection_type=connector_config.get("connection_type", "import"),
-            )
-        elif connector_type == "gcp":
-            # GCP connector configuration
-            gcs_cred_file = connector_config.get("gcs_cred_file")
-            gcs_path = connector_config.get("gcs_path")
-            data_type = connector_config.get("data_type")
-
-            if not all([gcs_cred_file, gcs_path, data_type]):
-                raise ValueError("Missing required GCS connector configuration")
-
-            result = self.create_gcs_connection(
-                client_id=client_id,
-                gcs_cred_file=str(gcs_cred_file),
-                gcs_path=str(gcs_path),
-                data_type=str(data_type),
-                name=connector_config.get("name", f"gcs_connector_{int(time.time())}"),
-                description=connector_config.get(
-                    "description", "Auto-created GCS connector"
-                ),
-                connection_type=connector_config.get("connection_type", "import"),
-            )
-        else:
-            raise LabellerrError(f"Unsupported cloud connector type: {connector_type}")
-
-        # Extract connection_id from the response
-        if isinstance(result, dict) and "response" in result:
-            return result["response"].get("connection_id")
-        return None
 
     def enable_multimodal_indexing(self, client_id, dataset_id, is_multimodal=True):
         """
@@ -851,30 +675,24 @@ class LabellerrClient:
 
     def fetch_download_url(self, project_id, uuid, export_id, client_id):
         try:
-            headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
+            url = f"{constants.BASE_URL}/exports/download"
+            params = {
+                "client_id": client_id,
+                "project_id": project_id,
+                "uuid": uuid,
+                "report_id": export_id,
+            }
+
+            response = self._make_request(
+                "GET",
+                url,
                 client_id=client_id,
                 extra_headers={"Content-Type": "application/json"},
+                request_id=uuid,
+                params=params,
             )
 
-            response = requests.get(
-                url=f"{constants.BASE_URL}/exports/download",
-                params={
-                    "client_id": client_id,
-                    "project_id": project_id,
-                    "uuid": uuid,
-                    "report_id": export_id,
-                },
-                headers=headers,
-            )
-
-            if response.ok:
-                return json.dumps(response.json().get("response"), indent=2)
-            else:
-                raise LabellerrError(
-                    f" Download request failed: {response.status_code} - {response.text}"
-                )
+            return json.dumps(response.get("response"), indent=2)
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to download export: {str(e)}")
             raise
@@ -926,7 +744,8 @@ class LabellerrClient:
         self, client_id: str, project_id: str, file_id: str, key_frames: List[KeyFrame]
     ):
         """
-        Links key frames to a file in a project.
+        Links key frames to a file in a video project.
+        Delegates to VideoProject.link_key_frame().
 
         :param client_id: The ID of the client
         :param project_id: The ID of the project
@@ -934,221 +753,30 @@ class LabellerrClient:
         :param key_frames: List of KeyFrame objects to link
         :return: Response from the API
         """
-        try:
-            unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/add_update_keyframes?client_id={client_id}&uuid={unique_id}"
-            headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
-                client_id=client_id,
-                extra_headers={"content-type": "application/json"},
-            )
+        from .projects.video_project import VideoProject
 
-            body = {
-                "project_id": project_id,
-                "file_id": file_id,
-                "keyframes": [
-                    kf.__dict__ if isinstance(kf, KeyFrame) else kf for kf in key_frames
-                ],
-            }
+        # Create a temporary VideoProject instance for delegation
+        video_project = VideoProject.__new__(VideoProject)
+        video_project.client = self
+        video_project.base_url = self.base_url
 
-            response = self._make_request("POST", url, headers=headers, json=body)
-            return self._handle_response(response, unique_id)
-
-        except LabellerrError as e:
-            raise e
-        except Exception as e:
-            raise LabellerrError(f"Failed to link key frames: {str(e)}")
+        return video_project.link_key_frame(client_id, project_id, file_id, key_frames)
 
     @validate_params(client_id=str, project_id=str)
     def delete_key_frames(self, client_id: str, project_id: str):
         """
-        Deletes key frames from a project.
+        Deletes key frames from a video project.
+        Delegates to VideoProject.delete_key_frames().
 
         :param client_id: The ID of the client
         :param project_id: The ID of the project
         :return: Response from the API
         """
-        try:
-            unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
-            headers = client_utils.build_headers(
-                api_key=self.api_key,
-                api_secret=self.api_secret,
-                client_id=client_id,
-                extra_headers={"content-type": "application/json"},
-            )
+        from .projects.video_project import VideoProject
 
-            response = self._make_request("POST", url, headers=headers)
-            return self._handle_response(response, unique_id)
+        # Create a temporary VideoProject instance for delegation
+        video_project = VideoProject.__new__(VideoProject)
+        video_project.client = self
+        video_project.base_url = self.base_url
 
-        except LabellerrError as e:
-            raise e
-        except Exception as e:
-            raise LabellerrError(f"Failed to delete key frames: {str(e)}")
-
-    # ===== Dataset-related methods (delegated to DataSets) =====
-
-    def create_annotation_guideline(
-        self, client_id, questions, template_name, data_type
-    ):
-        """
-        Creates an annotation guideline for a project.
-        Delegates to the DataSets handler.
-        """
-        return self.datasets.create_annotation_guideline(
-            client_id, questions, template_name, data_type
-        )
-
-    def validate_rotation_config(self, rotation_config):
-        """
-        Validates a rotation configuration.
-        Delegates to the DataSets handler.
-        """
-        return self.datasets.validate_rotation_config(rotation_config)
-
-    def sync_datasets(
-        self,
-        client_id,
-        project_id,
-        dataset_id,
-        path,
-        data_type,
-        email_id,
-        connection_id,
-    ):
-        """
-        Syncs datasets from cloud storage (AWS S3 or GCS) to the Labellerr platform.
-        Delegates to the DataSets handler.
-        """
-        return self.datasets.sync_datasets(
-            client_id,
-            project_id,
-            dataset_id,
-            path,
-            data_type,
-            email_id,
-            connection_id,
-        )
-
-    # ===== Project-related methods (delegated to Projects) =====
-
-    def initiate_create_project(self, payload):
-        """
-        Orchestrates project creation by handling dataset creation, annotation guidelines,
-        and final project setup.
-        Delegates to the Projects handler.
-        """
-        return self.projects.initiate_create_project(payload)
-
-    def list_file(
-        self, client_id, project_id, search_queries, size=10, next_search_after=None
-    ):
-        """
-        Lists files in a project with optional filtering and pagination.
-        Delegates to the Projects handler.
-        """
-        return self.projects.list_file(
-            client_id, project_id, search_queries, size, next_search_after
-        )
-
-    def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
-        """
-        Bulk assigns status to multiple files in a project.
-        Delegates to the Projects handler.
-        """
-        return self.projects.bulk_assign_files(
-            client_id, project_id, file_ids, new_status
-        )
-
-    # ===== User-related methods (delegated to Users) =====
-
-    def create_user(
-        self,
-        client_id,
-        first_name,
-        last_name,
-        email_id,
-        projects,
-        roles,
-        work_phone="",
-        job_title="",
-        language="en",
-        timezone="GMT",
-    ):
-        """
-        Creates a new user in the system.
-        Delegates to the Users handler.
-        """
-        return self.users.create_user(
-            client_id,
-            first_name,
-            last_name,
-            email_id,
-            projects,
-            roles,
-            work_phone,
-            job_title,
-            language,
-            timezone,
-        )
-
-    def update_user_role(
-        self,
-        client_id,
-        project_id,
-        email_id,
-        roles,
-        first_name=None,
-        last_name=None,
-        work_phone="",
-        job_title="",
-        language="en",
-        timezone="GMT",
-        profile_image="",
-    ):
-        """
-        Updates a user's role and profile information.
-        Delegates to the Users handler.
-        """
-        return self.users.update_user_role(
-            client_id,
-            project_id,
-            email_id,
-            roles,
-            first_name,
-            last_name,
-            work_phone,
-            job_title,
-            language,
-            timezone,
-            profile_image,
-        )
-
-    def delete_user(self, client_id, project_id, email_id, user_id):
-        """
-        Deletes a user from the system.
-        Delegates to the Users handler.
-        """
-        return self.users.delete_user(client_id, project_id, email_id, user_id)
-
-    def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
-        """
-        Adds a user to a project.
-        Delegates to the Users handler.
-        """
-        return self.users.add_user_to_project(client_id, project_id, email_id, role_id)
-
-    def remove_user_from_project(self, client_id, project_id, email_id):
-        """
-        Removes a user from a project.
-        Delegates to the Users handler.
-        """
-        return self.users.remove_user_from_project(client_id, project_id, email_id)
-
-    def change_user_role(self, client_id, project_id, email_id, new_role_id):
-        """
-        Changes a user's role in a project.
-        Delegates to the Users handler.
-        """
-        return self.users.change_user_role(client_id, project_id, email_id, new_role_id)
+        return video_project.delete_key_frames(client_id, project_id)

@@ -69,7 +69,7 @@ class TestInitiateCreateProject:
             del invalid_payload[param]
 
             with pytest.raises(LabellerrError) as exc_info:
-                client.initiate_create_project(invalid_payload)
+                client.projects.initiate_create_project(invalid_payload)
 
             assert f"Required parameter {param} is missing" in str(exc_info.value)
 
@@ -78,7 +78,7 @@ class TestInitiateCreateProject:
         del invalid_payload["annotation_guide"]
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert (
             "Please provide either annotation guide or annotation template id"
@@ -91,14 +91,14 @@ class TestInitiateCreateProject:
         invalid_payload["client_id"] = 123  # Not a string
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "client_id must be a non-empty string" in str(exc_info.value)
 
         # Test empty string
         invalid_payload["client_id"] = "   "
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         # Whitespace client_id causes HTTP header issues
         assert "Invalid leading whitespace" in str(
@@ -112,7 +112,7 @@ class TestInitiateCreateProject:
         # Missing option_type
         invalid_payload["annotation_guide"] = [{"question": "Test Question"}]
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "option_type is required in annotation_guide" in str(exc_info.value)
 
@@ -121,7 +121,7 @@ class TestInitiateCreateProject:
             {"option_type": "invalid_type", "question": "Test Question"}
         ]
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "option_type must be one of" in str(exc_info.value)
 
@@ -131,7 +131,7 @@ class TestInitiateCreateProject:
         invalid_payload["folder_to_upload"] = "/path/to/folder"
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "Cannot provide both files_to_upload and folder_to_upload" in str(
             exc_info.value
@@ -143,7 +143,7 @@ class TestInitiateCreateProject:
         del invalid_payload["files_to_upload"]
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "Either files_to_upload or folder_to_upload must be provided" in str(
             exc_info.value
@@ -155,7 +155,7 @@ class TestInitiateCreateProject:
         invalid_payload["files_to_upload"] = []
 
         with pytest.raises(LabellerrError):
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
     def test_invalid_folder_to_upload(self, client, sample_valid_payload):
         """Test error handling for invalid folder_to_upload"""
@@ -164,7 +164,7 @@ class TestInitiateCreateProject:
         invalid_payload["folder_to_upload"] = "   "
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.initiate_create_project(invalid_payload)
+            client.projects.initiate_create_project(invalid_payload)
 
         assert "Folder path does not exist" in str(exc_info.value)
 
@@ -175,7 +175,7 @@ class TestCreateUser:
     def test_create_user_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.create_user(
+            client.users.create_user(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
@@ -187,7 +187,7 @@ class TestCreateUser:
     def test_create_user_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.create_user(
+            client.users.create_user(
                 client_id=12345,  # Not a string
                 first_name="John",
                 last_name="Doe",
@@ -201,7 +201,7 @@ class TestCreateUser:
     def test_create_user_empty_projects(self, client):
         """Test error handling for empty projects list"""
         with pytest.raises(ValidationError) as exc_info:
-            client.create_user(
+            client.users.create_user(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
@@ -215,7 +215,7 @@ class TestCreateUser:
     def test_create_user_empty_roles(self, client):
         """Test error handling for empty roles list"""
         with pytest.raises(ValidationError) as exc_info:
-            client.create_user(
+            client.users.create_user(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
@@ -233,7 +233,7 @@ class TestUpdateUserRole:
     def test_update_user_role_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.update_user_role(
+            client.users.update_user_role(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id, roles
@@ -244,7 +244,7 @@ class TestUpdateUserRole:
     def test_update_user_role_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.update_user_role(
+            client.users.update_user_role(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -256,7 +256,7 @@ class TestUpdateUserRole:
     def test_update_user_role_empty_roles(self, client):
         """Test error handling for empty roles list"""
         with pytest.raises(ValidationError) as exc_info:
-            client.update_user_role(
+            client.users.update_user_role(
                 client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
@@ -272,7 +272,7 @@ class TestDeleteUser:
     def test_delete_user_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.delete_user(
+            client.users.delete_user(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id, user_id
@@ -283,7 +283,7 @@ class TestDeleteUser:
     def test_delete_user_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.delete_user(
+            client.users.delete_user(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -295,7 +295,7 @@ class TestDeleteUser:
     def test_delete_user_invalid_project_id(self, client):
         """Test error handling for invalid project_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.delete_user(
+            client.users.delete_user(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 email_id="john@example.com",
@@ -307,7 +307,7 @@ class TestDeleteUser:
     def test_delete_user_invalid_email_id(self, client):
         """Test error handling for invalid email_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.delete_user(
+            client.users.delete_user(
                 client_id="12345",
                 project_id="project_123",
                 email_id=12345,  # Not a string
@@ -319,7 +319,7 @@ class TestDeleteUser:
     def test_delete_user_invalid_user_id(self, client):
         """Test error handling for invalid user_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.delete_user(
+            client.users.delete_user(
                 client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
@@ -335,7 +335,7 @@ class TestAddUserToProject:
     def test_add_user_to_project_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.add_user_to_project(
+            client.users.add_user_to_project(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id
@@ -346,7 +346,7 @@ class TestAddUserToProject:
     def test_add_user_to_project_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.add_user_to_project(
+            client.users.add_user_to_project(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -361,7 +361,7 @@ class TestRemoveUserFromProject:
     def test_remove_user_from_project_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.remove_user_from_project(
+            client.users.remove_user_from_project(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id
@@ -372,7 +372,7 @@ class TestRemoveUserFromProject:
     def test_remove_user_from_project_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.remove_user_from_project(
+            client.users.remove_user_from_project(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -387,7 +387,7 @@ class TestChangeUserRole:
     def test_change_user_role_missing_required_params(self, client):
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
-            client.change_user_role(
+            client.users.change_user_role(
                 client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
@@ -399,7 +399,7 @@ class TestChangeUserRole:
     def test_change_user_role_invalid_client_id(self, client):
         """Test error handling for invalid client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.change_user_role(
+            client.users.change_user_role(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -414,11 +414,11 @@ class TestListAndBulkAssignFiles:
 
     def test_list_file_missing_required(self, client):
         with pytest.raises(TypeError):
-            client.list_file(client_id="12345", project_id="project_123")
+            client.projects.list_file(client_id="12345", project_id="project_123")
 
     def test_bulk_assign_files_missing_required(self, client):
         with pytest.raises(TypeError):
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345", project_id="project_123", new_status="None"
             )
 
@@ -429,7 +429,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_invalid_client_id_type(self, client):
         """Test error handling for invalid client_id type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -440,7 +440,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_empty_client_id(self, client):
         """Test error handling for empty client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -451,7 +451,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_invalid_project_id_type(self, client):
         """Test error handling for invalid project_id type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 file_ids=["file1", "file2"],
@@ -462,7 +462,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_empty_project_id(self, client):
         """Test error handling for empty project_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="",
                 file_ids=["file1", "file2"],
@@ -473,7 +473,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_empty_file_ids_list(self, client):
         """Test error handling for empty file_ids list"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=[],  # Empty list
@@ -484,7 +484,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_invalid_file_ids_type(self, client):
         """Test error handling for invalid file_ids type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids="file1,file2",  # Not a list
@@ -495,7 +495,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_file_ids_with_non_string(self, client):
         """Test error handling for file_ids containing non-string values"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", 123, "file3"],  # Contains integer
@@ -506,7 +506,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_invalid_new_status_type(self, client):
         """Test error handling for invalid new_status type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -517,7 +517,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_empty_new_status(self, client):
         """Test error handling for empty new_status"""
         with pytest.raises(ValidationError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -529,7 +529,7 @@ class TestBulkAssignFiles:
         """Test bulk assign with a single file"""
         # This should not raise validation errors
         try:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1"],
@@ -545,7 +545,7 @@ class TestBulkAssignFiles:
         """Test bulk assign with multiple files"""
         # This should not raise validation errors
         try:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2", "file3", "file4", "file5"],
@@ -560,7 +560,7 @@ class TestBulkAssignFiles:
     def test_bulk_assign_files_special_characters_in_ids(self, client):
         """Test bulk assign with special characters in IDs"""
         try:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id="client-123_test",
                 project_id="project-456_test",
                 file_ids=["file-1_test", "file-2_test"],
@@ -579,7 +579,7 @@ class TestListFile:
     def test_list_file_invalid_client_id_type(self, client):
         """Test error handling for invalid client_id type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -589,7 +589,7 @@ class TestListFile:
     def test_list_file_empty_client_id(self, client):
         """Test error handling for empty client_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -599,7 +599,7 @@ class TestListFile:
     def test_list_file_invalid_project_id_type(self, client):
         """Test error handling for invalid project_id type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 search_queries={"status": "completed"},
@@ -609,7 +609,7 @@ class TestListFile:
     def test_list_file_empty_project_id(self, client):
         """Test error handling for empty project_id"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="",
                 search_queries={"status": "completed"},
@@ -619,7 +619,7 @@ class TestListFile:
     def test_list_file_invalid_search_queries_type(self, client):
         """Test error handling for invalid search_queries type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries="status:completed",  # Not a dict
@@ -629,7 +629,7 @@ class TestListFile:
     def test_list_file_invalid_size_type(self, client):
         """Test error handling for invalid size type"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -640,7 +640,7 @@ class TestListFile:
     def test_list_file_negative_size(self, client):
         """Test error handling for negative size"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -651,7 +651,7 @@ class TestListFile:
     def test_list_file_zero_size(self, client):
         """Test error handling for zero size"""
         with pytest.raises(ValidationError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -662,7 +662,7 @@ class TestListFile:
     def test_list_file_with_default_size(self, client):
         """Test list_file with default size parameter"""
         try:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -676,7 +676,7 @@ class TestListFile:
     def test_list_file_with_custom_size(self, client):
         """Test list_file with custom size parameter"""
         try:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -691,7 +691,7 @@ class TestListFile:
     def test_list_file_with_next_search_after(self, client):
         """Test list_file with next_search_after for pagination"""
         try:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -707,7 +707,7 @@ class TestListFile:
     def test_list_file_complex_search_queries(self, client):
         """Test list_file with complex search queries"""
         try:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={
@@ -725,7 +725,7 @@ class TestListFile:
     def test_list_file_empty_search_queries(self, client):
         """Test list_file with empty search queries dict"""
         try:
-            client.list_file(
+            client.projects.list_file(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={},  # Empty dict

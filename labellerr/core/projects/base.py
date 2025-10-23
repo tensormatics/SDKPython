@@ -31,24 +31,20 @@ class LabellerrProjectMeta(ABCMeta):
     @staticmethod
     def get_project(client: "LabellerrClient", project_id: str):
         """Get project from Labellerr API"""
-        # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
         unique_id = str(uuid.uuid4())
         url = (
             f"{constants.BASE_URL}/projects/{project_id}?client_id={client.client_id}"
             f"&uuid={unique_id}"
         )
-        headers = client_utils.build_headers(
-            api_key=client.api_key,
-            api_secret=client.api_secret,
+
+        response = client._make_request(
+            "GET",
+            url,
             client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
-        )
-
-        response = client_utils.request(
-            "GET", url, headers=headers, request_id=unique_id
+            request_id=unique_id,
         )
         return response.get("response", None)
-        # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
 
     """Metaclass that combines ABC functionality with factory pattern"""
 
@@ -250,7 +246,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 "message": "Project created successfully",
                 "project_id": project_response,
             }
-
         except LabellerrError:
             raise
         except Exception:
@@ -308,18 +303,16 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             }
         )
 
-        headers = client_utils.build_headers(
-            api_key=self.client.api_key,
-            api_secret=self.client.api_secret,
+        return self.client._make_request(
+            "POST",
+            url,
             client_id=params.client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
             },
-        )
-
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+            request_id=unique_id,
+            data=payload,
         )
 
     def update_rotation_count(self):
@@ -332,20 +325,19 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/projects/rotations/add?project_id={self.project_id}&client_id={self.client.client_id}&uuid={unique_id}"
 
-            headers = client_utils.build_headers(
-                api_key=self.client.api_key,
-                api_secret=self.client.api_secret,
-                client_id=self.client.client_id,
-                extra_headers={"content-type": "application/json"},
-            )
-
             payload = json.dumps(self.rotation_config)
             logging.info(f"Update Rotation Count Payload: {payload}")
 
-            response = requests.request("POST", url, headers=headers, data=payload)
+            self.client._make_request(
+                "POST",
+                url,
+                client_id=self.client.client_id,
+                extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
+                data=payload,
+            )
 
             logging.info("Rotation configuration updated successfully.")
-            client_utils.handle_response(response, unique_id)
 
             return {"msg": "project rotation configuration updated"}
         except LabellerrError as e:
@@ -364,15 +356,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
 
-            headers = client_utils.build_headers(
-                api_key=self.client.api_key,
-                api_secret=self.client.api_secret,
+            return self.client._make_request(
+                "GET",
+                url,
                 client_id=client_id,
                 extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
             )
-
-            response = requests.request("GET", url, headers=headers, data={})
-            return client_utils.handle_response(response, unique_id)
         except Exception as e:
             logging.error(f"Failed to retrieve projects: {str(e)}")
             raise
@@ -429,13 +419,16 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             #         'email_id': self.api_key
             #     }, data=payload, files=files)
             url += "&gcs_path=" + gcs_path
-            headers = client_utils.build_headers(
-                api_key=self.client.api_key,
-                api_secret=self.client.api_secret,
+
+            response = self.client._make_request(
+                "POST",
+                url,
                 client_id=client_id,
                 extra_headers={"email_id": self.client.api_key},
+                request_id=request_uuid,
+                handle_response=False,
+                data=payload,
             )
-            response = requests.request("POST", url, headers=headers, data=payload)
             response_data = self.client._handle_upload_response(response, request_uuid)
 
             # read job_id from the response
@@ -528,13 +521,16 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 #         'email_id': self.api_key
                 #     }, data=payload, files=files)
                 url += "&gcs_path=" + gcs_path
-                headers = client_utils.build_headers(
-                    api_key=self.client.api_key,
-                    api_secret=self.client.api_secret,
+
+                response = self.client._make_request(
+                    "POST",
+                    url,
                     client_id=client_id,
                     extra_headers={"email_id": self.client.api_key},
+                    request_id=request_uuid,
+                    handle_response=False,
+                    data=payload,
                 )
-                response = requests.request("POST", url, headers=headers, data=payload)
                 response_data = self.client._handle_upload_response(
                     response, request_uuid
                 )
@@ -548,19 +544,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 logging.info(f"Pre annotation upload successful. Job ID: {job_id}")
 
                 # Now monitor the status
-                headers = client_utils.build_headers(
-                    api_key=self.client.api_key,
-                    api_secret=self.client.api_secret,
-                    client_id=self.client_id,
-                    extra_headers={"Origin": constants.ALLOWED_ORIGINS},
-                )
                 status_url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
                 while True:
                     try:
-                        response = requests.request(
-                            "GET", status_url, headers=headers, data={}
+                        status_data = self.client._make_request(
+                            "GET",
+                            status_url,
+                            client_id=self.client_id,
+                            extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                         )
-                        status_data = response.json()
 
                         logging.debug(f"Status data: {status_data}")
 
@@ -600,22 +592,17 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
 
         def check_status():
-            headers = client_utils.build_headers(
-                api_key=self.client.api_key,
-                api_secret=self.client.api_secret,
-                client_id=self.client_id,
-                extra_headers={"Origin": constants.ALLOWED_ORIGINS},
-            )
             url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
-            payload = {}
             retry_count = 0
 
             while retry_count < max_retries:
                 try:
-                    response = requests.request(
-                        "GET", url, headers=headers, data=payload
+                    response_data = self.client._make_request(
+                        "GET",
+                        url,
+                        client_id=self.client_id,
+                        extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                     )
-                    response_data = response.json()
 
                     # Check if job is completed
                     if response_data.get("response", {}).get("status") == "completed":
@@ -697,14 +684,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             payload = {}
             with open(annotation_file, "rb") as f:
                 files = [("file", (file_name, f, "application/octet-stream"))]
-                headers = client_utils.build_headers(
-                    api_key=self.client.api_key,
-                    api_secret=self.client.api_secret,
+                response = self.client._make_request(
+                    "POST",
+                    url,
                     client_id=client_id,
                     extra_headers={"email_id": self.client.api_key},
-                )
-                response = requests.request(
-                    "POST", url, headers=headers, data=payload, files=files
+                    request_id=request_uuid,
+                    handle_response=False,
+                    data=payload,
+                    files=files,
                 )
             response_data = self.client._handle_upload_response(response, request_uuid)
             logging.debug(f"response_data: {response_data}")
@@ -749,21 +737,17 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         export_config.update({"export_destination": "local", "question_ids": ["all"]})
 
         payload = json.dumps(export_config)
-        headers = client_utils.build_headers(
-            api_key=self.client.api_key,
-            api_secret=self.client.api_secret,
+
+        return self.client._make_request(
+            "POST",
+            f"{constants.BASE_URL}/sdk/export/files?project_id={project_id}&client_id={client_id}",
+            client_id=client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
             },
-        )
-
-        return client_utils.request(
-            "POST",
-            f"{constants.BASE_URL}/sdk/export/files?project_id={project_id}&client_id={client_id}",
-            headers=headers,
-            data=payload,
             request_id=unique_id,
+            data=payload,
         )
 
     @validate_params(project_id=str, report_ids=list, client_id=str)
@@ -780,18 +764,16 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             # Construct URL
             url = f"{constants.BASE_URL}/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
 
-            # Headers
-            headers = client_utils.build_headers(
-                api_key=self.client.api_key,
-                api_secret=self.client.api_secret,
-                client_id=client_id,
-                extra_headers={"Content-Type": "application/json"},
-            )
-
             payload = json.dumps({"report_ids": report_ids})
 
-            response = requests.post(url, headers=headers, data=payload)
-            result = client_utils.handle_response(response, request_uuid)
+            result = self.client._make_request(
+                "POST",
+                url,
+                client_id=client_id,
+                extra_headers={"Content-Type": "application/json"},
+                request_id=request_uuid,
+                data=payload,
+            )
 
             # Now process each report_id
             for status_item in result.get("status", []):
@@ -833,13 +815,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/search/project_files?project_id={params.project_id}&client_id={params.client_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.client.api_key,
-            api_secret=self.client.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
         payload = json.dumps(
             {
                 "search_queries": params.search_queries,
@@ -848,8 +823,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             }
         )
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
@@ -864,13 +844,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.client.api_key,
-            api_secret=self.client.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
         payload = json.dumps(
             {
                 "file_ids": params.file_ids,
@@ -878,8 +851,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             }
         )
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     def validate_rotation_config(self, rotation_config):

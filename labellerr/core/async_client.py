@@ -330,9 +330,15 @@ class AsyncLabellerrClient:
         self,
         dataset_config: Dict[str, Any],
         files_to_upload: Optional[List[str]] = None,
+        connection_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Async version of create_dataset.
+
+        :param dataset_config: Configuration for the dataset
+        :param files_to_upload: Optional list of files to upload
+        :param connection_id: Pre-existing connection ID to use for the dataset.
+                             If both connection_id and files_to_upload are provided, connection_id takes precedence.
         """
         try:
             # Validate data_type
@@ -341,9 +347,10 @@ class AsyncLabellerrClient:
                     f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
                 )
 
-            connection_id = None
-            if files_to_upload is not None:
-                connection_id = await self.upload_files_batch(
+            # Use provided connection_id or create one from files_to_upload
+            final_connection_id = connection_id
+            if final_connection_id is None and files_to_upload is not None:
+                final_connection_id = await self.upload_files_batch(
                     client_id=dataset_config["client_id"], files_list=files_to_upload
                 )
 
@@ -359,7 +366,7 @@ class AsyncLabellerrClient:
                 "dataset_name": dataset_config["dataset_name"],
                 "dataset_description": dataset_config.get("dataset_description", ""),
                 "data_type": dataset_config["data_type"],
-                "connection_id": connection_id,
+                "connection_id": final_connection_id,
                 "path": "local",
                 "client_id": dataset_config["client_id"],
             }

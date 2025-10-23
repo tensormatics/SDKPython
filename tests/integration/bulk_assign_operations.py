@@ -37,7 +37,7 @@ def test_list_files_by_status(api_key, api_secret, client_id, project_id):
     try:
         # List all files without specific status filter
         print("\n1. Listing files (first page)...")
-        result = client.list_file(
+        result = client.projects.list_file(
             client_id=client_id, project_id=project_id, search_queries={}, size=10
         )
 
@@ -70,7 +70,7 @@ def test_list_files_with_pagination(api_key, api_secret, client_id, project_id):
     try:
         # Get first page
         print("\n1. Fetching first page (5 items)...")
-        result_page1 = client.list_file(
+        result_page1 = client.projects.list_file(
             client_id=client_id, project_id=project_id, search_queries={}, size=5
         )
 
@@ -82,7 +82,7 @@ def test_list_files_with_pagination(api_key, api_secret, client_id, project_id):
         next_cursor = result_page1.get("next_search_after")
         if next_cursor:
             print("\n2. Next page cursor found, fetching second page...")
-            result_page2 = client.list_file(
+            result_page2 = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries={},
@@ -129,7 +129,7 @@ def test_bulk_assign_files(
         print(f"\n1. Bulk assigning {len(file_ids)} files to status: {new_status}")
         print("File IDs: {file_ids[:3]}{'...' if len(file_ids) > 3 else ''}")
 
-        result = client.bulk_assign_files(
+        result = client.projects.bulk_assign_files(
             client_id=client_id,
             project_id=project_id,
             file_ids=file_ids,
@@ -172,7 +172,7 @@ def test_list_then_bulk_assign_workflow(
     try:
         # Step 1: List files with target status
         print(f"\n1. Listing files with status: {target_status}")
-        list_result = client.list_file(
+        list_result = client.projects.list_file(
             client_id=client_id,
             project_id=project_id,
             search_queries={"status": target_status},
@@ -196,7 +196,7 @@ def test_list_then_bulk_assign_workflow(
 
         # Step 2: Bulk assign to new status
         print(f"\n2. Bulk assigning {len(file_ids)} files to status: {new_status}")
-        assign_result = client.bulk_assign_files(
+        assign_result = client.projects.bulk_assign_files(
             client_id=client_id,
             project_id=project_id,
             file_ids=file_ids,
@@ -209,7 +209,7 @@ def test_list_then_bulk_assign_workflow(
         # Step 3: Verify the change (optional)
         print(f"\n3. Verifying files now have status: {new_status}")
         time.sleep(1)  # Brief pause to allow status update
-        verify_result = client.list_file(
+        verify_result = client.projects.list_file(
             client_id=client_id,
             project_id=project_id,
             search_queries={"status": new_status},
@@ -255,7 +255,7 @@ def test_bulk_assign_single_file(
         print(f"\n1. Bulk assigning single file: {file_id}")
         print("New status: {new_status}")
 
-        result = client.bulk_assign_files(
+        result = client.projects.bulk_assign_files(
             client_id=client_id,
             project_id=project_id,
             file_ids=[file_id],
@@ -288,7 +288,7 @@ def test_search_with_filters(api_key, api_secret, client_id, project_id):
     try:
         # Test 1: Simple status filter
         print("\n1. Searching with simple filters...")
-        result1 = client.list_file(
+        result1 = client.projects.list_file(
             client_id=client_id,
             project_id=project_id,
             search_queries={"status": "pending"},
@@ -298,7 +298,7 @@ def test_search_with_filters(api_key, api_secret, client_id, project_id):
 
         # Test 2: Multiple filters (if supported)
         print("\n2. Searching with multiple filters...")
-        result2 = client.list_file(
+        result2 = client.projects.list_file(
             client_id=client_id,
             project_id=project_id,
             search_queries={

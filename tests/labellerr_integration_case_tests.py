@@ -187,7 +187,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Execute complete project creation workflow
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.projects.initiate_create_project(project_payload)
 
             # Step 3: Validate the workflow execution
             self.assertIsInstance(
@@ -227,7 +227,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.projects.initiate_create_project(base_payload)
 
         self.assertIn("Required parameter client_id is missing", str(context.exception))
 
@@ -246,7 +246,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.projects.initiate_create_project(base_payload)
 
         self.assertIn("Please enter email id in created_by", str(context.exception))
 
@@ -265,7 +265,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.projects.initiate_create_project(base_payload)
 
         self.assertIn("Invalid data_type", str(context.exception))
 
@@ -283,7 +283,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.projects.initiate_create_project(base_payload)
 
         self.assertIn(
             "Required parameter dataset_name is missing", str(context.exception)
@@ -303,7 +303,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.projects.initiate_create_project(base_payload)
 
         self.assertIn(
             "Please provide either annotation guide or annotation template id",
@@ -346,7 +346,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.projects.initiate_create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -390,7 +390,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.projects.initiate_create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -1385,7 +1385,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 1: Create a user
             print(f"\n=== Step 1: Creating user {test_email} ===")
-            create_result = self.client.create_user(
+            create_result = self.client.users.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1398,7 +1398,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Update user role
             print(f"\n=== Step 2: Updating user role for {test_email} ===")
-            update_result = self.client.update_user_role(
+            update_result = self.client.users.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1415,7 +1415,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             # 2025-10-09 21:40:48.976 IST
             # INFO:root:NotFound: AltairOne user not found.
             # print(f"\n=== Step 3: Adding user to project {test_project_id} ===")
-            # add_result = self.client.add_user_to_project(
+            # add_result = self.client.users.add_user_to_project(
             #     client_id=self.client_id,
             #     project_id=test_project_id,
             #     email_id=test_email,
@@ -1426,7 +1426,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 4: Change user role
             print(f"\n=== Step 4: Changing user role for {test_email} ===")
-            change_role_result = self.client.change_user_role(
+            change_role_result = self.client.users.change_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1437,7 +1437,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 5: Remove user from project
             print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
-            remove_result = self.client.remove_user_from_project(
+            remove_result = self.client.users.remove_user_from_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1447,7 +1447,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 6: Delete user
             print(f"\n=== Step 6: Deleting user {test_email} ===")
-            delete_result = self.client.delete_user(
+            delete_result = self.client.users.delete_user(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1475,7 +1475,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user creation for {test_email} ===")
 
-            result = self.client.create_user(
+            result = self.client.users.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1492,7 +1492,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result)
 
             try:
-                self.client.delete_user(
+                self.client.users.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1522,7 +1522,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user role update for {test_email} ===")
 
-            create_result = self.client.create_user(
+            create_result = self.client.users.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1532,7 +1532,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             print(f"User creation result: {create_result}")
 
-            update_result = self.client.update_user_role(
+            update_result = self.client.users.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1549,7 +1549,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                self.client.delete_user(
+                self.client.users.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1580,7 +1580,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing project user management for {test_email} ===")
 
             # Step 1: Create a user
-            create_result = self.client.create_user(
+            create_result = self.client.users.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1592,7 +1592,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(create_result)
 
             # Step 2: Update user role (use update_user_role instead of separate add/change operations)
-            update_result = self.client.update_user_role(
+            update_result = self.client.users.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1604,7 +1604,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                self.client.delete_user(
+                self.client.users.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1629,7 +1629,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid client_id
             try:
-                self.client.create_user(
+                self.client.users.create_user(
                     client_id="invalid_client_id",
                     first_name="Test",
                     last_name="User",
@@ -1642,7 +1642,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 print(f" Correctly caught error for invalid client_id: {str(e)}")
 
             with self.assertRaises(ValidationError) as e:
-                self.client.create_user(
+                self.client.users.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="",  # Empty string - should fail validation
@@ -1656,7 +1656,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid email format
             try:
-                self.client.create_user(
+                self.client.users.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="User",

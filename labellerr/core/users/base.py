@@ -53,16 +53,6 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/register?client_id={params.client_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "content-type": "application/json",
-                "accept": "application/json, text/plain, */*",
-            },
-        )
-
         payload = json.dumps(
             {
                 "first_name": params.first_name,
@@ -78,8 +68,16 @@ class LabellerrUsers(Singleton):
             }
         )
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+            request_id=unique_id,
+            data=payload,
         )
 
     def update_user_role(
@@ -130,16 +128,6 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/update?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "content-type": "application/json",
-                "accept": "application/json, text/plain, */*",
-            },
-        )
-
         # Build the payload with all provided information
         # Extract project_ids from roles for API requirement
         project_ids = [
@@ -166,8 +154,16 @@ class LabellerrUsers(Singleton):
 
         payload = json.dumps(payload_data)
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+            request_id=unique_id,
+            data=payload,
         )
 
     def delete_user(
@@ -230,16 +226,6 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/delete?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "content-type": "application/json",
-                "accept": "application/json, text/plain, */*",
-            },
-        )
-
         # Build the payload with all provided information
         payload_data = {
             "email_id": params.email_id,
@@ -268,8 +254,16 @@ class LabellerrUsers(Singleton):
 
         payload = json.dumps(payload_data)
 
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "accept": "application/json, text/plain, */*",
+            },
+            request_id=unique_id,
+            data=payload,
         )
 
     def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
@@ -293,21 +287,19 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/add_user_to_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
         payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         if params.role_id is not None:
             payload_data["role_id"] = params.role_id
 
         payload = json.dumps(payload_data)
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     def remove_user_from_project(self, client_id, project_id, email_id):
@@ -328,18 +320,16 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/remove_user_from_project?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
         payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         payload = json.dumps(payload_data)
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )
 
     # TODO: this is not working from UI
@@ -365,13 +355,6 @@ class LabellerrUsers(Singleton):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/change_user_role?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
         payload_data = {
             "email_id": params.email_id,
             "new_role_id": params.new_role_id,
@@ -379,6 +362,11 @@ class LabellerrUsers(Singleton):
         }
 
         payload = json.dumps(payload_data)
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+        return self.client._make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )

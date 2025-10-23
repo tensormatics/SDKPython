@@ -313,71 +313,12 @@ class Datasets(object):
 
         return response
 
-    def sync_datasets(
-        self,
-        client_id,
-        project_id,
-        dataset_id,
-        path,
-        data_type,
-        email_id,
-        connection_id,
-    ):
-        """
-        Syncs datasets with the backend.
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param dataset_id: The ID of the dataset to sync
-        :param path: The path to sync
-        :param data_type: Type of data (image, video, audio, document, text)
-        :param email_id: Email ID of the user
-        :param connection_id: The connection ID
-        :return: Dictionary containing sync status
-        :raises LabellerrError: If the sync fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.SyncDataSetParams(
-            client_id=client_id,
-            project_id=project_id,
-            dataset_id=dataset_id,
-            path=path,
-            data_type=data_type,
-            email_id=email_id,
-            connection_id=connection_id,
-        )
-
-        unique_id = str(uuid.uuid4())
-        url = f"https://api-gateway-722091373895.us-central1.run.app/connectors/datasets/sync?uuid={unique_id}&client_id={params.client_id}"
-
-        payload = json.dumps(
-            {
-                "client_id": params.client_id,
-                "project_id": params.project_id,
-                "dataset_id": params.dataset_id,
-                "path": params.path,
-                "data_type": params.data_type,
-                "email_id": params.email_id,
-                "connection_id": params.connection_id,
-            }
-        )
-
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
-        )
-
     def create_dataset(
         self,
         dataset_config,
         files_to_upload=None,
         folder_to_upload=None,
+        connection_id=None,
         connector_config=None,
     ):
         """
@@ -388,11 +329,22 @@ class Datasets(object):
                               Optional fields: dataset_description, connector_type
         :param files_to_upload: List of file paths to upload (for local connector)
         :param folder_to_upload: Path to folder to upload (for local connector)
+        :param connection_id: Pre-existing connection ID to use for the dataset.
+                             Either connection_id or connector_config can be provided, but not both.
         :param connector_config: Configuration for cloud connectors (GCP/AWS)
+                                Either connection_id or connector_config can be provided, but not both.
         :return: A dictionary containing the response status and the ID of the created dataset.
+        :raises LabellerrError: If both connection_id and connector_config are provided.
         """
 
         try:
+            # Validate that both connection_id and connector_config are not provided
+            if connection_id is not None and connector_config is not None:
+                raise LabellerrError(
+                    "Cannot provide both connection_id and connector_config. "
+                    "Use connection_id for existing connections or connector_config to create a new connection."
+                )
+
             # Validate required fields
             required_fields = ["client_id", "dataset_name", "data_type"]
             for field in required_fields:
@@ -408,56 +360,65 @@ class Datasets(object):
                 )
 
             connector_type = dataset_config.get("connector_type", "local")
-            connection_id = None
+            # Use provided connection_id or set to None (will be created later if needed)
+            final_connection_id = connection_id
             path = connector_type
 
-            # Handle different connector types
-            if connector_type == "local":
-                if files_to_upload is not None:
+            # Handle different connector types only if connection_id is not provided
+            if final_connection_id is None:
+                if connector_type == "local":
+                    if files_to_upload is not None:
+                        try:
+                            final_connection_id = self.client.upload_files(
+                                client_id=dataset_config["client_id"],
+                                files_list=files_to_upload,
+                            )
+                        except Exception as e:
+                            raise LabellerrError(
+                                f"Failed to upload files to dataset: {str(e)}"
+                            )
+
+                    elif folder_to_upload is not None:
+                        try:
+                            result = self.upload_folder_files_to_dataset(
+                                {
+                                    "client_id": dataset_config["client_id"],
+                                    "folder_path": folder_to_upload,
+                                    "data_type": dataset_config["data_type"],
+                                }
+                            )
+                            final_connection_id = result["connection_id"]
+                        except Exception as e:
+                            raise LabellerrError(
+                                f"Failed to upload folder files to dataset: {str(e)}"
+                            )
+                    elif connector_config is None:
+                        # Create empty dataset for local connector
+                        final_connection_id = None
+
+                elif connector_type in ["gcp", "aws"]:
+                    if connector_config is None:
+                        raise LabellerrError(
+                            f"connector_config is required for {connector_type} connector when connection_id is not provided"
+                        )
+
                     try:
-                        connection_id = self.client.upload_files(
-                            client_id=dataset_config["client_id"],
-                            files_list=files_to_upload,
+                        from ..connectors.connections import LabellerrConnectionMeta
+
+                        final_connection_id = LabellerrConnectionMeta.create_connection(
+                            self.client,
+                            connector_type,
+                            dataset_config["client_id"],
+                            connector_config,
                         )
                     except Exception as e:
                         raise LabellerrError(
-                            f"Failed to upload files to dataset: {str(e)}"
+                            f"Failed to setup {connector_type} connector: {str(e)}"
                         )
-
-                elif folder_to_upload is not None:
-                    try:
-                        result = self.upload_folder_files_to_dataset(
-                            {
-                                "client_id": dataset_config["client_id"],
-                                "folder_path": folder_to_upload,
-                                "data_type": dataset_config["data_type"],
-                            }
-                        )
-                        connection_id = result["connection_id"]
-                    except Exception as e:
-                        raise LabellerrError(
-                            f"Failed to upload folder files to dataset: {str(e)}"
-                        )
-                elif connector_config is None:
-                    # Create empty dataset for local connector
-                    connection_id = None
-
-            elif connector_type in ["gcp", "aws"]:
-                if connector_config is None:
+                else:
                     raise LabellerrError(
-                        f"connector_config is required for {connector_type} connector"
+                        f"Unsupported connector type: {connector_type}"
                     )
-
-                try:
-                    connection_id = self.client._setup_cloud_connector(
-                        connector_type, dataset_config["client_id"], connector_config
-                    )
-                except Exception as e:
-                    raise LabellerrError(
-                        f"Failed to setup {connector_type} connector: {str(e)}"
-                    )
-            else:
-                raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config['client_id']}&uuid={unique_id}"
@@ -475,7 +436,7 @@ class Datasets(object):
                         "dataset_description", ""
                     ),
                     "data_type": dataset_config["data_type"],
-                    "connection_id": connection_id,
+                    "connection_id": final_connection_id,
                     "path": path,
                     "client_id": dataset_config["client_id"],
                     "connector_type": connector_type,

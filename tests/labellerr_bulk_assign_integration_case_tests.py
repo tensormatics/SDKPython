@@ -171,7 +171,7 @@ def get_file_ids_from_project(
     if search_queries is None:
         search_queries = {}
 
-    list_result = client.list_file(
+    list_result = client.projects.list_file(
         client_id=client_id,
         project_id=project_id,
         search_queries=search_queries,
@@ -212,7 +212,7 @@ class TestBulkAssignBusinessScenarios:
 
             # Bulk assign files to annotation status
             new_status = "annotation"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -240,7 +240,7 @@ class TestBulkAssignBusinessScenarios:
             file_ids = get_file_ids_from_project(client, client_id, project_id, count=4)
 
             new_status = "review"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -267,7 +267,7 @@ class TestBulkAssignBusinessScenarios:
             file_ids = get_file_ids_from_project(client, client_id, project_id, count=3)
 
             new_status = "rework"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -294,7 +294,7 @@ class TestBulkAssignBusinessScenarios:
             file_ids = get_file_ids_from_project(client, client_id, project_id, count=6)
 
             new_status = "completed"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -321,7 +321,7 @@ class TestBulkAssignBusinessScenarios:
             file_ids = get_file_ids_from_project(client, client_id, project_id, count=1)
 
             new_status = "urgent_review"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -350,7 +350,7 @@ class TestBulkAssignBusinessScenarios:
             )
 
             new_status = "pending_annotation"
-            result = client.bulk_assign_files(
+            result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -379,7 +379,7 @@ class TestListFileBusinessScenarios:
         search_queries = {"status": "annotation"}
 
         try:
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -405,7 +405,7 @@ class TestListFileBusinessScenarios:
 
         try:
             # First page
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -417,7 +417,7 @@ class TestListFileBusinessScenarios:
             # Get next page if cursor exists
             next_cursor = result.get("next_search_after")
             if next_cursor:
-                result_page_2 = client.list_file(
+                result_page_2 = client.projects.list_file(
                     client_id=client_id,
                     project_id=project_id,
                     search_queries=search_queries,
@@ -447,7 +447,7 @@ class TestListFileBusinessScenarios:
         }
 
         try:
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -474,7 +474,7 @@ class TestListFileBusinessScenarios:
         }
 
         try:
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -499,7 +499,7 @@ class TestListFileBusinessScenarios:
         search_queries = {"status": "pending"}
 
         try:
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -526,7 +526,7 @@ class TestListFileBusinessScenarios:
 
         try:
             # Small page for preview
-            result_preview = client.list_file(
+            result_preview = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -536,7 +536,7 @@ class TestListFileBusinessScenarios:
             validate_list_file_response(result_preview)
 
             # Large page for bulk operations
-            result_bulk = client.list_file(
+            result_bulk = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -562,7 +562,7 @@ class TestListFileBusinessScenarios:
         search_queries = {"status": "failed"}
 
         try:
-            result = client.list_file(
+            result = client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -593,7 +593,7 @@ class TestIntegratedWorkflow:
             file_ids = get_file_ids_from_project(client, client_id, project_id, count=3)
 
             # Step 2: Bulk assign to annotation
-            assign_result = client.bulk_assign_files(
+            assign_result = client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -628,7 +628,7 @@ class TestIntegratedWorkflow:
 
                 # Move files to next stage
                 next_stage = stages[i + 1]
-                assign_result = client.bulk_assign_files(
+                assign_result = client.projects.bulk_assign_files(
                     client_id=client_id,
                     project_id=project_id,
                     file_ids=file_ids,
@@ -656,7 +656,7 @@ class TestErrorScenarios:
         file_ids = ["file1.jpg"]
 
         with pytest.raises(LabellerrError) as exc_info:
-            invalid_client.bulk_assign_files(
+            invalid_client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,
@@ -680,7 +680,7 @@ class TestErrorScenarios:
         search_queries = {"status": "completed"}
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.list_file(
+            client.projects.list_file(
                 client_id=client_id,
                 project_id=project_id,
                 search_queries=search_queries,
@@ -701,7 +701,7 @@ class TestErrorScenarios:
         file_ids = ["nonexistent_file_1_xyz", "nonexistent_file_2_xyz"]
 
         with pytest.raises(LabellerrError) as exc_info:
-            client.bulk_assign_files(
+            client.projects.bulk_assign_files(
                 client_id=client_id,
                 project_id=project_id,
                 file_ids=file_ids,

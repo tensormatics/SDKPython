@@ -351,3 +351,44 @@ class SyncDataSetParams(BaseModel):
     data_type: Literal["image", "video", "audio", "document", "text"]
     email_id: str = Field(min_length=1)
     connection_id: str = Field(min_length=1)
+
+
+class DatasetConfig(BaseModel):
+    """Configuration for creating a dataset."""
+
+    client_id: str = Field(min_length=1)
+    dataset_name: str = Field(min_length=1)
+    data_type: Literal["image", "video", "audio", "document", "text"]
+    dataset_description: str = ""
+    connector_type: Literal["local", "aws", "gcp"] = "local"
+
+
+class AWSConnectorConfig(BaseModel):
+    """Configuration for AWS S3 connector."""
+
+    aws_access_key: str = Field(min_length=1)
+    aws_secrets_key: str = Field(min_length=1)
+    s3_path: str = Field(min_length=1)
+    data_type: Literal["image", "video", "audio", "document", "text"]
+    name: Optional[str] = None
+    description: str = "Auto-created AWS connector"
+    connection_type: str = "import"
+
+
+class GCPConnectorConfig(BaseModel):
+    """Configuration for GCP connector."""
+
+    gcs_cred_file: str = Field(min_length=1)
+    gcs_path: str = Field(min_length=1)
+    data_type: Literal["image", "video", "audio", "document", "text"]
+    name: Optional[str] = None
+    description: str = "Auto-created GCS connector"
+    connection_type: str = "import"
+    credentials: str = "svc_account_json"
+
+    @field_validator("gcs_cred_file")
+    @classmethod
+    def validate_gcs_cred_file(cls, v):
+        if not os.path.exists(v):
+            raise ValueError(f"GCS credential file not found: {v}")
+        return v

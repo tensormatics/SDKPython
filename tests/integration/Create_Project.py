@@ -122,7 +122,7 @@ def create_project_all_option_type(
         "folder_to_upload": path_to_images,
     }
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[ALL OPTION TYPE] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -172,7 +172,7 @@ def create_project_polygon_boundingbox_project(
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[polygon_boundingbox] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -242,7 +242,7 @@ def create_project_select_dropdown_radio(
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[select_dropdown_radio] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -297,7 +297,7 @@ def create_project_polygon_input(api_key, api_secret, client_id, email, path_to_
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[polygon_input_project] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -364,7 +364,7 @@ def create_project_input_select_radio(
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[input_select_radio] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -435,7 +435,7 @@ def create_project_boundingbox_dropdown_input(
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[boundingbox_dropdown_input] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -493,7 +493,7 @@ def create_project_radio_dropdown(
     }
 
     try:
-        result = client.initiate_create_project(project_payload)
+        result = client.projects.initiate_create_project(project_payload)
         print(
             f"[radio_dropdown] Project ID: {result['project_id']['response']['project_id']}"
         )

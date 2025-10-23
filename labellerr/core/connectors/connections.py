@@ -20,7 +20,7 @@ class LabellerrConnectionMeta(ABCMeta):
     def register(cls, connection_type, connection_class):
         """Register a connection type handler"""
         cls._registry[connection_type] = connection_class
-
+    
     @staticmethod
     def get_connection(client: "LabellerrClient", connection_id: str):
         """Get connection from Labellerr API"""
@@ -76,6 +76,10 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
         self.client = client
         self.connection_id = connection_id
         self.connection_data = kwargs["connection_data"]
+
+    @property
+    def connection_id(self):
+        return self.connection_data.get("connection_id")
 
     @property
     def connection_type(self):

@@ -1,10 +1,9 @@
 import json
 import uuid
 
-from labellerr import schemas, LabellerrClient
+from labellerr import LabellerrClient, schemas
 from labellerr.core import constants
 from labellerr.core.base.singleton import Singleton
-from labellerr_integration_case_tests import client
 
 
 class LabellerrUsers(Singleton):

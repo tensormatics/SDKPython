@@ -11,7 +11,7 @@ import aiohttp
 
 from labellerr.core import client_utils, constants
 from labellerr.core.exceptions import LabellerrError
-from labellerr.core.validators import auto_log_and_handle_errors_async
+from labellerr.validators import auto_log_and_handle_errors_async
 
 
 @auto_log_and_handle_errors_async(

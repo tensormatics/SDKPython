@@ -11,14 +11,14 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from ..validators import auto_log_and_handle_errors
 from . import client_utils, constants, schemas
+from .connectors import create_connection
 
 # Initialize DataSets handler for dataset-related operations
 from .exceptions import LabellerrError
 from .schemas import DataSetDataType
-
 from .utils import validate_params
-from .validators import auto_log_and_handle_errors
 
 create_dataset_parameters: Dict[str, Any] = {}
 
@@ -307,7 +307,7 @@ class LabellerrClient:
             "connection_type": connection_type,
         }
 
-        return S3Connection.setup_full_connection(self, connection_config)
+        return create_connection(self, client, connection_config)
 
     def create_gcs_connection(
         self,

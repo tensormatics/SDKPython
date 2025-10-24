@@ -13,22 +13,25 @@ from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
 from labellerr.core.connectors import create_connection
+from labellerr.core.connectors.gcs_connection import GCSConnection
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import LabellerrProject
-from tests.test_client import client
 
 dotenv.load_dotenv()
 
 
-@pytest.fixture
-def client():
-    """Create a test client with mock credentials"""
-    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
+@pytest.fixture(scope="class")
+def client_fixture():
+    """Create a test client with real credentials from environment"""
+    api_key = os.getenv("API_KEY")
+    api_secret = os.getenv("API_SECRET")
+    client_id = os.getenv("CLIENT_ID")
+    return LabellerrClient(api_key, api_secret, client_id)
 
 
 @pytest.fixture
-def project(client: LabellerrClient):
-    """Create a test client with mock credentials"""
+def project(client):
+    """Create a test project instance"""
     return LabellerrProject(client, "sisely_serious_tarantula_26824")
 
 
@@ -217,7 +220,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Execute complete project creation workflow
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.create_project(project_payload)
 
             # Step 3: Validate the workflow execution
             self.assertIsInstance(
@@ -257,7 +260,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.create_project(base_payload)
 
         self.assertIn("Required parameter client_id is missing", str(context.exception))
 
@@ -276,7 +279,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.create_project(base_payload)
 
         self.assertIn("Please enter email id in created_by", str(context.exception))
 
@@ -295,11 +298,11 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.create_project(base_payload)
 
         self.assertIn("Invalid data_type", str(context.exception))
 
-    def test_project_creation_missing_dataset_name(self):
+    def test_project_creation_missing_dataset_name(self, client):
         """Test that project creation fails when dataset_name is missing"""
         base_payload = {
             "client_id": self.client_id,
@@ -313,7 +316,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            client.create_project(base_payload)
 
         self.assertIn(
             "Required parameter dataset_name is missing", str(context.exception)
@@ -333,7 +336,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.initiate_create_project(base_payload)
+            self.client.create_project(base_payload)
 
         self.assertIn(
             "Please provide either annotation guide or annotation template id",
@@ -376,7 +379,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -420,7 +423,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.initiate_create_project(project_payload)
+            result = self.client.create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -723,8 +726,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_data_set_connection_aws(self):
-
+    def test_data_set_connection_aws(self, project):
         # Read per-type AWS secrets from env (JSON strings): AWS_CONNECTION_IMAGE, AWS_CONNECTION_VIDEO
         image_secret_json = os.getenv("AWS_CONNECTION_IMAGE")
         video_secret_json = os.getenv("AWS_CONNECTION_VIDEO")
@@ -751,7 +753,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         cases: list[AWSConnectionTestCase] = [
             AWSConnectionTestCase(
                 test_name="Missing credentials",
-                client_id=self.client_id,
+                client_id=project.client_id,
                 access_key="",
                 secret_key="",
                 s3_path="s3://bucket/path",
@@ -770,7 +772,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             ),
             AWSConnectionTestCase(
                 test_name="Valid image import",
-                client_id=self.client_id,
+                client_id=project.client_id,
                 access_key=image_access_key,
                 secret_key=image_secret_key,
                 s3_path=image_s3_path,
@@ -780,7 +782,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             ),
             AWSConnectionTestCase(
                 test_name="Valid video import",
-                client_id=self.client_id,
+                client_id=project.client_id,
                 access_key=video_access_key,
                 secret_key=video_secret_key,
                 s3_path=video_s3_path,
@@ -815,15 +817,20 @@ class LabelerIntegrationTests(unittest.TestCase):
                         else LabellerrError
                     )
                     with self.assertRaises(error_type) as ctx:
-                        self.client.create_aws_connection(
-                            client_id=case.client_id,
-                            aws_access_key=case.access_key,
-                            aws_secrets_key=case.secret_key,
-                            s3_path=case.s3_path,
-                            data_type=case.data_type,
-                            name=case.name,
-                            description=case.description,
-                            connection_type=case.connection_type,
+                        create_connection(
+                            project,
+                            "aws",
+                            case.client_id,
+                            {
+                                "client_id": case.client_id,
+                                "aws_access_key": case.access_key,
+                                "aws_secrets_key": case.secret_key,
+                                "s3_path": case.s3_path,
+                                "data_type": case.data_type,
+                                "name": case.name,
+                                "description": case.description,
+                                "connection_type": case.connection_type,
+                            },
                         )
                     if expected_subst:
                         exc_str = str(ctx.exception)
@@ -833,7 +840,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                         )
                 else:
                     try:
-                        result = self.client.create_aws_connection(
+                        result = project.create_aws_connection(
                             client_id=case.client_id,
                             aws_access_key=case.access_key,
                             aws_secrets_key=case.secret_key,
@@ -848,7 +855,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                         connection_id = result["response"].get("connection_id")
                         self.assertIsNotNone(connection_id)
 
-                        list_result = self.client.list_connection(
+                        list_result = project.list_connection(
                             client_id=case.client_id,
                             connection_type=case.connection_type,
                             connector="s3",
@@ -856,7 +863,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                         self.assertIsInstance(list_result, dict)
                         self.assertIn("response", list_result)
 
-                        del_result = self.client.delete_connection(
+                        del_result = project.delete_connection(
                             client_id=case.client_id, connection_id=connection_id
                         )
                         self.assertIsInstance(del_result, dict)
@@ -1414,7 +1421,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 1: Create a user
             print(f"\n=== Step 1: Creating user {test_email} ===")
-            create_result = project.create_user(
+            create_result = self.client.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1427,7 +1434,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Update user role
             print(f"\n=== Step 2: Updating user role for {test_email} ===")
-            update_result = project.update_user_role(
+            update_result = self.client.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1455,7 +1462,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 4: Change user role
             print(f"\n=== Step 4: Changing user role for {test_email} ===")
-            change_role_result = project.change_user_role(
+            change_role_result = self.client.change_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1466,7 +1473,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 5: Remove user from project
             print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
-            remove_result = project.remove_user_from_project(
+            remove_result = self.client.remove_user_from_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1476,7 +1483,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 6: Delete user
             print(f"\n=== Step 6: Deleting user {test_email} ===")
-            delete_result = project.delete_user(
+            delete_result = self.client.delete_user(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1493,7 +1500,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User management workflow failed: {str(e)}")
             raise
 
-    def test_create_user_integration(self, user):
+    def test_create_user_integration(self, client):
         """Test user creation with real API calls"""
         try:
             test_email = f"integration_test_{int(time.time())}@example.com"
@@ -1504,8 +1511,8 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user creation for {test_email} ===")
 
-            result = user.create_user(
-                client_id=self.client_id,
+            result = client.create_user(
+                client_id=client.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
                 email_id=test_email,
@@ -1521,8 +1528,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result)
 
             try:
-                user.delete_user(
-                    client_id=self.client_id,
+                client.delete_user(
+                    client_id=client.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
                     user_id=f"test-user-{int(time.time())}",
@@ -1539,7 +1546,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User creation integration test failed: {str(e)}")
             raise
 
-    def test_update_user_role_integration(self):
+    def test_update_user_role_integration(self, client):
         """Test user role update with real API calls"""
         try:
             test_email = f"update_test_{int(time.time())}@example.com"
@@ -1551,7 +1558,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user role update for {test_email} ===")
 
-            create_result = project.create_user(
+            create_result = client.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1561,7 +1568,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             print(f"User creation result: {create_result}")
 
-            update_result = project.update_user_role(
+            update_result = client.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1578,7 +1585,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                project.delete_user(
+                client.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1596,7 +1603,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User role update integration test failed: {str(e)}")
             raise
 
-    def test_project_user_management_integration(self):
+    def test_project_user_management_integration(self, client):
         """Test project user management operations with real API calls"""
         try:
             test_email = f"project_test_{int(time.time())}@example.com"
@@ -1609,8 +1616,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing project user management for {test_email} ===")
 
             # Step 1: Create a user
-            create_result = project.create_user(
-                client_id=self.client_id,
+            create_result = client.create_user(
+                client_id=client.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
                 email_id=test_email,
@@ -1621,8 +1628,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(create_result)
 
             # Step 2: Update user role (use update_user_role instead of separate add/change operations)
-            update_result = project.update_user_role(
-                client_id=self.client_id,
+            update_result = client.update_user_role(
+                client_id=client.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
                 roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
@@ -1633,8 +1640,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                project.delete_user(
-                    client_id=self.client_id,
+                client.delete_user(
+                    client_id=client.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
                     user_id=f"test-user-{int(time.time())}",
@@ -1651,14 +1658,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" Project user management integration test failed: {str(e)}")
             raise
 
-    def test_user_management_error_handling(self):
+    def test_user_management_error_handling(self, client):
         """Test user management error handling with invalid inputs"""
         try:
             print("=== Testing user management error handling ===")
 
             # Test with invalid client_id
             try:
-                project.create_user(
+                client.create_user(
                     client_id="invalid_client_id",
                     first_name="Test",
                     last_name="User",
@@ -1671,7 +1678,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 print(f" Correctly caught error for invalid client_id: {str(e)}")
 
             with self.assertRaises(ValidationError) as e:
-                project.create_user(
+                self.client.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="",  # Empty string - should fail validation
@@ -1685,7 +1692,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid email format
             try:
-                project.create_user(
+                client.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="User",

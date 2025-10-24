@@ -3,6 +3,7 @@ Pydantic models for LabellerrClient method parameter validation.
 """
 
 import os
+from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
@@ -104,7 +105,9 @@ class AWSConnectionParams(BaseModel):
 
 
 # todo: ximi will make this common
-class DataSetDataType:
+class DataSetDataType(str, Enum):
+    """Enum for dataset data types."""
+
     image = "image"
     video = "video"
     audio = "audio"

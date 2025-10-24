@@ -1,7 +1,11 @@
-from ..client import LabellerrClient
+from typing import TYPE_CHECKING
+
 from .connections import LabellerrConnection
 from .gcs_connection import GCSConnection as LabellerrGCSConnection
 from .s3_connection import S3Connection as LabellerrS3Connection
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 __all__ = ["LabellerrGCSConnection", "LabellerrConnection", "LabellerrS3Connection"]
 

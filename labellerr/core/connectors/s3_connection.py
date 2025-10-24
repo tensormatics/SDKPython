@@ -1,11 +1,13 @@
 import json
 import uuid
-
-from labellerr import LabellerrClient
+from typing import TYPE_CHECKING
 
 from ... import schemas
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
+
+if TYPE_CHECKING:
+    from labellerr import LabellerrClient
 
 
 class S3Connection(LabellerrConnection):

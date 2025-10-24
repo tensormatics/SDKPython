@@ -1,9 +1,11 @@
 import uuid
-
-from labellerr import LabellerrClient
+from typing import TYPE_CHECKING
 
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
+
+if TYPE_CHECKING:
+    from labellerr import LabellerrClient
 
 
 class GCSConnection(LabellerrConnection):

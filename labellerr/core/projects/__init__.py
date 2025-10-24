@@ -113,9 +113,9 @@ def create_project(client: "LabellerrClient", payload: dict):
 
         logging.info("Creating dataset . . .")
         dataset_response = create_dataset(
+            client,
             {
                 "client_id": payload["client_id"],
-                "dataset_config": payload["dataset_config"],
                 "dataset_name": payload["dataset_name"],
                 "data_type": payload["data_type"],
                 "dataset_description": payload["dataset_description"],

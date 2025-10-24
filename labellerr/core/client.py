@@ -2,17 +2,15 @@
 
 import json
 import logging
-import os
-import time
 import uuid
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List
 
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from . import client_utils, constants, gcs, schemas
+from . import client_utils, constants, schemas
 
 # Initialize DataSets handler for dataset-related operations
 from .exceptions import LabellerrError
@@ -401,10 +399,24 @@ class LabellerrClient:
         :param connector: Optional connector type filter (s3, gcs, etc.)
         :return: List of connections
         """
-        from .connectors.connections import LabellerrConnectionMeta
+        request_uuid = str(uuid.uuid4())
+        list_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/list"
+            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
+        )
 
-        return LabellerrConnectionMeta.list_connections(
-            self, client_id, connection_type, connector
+        if connector:
+            list_connection_url += f"&connector={connector}"
+
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        return client_utils.request(
+            "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
 
     def delete_connection(self, client_id: str, connection_id: str):
@@ -415,11 +427,33 @@ class LabellerrClient:
         :param connection_id: The ID of the connection to delete.
         :return: Parsed JSON response
         """
-        from .connectors.connections import LabellerrConnectionMeta
+        import json
 
-        return LabellerrConnectionMeta.delete_connection(self, client_id, connection_id)
+        # Validate parameters using Pydantic
+        params = schemas.DeleteConnectionParams(
+            client_id=client_id, connection_id=connection_id
+        )
+        request_uuid = str(uuid.uuid4())
+        delete_url = (
+            f"{constants.BASE_URL}/connectors/connections/delete"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
+        )
 
-    
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={
+                "content-type": "application/json",
+                "email_id": self.api_key,
+            },
+        )
+
+        payload = json.dumps({"connection_id": params.connection_id})
+
+        return client_utils.request(
+            "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
+        )
 
     def get_dataset(self, workspace_id, dataset_id):
         """
@@ -612,7 +646,6 @@ class LabellerrClient:
         # Create a temporary VideoProject instance for delegation
         video_project = VideoProject.__new__(VideoProject)
         video_project.client = self
-        video_project.base_url = self.base_url
 
         return video_project.link_key_frame(client_id, project_id, file_id, key_frames)
 
@@ -631,6 +664,5 @@ class LabellerrClient:
         # Create a temporary VideoProject instance for delegation
         video_project = VideoProject.__new__(VideoProject)
         video_project.client = self
-        video_project.base_url = self.base_url
 
         return video_project.delete_key_frames(client_id, project_id)

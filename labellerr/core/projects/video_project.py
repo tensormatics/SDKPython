@@ -1,6 +1,7 @@
 import uuid
 from typing import TYPE_CHECKING, List
 
+from .. import constants
 from ..exceptions import LabellerrError
 from ..utils import validate_params
 from .base import LabellerrProject
@@ -16,7 +17,9 @@ class VideoProject(LabellerrProject):
 
     @staticmethod
     def create_project(client: "LabellerrClient", payload: dict) -> "VideoProject":
-        pass
+        return VideoProject(
+            client=client, connection_id=payload["connection_id"], **payload
+        )
 
     @validate_params(client_id=str, project_id=str, file_id=str, key_frames=list)
     def link_key_frame(
@@ -37,7 +40,7 @@ class VideoProject(LabellerrProject):
         """
         try:
             unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/add_update_keyframes?client_id={client_id}&uuid={unique_id}"
+            url = f"{constants.BASE_URL}/actions/add_update_keyframes?client_id={client_id}&uuid={unique_id}"
 
             body = {
                 "project_id": project_id,
@@ -77,7 +80,7 @@ class VideoProject(LabellerrProject):
         """
         try:
             unique_id = str(uuid.uuid4())
-            url = f"{self.base_url}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
+            url = f"{constants.BASE_URL}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
 
             return self.client._make_request(
                 "POST",

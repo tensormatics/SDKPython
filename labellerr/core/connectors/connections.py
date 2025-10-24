@@ -43,7 +43,6 @@ class LabellerrConnectionMeta(ABCMeta):
         return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
 
-
     @staticmethod
     def create_connection(
         client: "LabellerrClient",
@@ -116,7 +115,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
 
     def __init__(self, client: "LabellerrClient", connection_id: str, **kwargs):
         self.client = client
-        self.connection_id = connection_id
+        self._connection_id_input = connection_id
         self.connection_data = kwargs["connection_data"]
 
     @property
@@ -165,9 +164,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
             "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
 
-    def delete_connection(
-        self, client_id: str, connection_id: str
-    ):
+    def delete_connection(self, client_id: str, connection_id: str):
         """
         Deletes a connector connection by ID.
         :param client_id: The ID of the client

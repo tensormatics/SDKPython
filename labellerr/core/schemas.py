@@ -328,7 +328,7 @@ class ListFileParams(BaseModel):
     client_id: str = Field(min_length=1)
     project_id: str = Field(min_length=1)
     search_queries: Dict[str, Any]
-    size: int = 10
+    size: int = Field(default=10, gt=0)
     next_search_after: Optional[Any] = None
 
 
@@ -351,6 +351,7 @@ class SyncDataSetParams(BaseModel):
     data_type: str = Field(min_length=1)
     email_id: str = Field(min_length=1)
     connection_id: str = Field(min_length=1)
+
 
 class DatasetConfig(BaseModel):
     """Configuration for creating a dataset."""

@@ -187,7 +187,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Execute complete project creation workflow
 
-            result = self.client.projects.initiate_create_project(project_payload)
+            result = self.client.projects.create_project(project_payload)
 
             # Step 3: Validate the workflow execution
             self.assertIsInstance(
@@ -227,7 +227,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.initiate_create_project(base_payload)
+            self.client.projects.create_project(base_payload)
 
         self.assertIn("Required parameter client_id is missing", str(context.exception))
 
@@ -246,7 +246,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.initiate_create_project(base_payload)
+            self.client.projects.create_project(base_payload)
 
         self.assertIn("Please enter email id in created_by", str(context.exception))
 
@@ -265,7 +265,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.initiate_create_project(base_payload)
+            self.client.projects.create_project(base_payload)
 
         self.assertIn("Invalid data_type", str(context.exception))
 
@@ -283,7 +283,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.initiate_create_project(base_payload)
+            self.client.projects.create_project(base_payload)
 
         self.assertIn(
             "Required parameter dataset_name is missing", str(context.exception)
@@ -303,7 +303,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.initiate_create_project(base_payload)
+            self.client.projects.create_project(base_payload)
 
         self.assertIn(
             "Please provide either annotation guide or annotation template id",
@@ -346,7 +346,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.projects.initiate_create_project(project_payload)
+            result = self.client.projects.create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -390,7 +390,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.projects.initiate_create_project(project_payload)
+            result = self.client.projects.create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")

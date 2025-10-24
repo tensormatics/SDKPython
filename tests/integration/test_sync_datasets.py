@@ -21,6 +21,7 @@ import dotenv
 
 from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
+from labellerr.core.datasets.datasets import DataSets
 
 dotenv.load_dotenv()
 
@@ -57,6 +58,9 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
         self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
 
+        # Create DataSets instance
+        self.datasets = DataSets(self.api_key, self.api_secret, self.client)
+
         # Shared configuration (used by both AWS and GCS tests)
         self.project_id = "gabrila_artificial_duck_74237"  # Same project for both tests
         self.email_id = "dev@labellerr.com"  # Same email for both tests
@@ -87,7 +91,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
             print(f"Data Type: {self.data_type}")
             print(f"Email ID: {self.email_id}")
 
-            response = self.client.datasets.sync_datasets(
+            response = self.datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -118,10 +122,14 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 self.gcs_path != "gs://",
             ]
         ):
+            self.skipTest(
+                "GCS credentials not provided. Set gcs_dataset_id, gcs_connection_id, and gcs_path in setUp()"
+            )
+            return
 
-            print("\n" + "=" * 60)
-            print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
-            print("=" * 60)
+        print("\n" + "=" * 60)
+        print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
+        print("=" * 60)
 
         try:
             print("\n1. Syncing dataset from GCS...")
@@ -132,7 +140,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
             print(f"Data Type: {self.data_type}")
             print(f"Email ID: {self.email_id}")
 
-            response = self.client.datasets.sync_datasets(
+            response = self.datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.gcs_dataset_id,
@@ -143,7 +151,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
             )
 
             print("GCS Sync successful")
-            print("Response: {response}")
+            print(f"Response: {response}")
 
             self.assertIsInstance(response, dict)
             self.assertIsNotNone(response)
@@ -166,7 +174,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 print(f"\n  Testing with data_type: {data_type}")
 
                 try:
-                    response = self.client.datasets.sync_datasets(
+                    response = self.datasets.sync_datasets(
                         client_id=self.client_id,
                         project_id=self.project_id,
                         dataset_id=self.aws_dataset_id,
@@ -190,7 +198,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            self.client.datasets.sync_datasets(
+            self.datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -209,7 +217,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            self.client.datasets.sync_datasets(
+            self.datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",

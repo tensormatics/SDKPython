@@ -2,7 +2,7 @@ import json
 import uuid
 
 from labellerr import schemas
-from labellerr.core import client_utils, constants
+from labellerr.core import constants
 from labellerr.core.base.singleton import Singleton
 
 

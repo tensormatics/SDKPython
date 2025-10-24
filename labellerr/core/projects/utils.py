@@ -1,5 +1,7 @@
-from typing import Dict, Any
+from typing import Any, Dict
+
 from ..exceptions import LabellerrError
+
 
 def validate_rotation_config(rotation_config: Dict[str, Any]) -> None:
     """

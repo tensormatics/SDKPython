@@ -7,11 +7,11 @@ import os
 import uuid
 from abc import ABCMeta
 from datetime import time
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, Dict, List
 
 import requests
 
-from .. import client_utils, constants, gcs, schemas, utils
+from .. import client_utils, constants, gcs, schemas
 from ..exceptions import InvalidProjectError, LabellerrError
 from ..utils import validate_params
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 class LabellerrProjectMeta(ABCMeta):
     # Class-level registry for project types
-    _registry = {}
+    _registry: Dict[str, type] = {}
 
     @classmethod
     def register(cls, data_type, project_class):
@@ -85,71 +85,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
     @property
     def attached_datasets(self):
         return self.project_data.get("attached_datasets")
-
-    
-
-    def create_project(
-        self,
-        project_name,
-        data_type,
-        client_id,
-        attached_datasets,
-        annotation_template_id,
-        rotations,
-        use_ai=False,
-        created_by=None,
-    ):
-        """
-        Creates a project with the given configuration.
-
-        :param project_name: Name of the project
-        :param data_type: Type of data (image, video, etc.)
-        :param client_id: ID of the client
-        :param attached_datasets: List of dataset IDs to attach to the project
-        :param annotation_template_id: ID of the annotation template
-        :param rotations: Dictionary containing rotation configuration
-        :param use_ai: Boolean flag for AI usage (default: False)
-        :param created_by: Optional creator information
-        :return: Project creation response
-        :raises LabellerrError: If the creation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.CreateProjectParams(
-            project_name=project_name,
-            data_type=data_type,
-            client_id=client_id,
-            attached_datasets=attached_datasets,
-            annotation_template_id=annotation_template_id,
-            rotations=rotations,
-            use_ai=use_ai,
-            created_by=created_by,
-        )
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
-
-        payload = json.dumps(
-            {
-                "project_name": params.project_name,
-                "attached_datasets": params.attached_datasets,
-                "data_type": params.data_type,
-                "annotation_template_id": str(params.annotation_template_id),
-                "rotations": params.rotations.model_dump(),
-                "use_ai": params.use_ai,
-                "created_by": params.created_by,
-            }
-        )
-
-        return self.client._make_request(
-            "POST",
-            url,
-            client_id=params.client_id,
-            extra_headers={
-                "Origin": constants.ALLOWED_ORIGINS,
-                "Content-Type": "application/json",
-            },
-            request_id=unique_id,
-            data=payload,
-        )
 
     def update_rotation_count(self):
         """

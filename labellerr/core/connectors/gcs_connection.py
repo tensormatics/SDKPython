@@ -1,6 +1,8 @@
 import os
 import uuid
 
+from labellerr import LabellerrClient
+
 from ... import schemas
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta

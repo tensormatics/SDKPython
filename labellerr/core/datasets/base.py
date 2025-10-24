@@ -3,10 +3,10 @@
 import json
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 from ... import schemas
-from .. import  constants
+from .. import constants
 from ..exceptions import InvalidDatasetError, LabellerrError
 from ..utils import validate_params
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 
 class LabellerrDatasetMeta(ABCMeta):
     # Class-level registry for dataset types
-    _registry = {}
+    _registry: Dict[str, type] = {}
 
     @classmethod
     def register(cls, data_type, dataset_class):
@@ -222,8 +222,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             request_id=unique_id,
         )
 
-    
-
     def delete_dataset(self, client_id, dataset_id):
         """
         Deletes a dataset from the system.
@@ -245,5 +243,3 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
-
-    

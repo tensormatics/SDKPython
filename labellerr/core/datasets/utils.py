@@ -1,15 +1,13 @@
-from typing import Union, List
-from .. import constants
-from .. import gcs
-from ..client import LabellerrClient
-from ..exceptions import LabellerrError
-from .. import schemas
-from ..utils import validate_params
+import logging
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-import logging
-from .. import client_utils
+from typing import List, Union
+
+from .. import client_utils, constants, gcs, schemas
+from ..client import LabellerrClient
+from ..exceptions import LabellerrError
+from ..utils import validate_params
 
 
 def get_total_folder_file_count_and_total_size(folder_path, data_type):
@@ -54,6 +52,7 @@ def get_total_folder_file_count_and_total_size(folder_path, data_type):
     scan_directory(folder_path)
     return total_file_count, total_file_size, files_list
 
+
 def get_total_file_count_and_total_size(files_list, data_type):
     """
     Retrieves the total count and size of files in a list.
@@ -84,7 +83,11 @@ def get_total_file_count_and_total_size(files_list, data_type):
             logging.error(f"Unexpected error reading {file_path}: {str(e)}")
 
     return total_file_count, total_file_size, files_list
-def connect_local_files(client: "LabellerrClient", client_id, file_names, connection_id=None):
+
+
+def connect_local_files(
+    client: "LabellerrClient", client_id, file_names, connection_id=None
+):
     """
     Connects local files to the API.
 
@@ -106,7 +109,9 @@ def connect_local_files(client: "LabellerrClient", client_id, file_names, connec
 
 
 @validate_params(client_id=str, files_list=(str, list))
-def upload_files(client: "LabellerrClient", client_id: str, files_list: Union[str, List[str]]):
+def upload_files(
+    client: "LabellerrClient", client_id: str, files_list: Union[str, List[str]]
+):
     """
     Uploads files to the API.
 
@@ -133,7 +138,10 @@ def upload_files(client: "LabellerrClient", client_id: str, files_list: Union[st
         logging.error(f"Failed to upload files: {str(e)}")
         raise
 
-def __process_batch(client: "LabellerrClient", client_id, files_list, connection_id=None):
+
+def __process_batch(
+    client: "LabellerrClient", client_id, files_list, connection_id=None
+):
     """
     Processes a batch of files for upload.
 
@@ -148,16 +156,13 @@ def __process_batch(client: "LabellerrClient", client_id, files_list, connection
         file_name = os.path.basename(file_path)
         files[file_name] = file_path
 
-    response = connect_local_files(
-        client, client_id, list(files.keys()), connection_id
-    )
+    response = connect_local_files(client, client_id, list(files.keys()), connection_id)
     resumable_upload_links = response["response"]["resumable_upload_links"]
     for file_name in resumable_upload_links.keys():
-        gcs.upload_to_gcs_resumable(
-            resumable_upload_links[file_name], files[file_name]
-        )
+        gcs.upload_to_gcs_resumable(resumable_upload_links[file_name], files[file_name])
 
     return response
+
 
 def upload_folder_files_to_dataset(client: "LabellerrClient", data_config):
     """
@@ -242,9 +247,7 @@ def upload_folder_files_to_dataset(client: "LabellerrClient", data_config):
                     logging.error(f"Error accessing file {file_path}: {str(e)}")
                     fail_queue.append(file_path)
                 except Exception as e:
-                    logging.error(
-                        f"Unexpected error processing {file_path}: {str(e)}"
-                    )
+                    logging.error(f"Unexpected error processing {file_path}: {str(e)}")
                     fail_queue.append(file_path)
 
             if current_batch:
@@ -262,7 +265,7 @@ def upload_folder_files_to_dataset(client: "LabellerrClient", data_config):
 
         # Calculate optimal number of workers based on CPU count and batch count
         max_workers = min(
-            os.cpu_count(),  # Number of CPU cores
+            os.cpu_count() or 1,  # Number of CPU cores (default to 1 if None)
             len(batches),  # Number of batches
             20,
         )

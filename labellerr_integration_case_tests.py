@@ -14,8 +14,10 @@ from pydantic import ValidationError
 from labellerr.client import LabellerrClient
 from labellerr.core.connectors import create_connection
 from labellerr.core.connectors.gcs_connection import GCSConnection
+from labellerr.core.datasets import LabellerrDataset
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import LabellerrProject
+from labellerr.core.users.base import LabellerrUsers
 
 dotenv.load_dotenv()
 
@@ -33,6 +35,18 @@ def client_fixture():
 def project(client):
     """Create a test project instance"""
     return LabellerrProject(client, "sisely_serious_tarantula_26824")
+
+
+@pytest.fixture
+def datasets(client):
+    """Create a test project instance"""
+    return LabellerrDataset(client, "sisely_serious_tarantula_26824")
+
+
+@pytest.fixture
+def user(client):
+    """Create a test project instance"""
+    return LabellerrUsers(client)
 
 
 @pytest.fixture
@@ -283,7 +297,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
         self.assertIn("Please enter email id in created_by", str(context.exception))
 
-    def test_project_creation_invalid_data_type(self):
+    def test_project_creation_invalid_data_type(self, project):
         """Test that project creation fails with invalid data type"""
         base_payload = {
             "client_id": self.client_id,
@@ -298,7 +312,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.create_project(base_payload)
+            project.create_project(base_payload)
 
         self.assertIn("Invalid data_type", str(context.exception))
 
@@ -1051,7 +1065,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                     except OSError:
                         pass
 
-    def test_attach_detach_dataset_workflow(self):
+    def test_attach_detach_dataset_workflow(self, datasets):
         """Comprehensive test for single and batch attach/detach workflows - always detach first to ensure consistent state"""
         # ========== SINGLE DATASET OPERATIONS ==========
         print("\n=== Testing Single Dataset Operations ===")
@@ -1059,7 +1073,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 1: Detach single dataset first to get to a known state
         print(f"Step 1: Detaching single dataset {self.test_dataset_id}...")
         try:
-            single_detach_result = project.initiate_detach_dataset_from_project(
+            single_detach_result = datasets.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1076,7 +1090,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 2: Attach single dataset
         print("Step 2: Attaching single dataset...")
         try:
-            single_attach_result = project.initiate_attach_dataset_to_project(
+            single_attach_result = datasets.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1101,7 +1115,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 3: Detach batch datasets first to get to a known state
         print(f"Step 3: Detaching batch datasets {test_dataset_ids}...")
         try:
-            batch_detach_result = project.initiate_detach_datasets_from_project(
+            batch_detach_result = datasets.initiate_detach_datasets_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1137,20 +1151,20 @@ class LabelerIntegrationTests(unittest.TestCase):
             "\n Complete attach/detach workflow successful (single & batch operations)"
         )
 
-    def test_attach_dataset_invalid_project_id(self):
+    def test_attach_dataset_invalid_project_id(self, datasets):
         """Test dataset attachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            project.initiate_attach_dataset_to_project(
+            datasets.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_attach_dataset_invalid_dataset_id(self):
+    def test_attach_dataset_invalid_dataset_id(self, datasets):
         """Test dataset attachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            project.initiate_attach_dataset_to_project(
+            datasets.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1164,10 +1178,10 @@ class LabelerIntegrationTests(unittest.TestCase):
             or "uuid" in error_msg.lower()
         )
 
-    def test_attach_dataset_missing_client_id(self):
+    def test_attach_dataset_missing_client_id(self, datasets):
         """Test dataset attachment with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            project.initiate_attach_dataset_to_project(
+            datasets.initiate_attach_dataset_to_project(
                 client_id="",
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1178,40 +1192,40 @@ class LabelerIntegrationTests(unittest.TestCase):
             "at least 1 character" in error_msg or "Required parameter" in error_msg
         )
 
-    def test_attach_dataset_nonexistent_project(self):
+    def test_attach_dataset_nonexistent_project(self, datasets):
         """Test dataset attachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            project.initiate_attach_dataset_to_project(
+            datasets.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_attach_dataset_nonexistent_dataset(self):
+    def test_attach_dataset_nonexistent_dataset(self, datasets):
         """Test dataset attachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            project.initiate_attach_dataset_to_project(
+            datasets.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_detach_dataset_invalid_project_id(self):
+    def test_detach_dataset_invalid_project_id(self, datasets):
         """Test dataset detachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            project.initiate_detach_dataset_from_project(
+            datasets.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_detach_dataset_invalid_dataset_id(self):
+    def test_detach_dataset_invalid_dataset_id(self, datasets):
         """Test dataset detachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            project.initiate_detach_dataset_from_project(
+            datasets.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1239,33 +1253,33 @@ class LabelerIntegrationTests(unittest.TestCase):
             "at least 1 character" in error_msg or "Required parameter" in error_msg
         )
 
-    def test_detach_dataset_nonexistent_project(self):
+    def test_detach_dataset_nonexistent_project(self, datasets):
         """Test dataset detachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            project.initiate_detach_dataset_from_project(
+            datasets.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_detach_dataset_nonexistent_dataset(self):
+    def test_detach_dataset_nonexistent_dataset(self, datasets):
         """Test dataset detachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            project.initiate_detach_dataset_from_project(
+            datasets.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
-    def test_attach_datasets_batch_invalid_dataset_id(self):
+    def test_attach_datasets_batch_invalid_dataset_id(self, datasets):
         """Test batch attach with one invalid dataset_id format"""
         # Mix of valid UUID and invalid string
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            project.initiate_attach_datasets_to_project(
+            datasets.initiate_attach_datasets_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1278,13 +1292,13 @@ class LabelerIntegrationTests(unittest.TestCase):
             or "uuid" in error_msg.lower()
         )
 
-    def test_detach_datasets_batch_invalid_dataset_id(self):
+    def test_detach_datasets_batch_invalid_dataset_id(self, datasets):
         """Test batch detach with one invalid dataset_id format"""
         # Mix of valid UUID and invalid string
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            project.initiate_detach_datasets_from_project(
+            datasets.initiate_detach_datasets_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1297,9 +1311,9 @@ class LabelerIntegrationTests(unittest.TestCase):
             or "uuid" in error_msg.lower()
         )
 
-    def test_enable_multimodal_indexing(self):
+    def test_enable_multimodal_indexing(self, datasets):
         """Test enabling multimodal indexing for a dataset"""
-        result = project.enable_multimodal_indexing(
+        result = datasets.enable_multimodal_indexing(
             client_id=self.client_id,
             dataset_id=self.test_dataset_id,
             is_multimodal=True,
@@ -1408,7 +1422,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 f"Get multimodal indexing status test failed with unexpected error: {e}"
             )
 
-    def test_user_management_workflow(self):
+    def test_user_management_workflow(self, user):
         """Test complete user management workflow: create, update, add to project, change role, remove, delete"""
         try:
             test_email = f"test_user_{int(time.time())}@example.com"
@@ -1421,7 +1435,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 1: Create a user
             print(f"\n=== Step 1: Creating user {test_email} ===")
-            create_result = self.client.create_user(
+            create_result = user.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1434,7 +1448,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Update user role
             print(f"\n=== Step 2: Updating user role for {test_email} ===")
-            update_result = self.client.update_user_role(
+            update_result = user.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1462,7 +1476,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 4: Change user role
             print(f"\n=== Step 4: Changing user role for {test_email} ===")
-            change_role_result = self.client.change_user_role(
+            change_role_result = user.change_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1473,7 +1487,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 5: Remove user from project
             print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
-            remove_result = self.client.remove_user_from_project(
+            remove_result = user.remove_user_from_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1483,7 +1497,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 6: Delete user
             print(f"\n=== Step 6: Deleting user {test_email} ===")
-            delete_result = self.client.delete_user(
+            delete_result = user.delete_user(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1500,7 +1514,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User management workflow failed: {str(e)}")
             raise
 
-    def test_create_user_integration(self, client):
+    def test_create_user_integration(self, user):
         """Test user creation with real API calls"""
         try:
             test_email = f"integration_test_{int(time.time())}@example.com"
@@ -1511,8 +1525,8 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user creation for {test_email} ===")
 
-            result = client.create_user(
-                client_id=client.client_id,
+            result = user.create_user(
+                client_id=user.client.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
                 email_id=test_email,
@@ -1528,8 +1542,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result)
 
             try:
-                client.delete_user(
-                    client_id=client.client_id,
+                user.delete_user(
+                    client_id=user.client.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
                     user_id=f"test-user-{int(time.time())}",
@@ -1546,7 +1560,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User creation integration test failed: {str(e)}")
             raise
 
-    def test_update_user_role_integration(self, client):
+    def test_update_user_role_integration(self, user):
         """Test user role update with real API calls"""
         try:
             test_email = f"update_test_{int(time.time())}@example.com"
@@ -1558,8 +1572,8 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user role update for {test_email} ===")
 
-            create_result = client.create_user(
-                client_id=self.client_id,
+            create_result = user.create_user(
+                client_id=user.client.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
                 email_id=test_email,
@@ -1568,8 +1582,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             print(f"User creation result: {create_result}")
 
-            update_result = client.update_user_role(
-                client_id=self.client_id,
+            update_result = user.update_user_role(
+                client_id=user.client.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
                 roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
@@ -1585,8 +1599,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                client.delete_user(
-                    client_id=self.client_id,
+                user.delete_user(
+                    client_id=user.client.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
                     user_id=f"test-user-{int(time.time())}",
@@ -1603,7 +1617,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User role update integration test failed: {str(e)}")
             raise
 
-    def test_project_user_management_integration(self, client):
+    def test_project_user_management_integration(self, user):
         """Test project user management operations with real API calls"""
         try:
             test_email = f"project_test_{int(time.time())}@example.com"
@@ -1616,8 +1630,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing project user management for {test_email} ===")
 
             # Step 1: Create a user
-            create_result = client.create_user(
-                client_id=client.client_id,
+            create_result = user.create_user(
+                client_id=user.client.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
                 email_id=test_email,
@@ -1628,8 +1642,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(create_result)
 
             # Step 2: Update user role (use update_user_role instead of separate add/change operations)
-            update_result = client.update_user_role(
-                client_id=client.client_id,
+            update_result = user.update_user_role(
+                client_id=user.client.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
                 roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
@@ -1640,8 +1654,8 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                client.delete_user(
-                    client_id=client.client_id,
+                user.delete_user(
+                    client_id=user.client.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
                     user_id=f"test-user-{int(time.time())}",
@@ -1658,14 +1672,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" Project user management integration test failed: {str(e)}")
             raise
 
-    def test_user_management_error_handling(self, client):
+    def test_user_management_error_handling(self, user):
         """Test user management error handling with invalid inputs"""
         try:
             print("=== Testing user management error handling ===")
 
             # Test with invalid client_id
             try:
-                client.create_user(
+                user.create_user(
                     client_id="invalid_client_id",
                     first_name="Test",
                     last_name="User",
@@ -1678,8 +1692,8 @@ class LabelerIntegrationTests(unittest.TestCase):
                 print(f" Correctly caught error for invalid client_id: {str(e)}")
 
             with self.assertRaises(ValidationError) as e:
-                self.client.create_user(
-                    client_id=self.client_id,
+                user.create_user(
+                    client_id=user.client.client_id,
                     first_name="Test",
                     last_name="",  # Empty string - should fail validation
                     email_id="",  # Empty string - should fail validation
@@ -1692,7 +1706,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid email format
             try:
-                client.create_user(
+                user.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="User",

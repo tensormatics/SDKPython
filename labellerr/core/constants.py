@@ -41,5 +41,5 @@ OPTION_TYPE_LIST = [
     "dot",
     "audio",
 ]
-
+CONNECTION_TYPES = ["s3", "gcs", "local"]
 cdn_server_address = "cdn-951134552678.us-central1.run.app:443"

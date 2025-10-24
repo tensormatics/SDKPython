@@ -43,47 +43,6 @@ class LabellerrConnectionMeta(ABCMeta):
         return response.get("response", None)
         # ------------------------------- [needs refactoring after we consolidate api_calls into one function ] ---------------------------------
 
-    @staticmethod
-    def create_connection(
-        client: "LabellerrClient",
-        connector_type: str,
-        client_id: str,
-        connector_config: dict,
-    ) -> str:
-        """
-        Sets up cloud connector (GCP/AWS) for dataset creation using factory pattern.
-
-        :param client: LabellerrClient instance
-        :param connector_type: Type of connector ('gcp' or 'aws')
-        :param client_id: Client ID
-        :param connector_config: Configuration dictionary for the connector
-        :return: Connection ID for the cloud connector
-        """
-        import logging
-
-        from ..exceptions import InvalidConnectionError
-
-        try:
-            if connector_type == "gcp":
-                from .gcs_connection import GCSConnection
-
-                return GCSConnection.create_connection(
-                    client, client_id, connector_config
-                )
-            elif connector_type == "aws":
-                from .s3_connection import S3Connection
-
-                return S3Connection.create_connection(
-                    client, client_id, connector_config
-                )
-            else:
-                raise InvalidConnectionError(
-                    f"Unsupported connector type: {connector_type}"
-                )
-        except Exception as e:
-            logging.error(f"Failed to setup {connector_type} connector: {e}")
-            raise
-
     """Metaclass that combines ABC functionality with factory pattern"""
 
     def __call__(cls, client, connection_id, **kwargs):

@@ -1,11 +1,14 @@
+import json
 import logging
+import uuid
+
+import requests
 
 from labellerr import LabellerrClient
 from labellerr.core import utils
 
 from .. import constants
-from ..datasets import LabellerrDataset
-from ..datasets.datasets import DataSets
+from ..datasets import LabellerrDataset, create_dataset
 from ..exceptions import LabellerrError
 from .base import LabellerrProject
 from .image_project import ImageProject as LabellerrImageProject
@@ -107,12 +110,12 @@ def create_project(client: "LabellerrClient", payload: dict):
         logging.info("Rotation configuration validated . . .")
 
         # Create DataSets instance for API operations
-        datasets = DataSets(client.api_key, client.api_secret, client)
 
         logging.info("Creating dataset . . .")
-        dataset_response = datasets.create_dataset(
+        dataset_response = create_dataset(
             {
                 "client_id": payload["client_id"],
+                "dataset_config": payload["dataset_config"],
                 "dataset_name": payload["dataset_name"],
                 "data_type": payload["data_type"],
                 "dataset_description": payload["dataset_description"],
@@ -153,15 +156,15 @@ def create_project(client: "LabellerrClient", payload: dict):
         if payload.get("annotation_template_id"):
             annotation_template_id = payload["annotation_template_id"]
         else:
-            annotation_template_id = datasets.create_annotation_guideline(
+            annotation_template_id = create_annotation_guideline(
                 payload["client_id"],
                 payload["annotation_guide"],
                 payload["project_name"],
                 payload["data_type"],
             )
         logging.info(f"Annotation guidelines created {annotation_template_id}")
-
-        project_response = datasets.create_project(
+        # TODO : add api call
+        project_response = create_project(
             project_name=payload["project_name"],
             data_type=payload["data_type"],
             client_id=payload["client_id"],
@@ -177,4 +180,25 @@ def create_project(client: "LabellerrClient", payload: dict):
         raise
     except Exception:
         logging.exception("Unexpected error in project creation")
+        raise
+
+
+def create_annotation_guideline(self, client_id, questions, template_name, data_type):
+    unique_id = str(uuid.uuid4())
+    url = f"{constants.BASE_URL}/annotations/create_template?data_type={data_type}&client_id={client_id}&uuid={unique_id}"
+
+    guide_payload = json.dumps({"templateName": template_name, "questions": questions})
+
+    try:
+        response_data = self.client.make_request(
+            "POST",
+            url,
+            client_id=client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=guide_payload,
+        )
+        return response_data["response"]["template_id"]
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Failed to update project annotation guideline: {str(e)}")
         raise

@@ -17,7 +17,7 @@ class LabellerrConnectionMeta(ABCMeta):
     _registry: Dict[str, type] = {}
 
     @classmethod
-    def register(cls, connection_type, connection_class):
+    def _register(cls, connection_type, connection_class):
         """Register a connection type handler"""
         cls._registry[connection_type] = connection_class
 

@@ -5,10 +5,12 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Dict
 
+
 from ... import schemas
 from .. import constants
 from ..exceptions import InvalidDatasetError, LabellerrError
 from ..utils import validate_params
+from ...schemas import DataSetScope
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -19,7 +21,7 @@ class LabellerrDatasetMeta(ABCMeta):
     _registry: Dict[str, type] = {}
 
     @classmethod
-    def register(cls, data_type, dataset_class):
+    def _register(cls, data_type, dataset_class):
         """Register a dataset type handler"""
         cls._registry[data_type] = dataset_class
 
@@ -32,7 +34,7 @@ class LabellerrDatasetMeta(ABCMeta):
             f"&uuid={unique_id}"
         )
 
-        response = client._make_request(
+        response = client.make_request(
             "GET",
             url,
             client_id=client.client_id,
@@ -126,7 +128,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
         payload = json.dumps({"attached_datasets": validated_dataset_ids})
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -179,7 +181,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
         payload = json.dumps({"attached_datasets": validated_dataset_ids})
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -190,7 +192,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
     @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
     def get_all_datasets(
-        self, client_id: str, datatype: str, project_id: str, scope: str
+        self, client_id: str, datatype: str, project_id: str, scope: DataSetScope
     ):
         """
         Retrieves datasets by parameters.
@@ -214,7 +216,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             f"&project_id={params.project_id}&uuid={unique_id}"
         )
 
-        return self.client._make_request(
+        return self.client.make_request(
             "GET",
             url,
             client_id=params.client_id,
@@ -236,7 +238,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
 
-        return self.client._make_request(
+        return self.client.make_request(
             "DELETE",
             url,
             client_id=params.client_id,

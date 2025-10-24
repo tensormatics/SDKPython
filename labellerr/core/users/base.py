@@ -1,12 +1,17 @@
 import json
 import uuid
 
-from labellerr import schemas
+from labellerr import schemas, LabellerrClient
 from labellerr.core import constants
 from labellerr.core.base.singleton import Singleton
+from labellerr_integration_case_tests import client
 
 
 class LabellerrUsers(Singleton):
+
+    def __init__(self, client: "LabellerrClient", *args):
+        super().__init__(*args)
+        self.client = client
 
     def create_user(
         self,
@@ -68,7 +73,7 @@ class LabellerrUsers(Singleton):
             }
         )
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -154,7 +159,7 @@ class LabellerrUsers(Singleton):
 
         payload = json.dumps(payload_data)
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -254,7 +259,7 @@ class LabellerrUsers(Singleton):
 
         payload = json.dumps(payload_data)
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -293,7 +298,7 @@ class LabellerrUsers(Singleton):
             payload_data["role_id"] = params.role_id
 
         payload = json.dumps(payload_data)
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -323,7 +328,7 @@ class LabellerrUsers(Singleton):
         payload_data = {"email_id": params.email_id, "uuid": unique_id}
 
         payload = json.dumps(payload_data)
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -362,7 +367,7 @@ class LabellerrUsers(Singleton):
         }
 
         payload = json.dumps(payload_data)
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -370,3 +375,11 @@ class LabellerrUsers(Singleton):
             request_id=unique_id,
             data=payload,
         )
+
+
+def main():
+    LabellerrUsers(LabellerrClient("", "", ""))
+
+
+if __name__ == "__main__":
+    main()

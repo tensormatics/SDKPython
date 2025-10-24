@@ -114,7 +114,6 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_gcs(self):
         """Test syncing datasets from Google Cloud Storage (GCS)"""
-        # Skip if GCS credentials are not provided
         if not all(
             [
                 self.gcs_dataset_id,
@@ -122,44 +121,40 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 self.gcs_path != "gs://",
             ]
         ):
-            self.skipTest(
-                "GCS credentials not provided. Set gcs_dataset_id, gcs_connection_id, and gcs_path in setUp()"
-            )
-            return
 
-        print("\n" + "=" * 60)
-        print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
-        print("=" * 60)
+            print("\n" + "=" * 60)
+            print("TEST: Sync Datasets - Google Cloud Storage (GCS)")
+            print("=" * 60)
 
-        try:
-            print("\n1. Syncing dataset from GCS...")
-            print(f"Project ID: {self.project_id}")
-            print(f"Dataset ID: {self.gcs_dataset_id}")
-            print(f"Connection ID: {self.gcs_connection_id}")
-            print(f"Path: {self.gcs_path}")
-            print(f"Data Type: {self.data_type}")
-            print(f"Email ID: {self.email_id}")
+            try:
+                print("\n1. Syncing dataset from GCS...")
+                print(f"Project ID: {self.project_id}")
+                print(f"Dataset ID: {self.gcs_dataset_id}")
+                print(f"Connection ID: {self.gcs_connection_id}")
+                print(f"Path: {self.gcs_path}")
+                print(f"Data Type: {self.data_type}")
+                print(f"Email ID: {self.email_id}")
 
-            response = self.datasets.sync_datasets(
-                client_id=self.client_id,
-                project_id=self.project_id,
-                dataset_id=self.gcs_dataset_id,
-                path=self.gcs_path,
-                data_type=self.data_type,
-                email_id=self.email_id,
-                connection_id=self.gcs_connection_id,
-            )
+                response = self.datasets.sync_datasets(
+                    client_id=self.client_id,
+                    project_id=self.project_id,
+                    dataset_id=self.gcs_dataset_id,
+                    path=self.gcs_path,
+                    data_type=self.data_type,
+                    email_id=self.email_id,
+                    connection_id=self.gcs_connection_id,
+                )
 
-            print("GCS Sync successful")
-            print(f"Response: {response}")
+                print("GCS Sync successful")
+                print(f"Response: {response}")
 
-            self.assertIsInstance(response, dict)
-            self.assertIsNotNone(response)
+                self.assertIsInstance(response, dict)
+                self.assertIsNotNone(response)
 
-        except LabellerrError as e:
-            self.fail(f"GCS Sync API ERROR: {str(e)}")
-        except Exception as e:
-            self.fail(f"GCS Sync ERROR: {type(e).__name__}: {str(e)}")
+            except LabellerrError as e:
+                self.fail(f"GCS Sync API ERROR: {str(e)}")
+            except Exception as e:
+                self.fail(f"GCS Sync ERROR: {type(e).__name__}: {str(e)}")
 
     def test_sync_datasets_with_multiple_data_types(self):
         """Test syncing datasets with different data types (AWS)"""

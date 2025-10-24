@@ -2,7 +2,8 @@ import json
 import logging
 import uuid
 
-from labellerr import LabellerrError, constants
+from labellerr import LabellerrError
+from .core import constants, client_utils
 
 
 def _setup_cloud_connector(self, connector_type, client_id, connector_config):
@@ -54,7 +55,7 @@ def _setup_gcp_connector(self, client_id, gcp_config):
         }
     )
 
-    response_data = self._request(
+    response_data = client_utils.request(
         "POST", url, headers=headers, data=payload, request_id=unique_id
     )
     return response_data["response"]["connection_id"]
@@ -90,7 +91,7 @@ def _setup_aws_connector(self, client_id, aws_config):
         }
     )
 
-    response_data = self._request(
+    response_data = client_utils.request(
         "POST", url, headers=headers, data=payload, request_id=unique_id
     )
     return response_data["response"]["connection_id"]

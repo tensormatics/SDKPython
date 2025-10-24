@@ -31,7 +31,7 @@ class VideoDataset(LabellerrDataset):
                     "size": page_size,
                     "uuid": unique_id,
                     "dataset_id": self.dataset_id,
-                    "client_id": self.client_id,
+                    "client_id": self.client.client_id,
                 }
 
                 # Add next_search_after only if it exists (don't send on first request)
@@ -40,8 +40,8 @@ class VideoDataset(LabellerrDataset):
 
                 # print(params)
 
-                response = self.client.make_api_request(
-                    self.client_id, url, params, unique_id
+                response = self.client.make_request(
+                    self.client.client_id, url, params, unique_id
                 )
 
                 # pprint.pprint(response)
@@ -162,4 +162,4 @@ class VideoDataset(LabellerrDataset):
             raise LabellerrError(f"Failed to process dataset videos: {str(e)}")
 
 
-LabellerrDatasetMeta.register("video", VideoDataset)
+LabellerrDatasetMeta._register("video", VideoDataset)

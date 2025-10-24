@@ -1,6 +1,8 @@
 import os
 import sys
 
+from labellerr.core.projects import LabellerrProject
+
 sys.path.append(
     os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "SDKPython"))
 )
@@ -15,12 +17,16 @@ import uuid
 from labellerr import LabellerrClient, LabellerrError
 
 
+@pytest.fixture
+def labellerr_client():
+    return LabellerrClient(api_key, api_secret)
+
+
 def create_project_all_option_type(
     api_key, api_secret, client_id, email, path_to_images
 ):
     """Creates a project with all option types using the Labellerr SDK."""
 
-    client = LabellerrClient(api_key, api_secret)
     project_payload = {
         "client_id": client_id,
         "dataset_name": "Testing_dataset",
@@ -122,7 +128,7 @@ def create_project_all_option_type(
         "folder_to_upload": path_to_images,
     }
     try:
-        result = client.projects.create_project(project_payload)
+        result = create_project(client, project_payload)
         print(
             f"[ALL OPTION TYPE] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -364,7 +370,7 @@ def create_project_input_select_radio(
     }
 
     try:
-        result = client.projects.create_project(project_payload)
+        result = create_project(project_payload)
         print(
             f"[input_select_radio] Project ID: {result['project_id']['response']['project_id']}"
         )

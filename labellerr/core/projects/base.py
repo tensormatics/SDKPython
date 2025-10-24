@@ -1,12 +1,12 @@
 """This module will contain all CRUD for projects. Example, create, list projects, get project, delete project, update project, etc."""
 
-import concurrent
+import concurrent.futures
 import json
 import logging
 import os
 import uuid
 from abc import ABCMeta
-from datetime import time
+import time
 from typing import TYPE_CHECKING, Dict, List
 
 import requests
@@ -24,7 +24,7 @@ class LabellerrProjectMeta(ABCMeta):
     _registry: Dict[str, type] = {}
 
     @classmethod
-    def register(cls, data_type, project_class):
+    def _register(cls, data_type, project_class):
         """Register a project type handler"""
         cls._registry[data_type] = project_class
 
@@ -37,7 +37,7 @@ class LabellerrProjectMeta(ABCMeta):
             f"&uuid={unique_id}"
         )
 
-        response = client._make_request(
+        response = client.make_request(
             "GET",
             url,
             client_id=client.client_id,
@@ -86,7 +86,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
     def attached_datasets(self):
         return self.project_data.get("attached_datasets")
 
-    def update_rotation_count(self):
+    def update_rotation_count(self, rotation_config):
         """
         Updates the rotation count for a project.
 
@@ -96,10 +96,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/projects/rotations/add?project_id={self.project_id}&client_id={self.client.client_id}&uuid={unique_id}"
 
-            payload = json.dumps(self.rotation_config)
+            payload = json.dumps(rotation_config)
             logging.info(f"Update Rotation Count Payload: {payload}")
 
-            self.client._make_request(
+            self.client.make_request(
                 "POST",
                 url,
                 client_id=self.client.client_id,
@@ -127,7 +127,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
 
-            return self.client._make_request(
+            return self.client.make_request(
                 "GET",
                 url,
                 client_id=client_id,
@@ -191,7 +191,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             #     }, data=payload, files=files)
             url += "&gcs_path=" + gcs_path
 
-            response = self.client._make_request(
+            response = self.client.make_request(
                 "POST",
                 url,
                 client_id=client_id,
@@ -200,7 +200,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 handle_response=False,
                 data=payload,
             )
-            response_data = self.client._handle_upload_response(response, request_uuid)
+            response_data = self.client.handle_upload_response(response, request_uuid)
 
             # read job_id from the response
             job_id = response_data["response"]["job_id"]
@@ -293,7 +293,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 #     }, data=payload, files=files)
                 url += "&gcs_path=" + gcs_path
 
-                response = self.client._make_request(
+                response = self.client.make_request(
                     "POST",
                     url,
                     client_id=client_id,
@@ -302,7 +302,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                     handle_response=False,
                     data=payload,
                 )
-                response_data = self.client._handle_upload_response(
+                response_data = self.client.handle_upload_response(
                     response, request_uuid
                 )
 
@@ -318,7 +318,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 status_url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
                 while True:
                     try:
-                        status_data = self.client._make_request(
+                        status_data = self.client.make_request(
                             "GET",
                             status_url,
                             client_id=self.client_id,
@@ -368,7 +368,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
             while retry_count < max_retries:
                 try:
-                    response_data = self.client._make_request(
+                    response_data = self.client.make_request(
                         "GET",
                         url,
                         client_id=self.client_id,
@@ -455,7 +455,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             payload = {}
             with open(annotation_file, "rb") as f:
                 files = [("file", (file_name, f, "application/octet-stream"))]
-                response = self.client._make_request(
+                response = self.client.make_request(
                     "POST",
                     url,
                     client_id=client_id,
@@ -465,13 +465,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                     data=payload,
                     files=files,
                 )
-            response_data = self.client._handle_upload_response(response, request_uuid)
+            response_data = self.client.handle_upload_response(response, request_uuid)
             logging.debug(f"response_data: {response_data}")
 
-            # read job_id from the response
             job_id = response_data["response"]["job_id"]
-            self.client_id = client_id
-            self.job_id = job_id
+            # self.client_id = client_id
+            # self.job_id = job_id
             self.project_id = project_id
 
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
@@ -509,7 +508,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         payload = json.dumps(export_config)
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             f"{constants.BASE_URL}/sdk/export/files?project_id={project_id}&client_id={client_id}",
             client_id=client_id,
@@ -537,7 +536,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
             payload = json.dumps({"report_ids": report_ids})
 
-            result = self.client._make_request(
+            result = self.client.make_request(
                 "POST",
                 url,
                 client_id=client_id,
@@ -594,7 +593,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             }
         )
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,
@@ -622,7 +621,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             }
         )
 
-        return self.client._make_request(
+        return self.client.make_request(
             "POST",
             url,
             client_id=params.client_id,

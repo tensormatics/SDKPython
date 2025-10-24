@@ -6,4 +6,4 @@ class ImageDataset(LabellerrDataset):
         print("Yo I am gonna fetch some files!")
 
 
-LabellerrDatasetMeta.register("image", ImageDataset)
+LabellerrDatasetMeta._register("image", ImageDataset)

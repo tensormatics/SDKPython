@@ -8,12 +8,42 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import dotenv
+import pytest
 from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
+from labellerr.core.connectors import create_connection
 from labellerr.core.exceptions import LabellerrError
+from labellerr.core.projects import LabellerrProject
+from tests.test_client import client
 
 dotenv.load_dotenv()
+
+
+@pytest.fixture
+def client():
+    """Create a test client with mock credentials"""
+    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
+
+
+@pytest.fixture
+def project(client: LabellerrClient):
+    """Create a test client with mock credentials"""
+    return LabellerrProject(client, "sisely_serious_tarantula_26824")
+
+
+@pytest.fixture
+def gcsConnection(
+    client: "LabellerrClient", connection_config: dict
+) -> "GCSConnection":
+    create_connection(client, "gcs", "test_client_id", connection_config)
+
+
+@pytest.fixture
+def awsConnection(
+    client: "LabellerrClient", connection_config: dict
+) -> "GCSConnection":
+    create_connection(client, "aws", "test_client_id", connection_config)
 
 
 @dataclass
@@ -515,7 +545,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_pre_annotation_upload_coco_json(self):
+    def test_pre_annotation_upload_coco_json(self, project):
         """Test uploading pre annotations in COCO JSON format"""
         temp_annotation_file = None
         try:
@@ -547,7 +577,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             else:
                 # Try to get an image-type project
                 try:
-                    projects = self.client.get_all_project_per_client_id(self.client_id)
+                    projects = project.get_all_project_per_client_id(self.client_id)
                     if projects.get("response") and len(projects["response"]) > 0:
                         # Look for a project with data_type 'image'
                         for project in projects["response"]:
@@ -566,7 +596,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                     "No valid project available for pre-annotation upload test"
                 )
 
-            result = self.client._upload_preannotation_sync(
+            result = project._upload_preannotation_sync(
                 project_id=test_project_id,
                 client_id=self.client_id,
                 annotation_format="coco_json",
@@ -583,7 +613,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_pre_annotation_upload_json(self):
+    def test_pre_annotation_upload_json(self, project):
         """Test uploading pre_annotations in JSON format with timeout protection
 
         Note: This test requires a valid project ID. It will use:
@@ -630,7 +660,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print("Note: This test has a 60-second timeout to prevent hanging")
 
             try:
-                result = self.client._upload_preannotation_sync(
+                result = project._upload_preannotation_sync(
                     project_id=test_project_id,
                     client_id=self.client_id,
                     annotation_format="json",
@@ -1022,7 +1052,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 1: Detach single dataset first to get to a known state
         print(f"Step 1: Detaching single dataset {self.test_dataset_id}...")
         try:
-            single_detach_result = self.client.initiate_detach_dataset_from_project(
+            single_detach_result = project.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1039,7 +1069,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 2: Attach single dataset
         print("Step 2: Attaching single dataset...")
         try:
-            single_attach_result = self.client.initiate_attach_dataset_to_project(
+            single_attach_result = project.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1064,7 +1094,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 3: Detach batch datasets first to get to a known state
         print(f"Step 3: Detaching batch datasets {test_dataset_ids}...")
         try:
-            batch_detach_result = self.client.initiate_detach_datasets_from_project(
+            batch_detach_result = project.initiate_detach_datasets_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1078,7 +1108,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 4: Attach batch datasets
         print("Step 4: Attaching batch datasets...")
         try:
-            batch_attach_result = self.client.initiate_attach_datasets_to_project(
+            batch_attach_result = project.initiate_attach_datasets_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1103,7 +1133,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_invalid_project_id(self):
         """Test dataset attachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            project.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
@@ -1113,7 +1143,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_invalid_dataset_id(self):
         """Test dataset attachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_dataset_to_project(
+            project.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1130,7 +1160,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_missing_client_id(self):
         """Test dataset attachment with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_dataset_to_project(
+            project.initiate_attach_dataset_to_project(
                 client_id="",
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1144,7 +1174,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_nonexistent_project(self):
         """Test dataset attachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            project.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
@@ -1154,7 +1184,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_nonexistent_dataset(self):
         """Test dataset attachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            project.initiate_attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
@@ -1164,7 +1194,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_invalid_project_id(self):
         """Test dataset detachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            project.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
@@ -1174,7 +1204,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_invalid_dataset_id(self):
         """Test dataset detachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_dataset_from_project(
+            project.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1191,7 +1221,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_missing_client_id(self):
         """Test dataset detachment with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_dataset_from_project(
+            project.initiate_detach_dataset_from_project(
                 client_id="",
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1205,7 +1235,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_nonexistent_project(self):
         """Test dataset detachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            project.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
@@ -1215,7 +1245,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_nonexistent_dataset(self):
         """Test dataset detachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            project.initiate_detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
@@ -1228,7 +1258,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_datasets_to_project(
+            project.initiate_attach_datasets_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1247,7 +1277,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_datasets_from_project(
+            project.initiate_detach_datasets_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1262,7 +1292,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_enable_multimodal_indexing(self):
         """Test enabling multimodal indexing for a dataset"""
-        result = self.client.enable_multimodal_indexing(
+        result = project.enable_multimodal_indexing(
             client_id=self.client_id,
             dataset_id=self.test_dataset_id,
             is_multimodal=True,
@@ -1274,7 +1304,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_disable_multimodal_indexing(self):
         """Test disabling multimodal indexing for a dataset"""
-        result = self.client.enable_multimodal_indexing(
+        result = project.enable_multimodal_indexing(
             client_id=self.client_id,
             dataset_id=self.test_dataset_id,
             is_multimodal=False,
@@ -1287,7 +1317,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_multimodal_indexing_invalid_dataset_id(self):
         """Test multimodal indexing with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.enable_multimodal_indexing(
+            project.enable_multimodal_indexing(
                 client_id=self.client_id,
                 dataset_id="invalid-dataset-id",
                 is_multimodal=True,
@@ -1298,7 +1328,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_multimodal_indexing_missing_client_id(self):
         """Test multimodal indexing with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            self.client.enable_multimodal_indexing(
+            project.enable_multimodal_indexing(
                 client_id="",
                 dataset_id=self.test_dataset_id,
                 is_multimodal=True,
@@ -1312,7 +1342,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 1: Enable multimodal indexing
             print("Step 1: Enabling multimodal indexing...")
 
-            enable_result = self.client.enable_multimodal_indexing(
+            enable_result = project.enable_multimodal_indexing(
                 client_id=self.client_id,
                 dataset_id=self.test_dataset_id,
                 is_multimodal=True,
@@ -1327,7 +1357,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 3: Disable multimodal indexing
             print("Step 3: Disabling multimodal indexing...")
 
-            disable_result = self.client.enable_multimodal_indexing(
+            disable_result = project.enable_multimodal_indexing(
                 client_id=self.client_id,
                 dataset_id=self.test_dataset_id,
                 is_multimodal=False,
@@ -1346,7 +1376,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_get_multimodal_indexing_status(self):
         """Test getting multimodal indexing status for a dataset"""
         try:
-            status_result = self.client.get_multimodal_indexing_status(
+            status_result = project.get_multimodal_indexing_status(
                 client_id=self.client_id,
                 dataset_id=self.test_dataset_id,
             )
@@ -1384,7 +1414,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 1: Create a user
             print(f"\n=== Step 1: Creating user {test_email} ===")
-            create_result = self.client.create_user(
+            create_result = project.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1397,7 +1427,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Update user role
             print(f"\n=== Step 2: Updating user role for {test_email} ===")
-            update_result = self.client.update_user_role(
+            update_result = project.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1414,7 +1444,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             # 2025-10-09 21:40:48.976 IST
             # INFO:root:NotFound: AltairOne user not found.
             # print(f"\n=== Step 3: Adding user to project {test_project_id} ===")
-            # add_result = self.client.add_user_to_project(
+            # add_result =project.add_user_to_project(
             #     client_id=self.client_id,
             #     project_id=test_project_id,
             #     email_id=test_email,
@@ -1425,7 +1455,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 4: Change user role
             print(f"\n=== Step 4: Changing user role for {test_email} ===")
-            change_role_result = self.client.change_user_role(
+            change_role_result = project.change_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1436,7 +1466,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 5: Remove user from project
             print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
-            remove_result = self.client.remove_user_from_project(
+            remove_result = project.remove_user_from_project(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1446,7 +1476,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 6: Delete user
             print(f"\n=== Step 6: Deleting user {test_email} ===")
-            delete_result = self.client.delete_user(
+            delete_result = project.delete_user(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1463,7 +1493,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f" User management workflow failed: {str(e)}")
             raise
 
-    def test_create_user_integration(self):
+    def test_create_user_integration(self, user):
         """Test user creation with real API calls"""
         try:
             test_email = f"integration_test_{int(time.time())}@example.com"
@@ -1474,7 +1504,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user creation for {test_email} ===")
 
-            result = self.client.create_user(
+            result = user.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1491,7 +1521,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(result)
 
             try:
-                self.client.delete_user(
+                user.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1521,7 +1551,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             print(f"\n=== Testing user role update for {test_email} ===")
 
-            create_result = self.client.create_user(
+            create_result = project.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1531,7 +1561,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             )
             print(f"User creation result: {create_result}")
 
-            update_result = self.client.update_user_role(
+            update_result = project.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1548,7 +1578,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                self.client.delete_user(
+                project.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1579,7 +1609,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing project user management for {test_email} ===")
 
             # Step 1: Create a user
-            create_result = self.client.create_user(
+            create_result = project.create_user(
                 client_id=self.client_id,
                 first_name=test_first_name,
                 last_name=test_last_name,
@@ -1591,7 +1621,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(create_result)
 
             # Step 2: Update user role (use update_user_role instead of separate add/change operations)
-            update_result = self.client.update_user_role(
+            update_result = project.update_user_role(
                 client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
@@ -1603,7 +1633,7 @@ class LabelerIntegrationTests(unittest.TestCase):
             self.assertIsNotNone(update_result)
 
             try:
-                self.client.delete_user(
+                project.delete_user(
                     client_id=self.client_id,
                     project_id=test_project_id,
                     email_id=test_email,
@@ -1628,7 +1658,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid client_id
             try:
-                self.client.create_user(
+                project.create_user(
                     client_id="invalid_client_id",
                     first_name="Test",
                     last_name="User",
@@ -1641,7 +1671,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 print(f" Correctly caught error for invalid client_id: {str(e)}")
 
             with self.assertRaises(ValidationError) as e:
-                self.client.create_user(
+                project.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="",  # Empty string - should fail validation
@@ -1655,7 +1685,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Test with invalid email format
             try:
-                self.client.create_user(
+                project.create_user(
                     client_id=self.client_id,
                     first_name="Test",
                     last_name="User",

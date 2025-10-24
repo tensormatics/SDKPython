@@ -64,9 +64,7 @@ class LabellerrVideoFile(LabellerrFile):
                 "client_id": self.client_id,
             }
 
-            response = self.client.make_api_request(
-                self.client_id, url, params, unique_id
-            )
+            response = self.client.make_request(self.client_id, url, params, unique_id)
 
             return response
 
@@ -334,4 +332,4 @@ class LabellerrVideoFile(LabellerrFile):
             raise LabellerrError(f"Failed in video processing: {str(e)}")
 
 
-LabellerrFileMeta.register("video", LabellerrVideoFile)
+LabellerrFileMeta._register("video", LabellerrVideoFile)

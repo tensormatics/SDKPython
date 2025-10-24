@@ -3,6 +3,7 @@ Pydantic models for LabellerrClient method parameter validation.
 """
 
 import os
+from enum import StrEnum
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
 
@@ -196,13 +197,19 @@ class DetachDatasetParams(BaseModel):
     dataset_id: UUID
 
 
+class DataSetScope(StrEnum):
+    project = "project"
+    client = "client"
+    public = "public"
+
+
 class GetAllDatasetParams(BaseModel):
     """Parameters for getting all datasets."""
 
     client_id: str = Field(min_length=1)
     datatype: str = Field(min_length=1)
     project_id: str = Field(min_length=1)
-    scope: Literal["project", "client", "public"]
+    scope: DataSetScope
 
 
 class CreateLocalExportParams(BaseModel):

@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List
@@ -14,9 +15,8 @@ from . import client_utils, constants, schemas
 
 # Initialize DataSets handler for dataset-related operations
 from .exceptions import LabellerrError
+from .schemas import DataSetDataType
 
-# Initialize Projects handler for project-related operations
-# from .projects.base import LabellerrProject
 from .utils import validate_params
 from .validators import auto_log_and_handle_errors
 
@@ -42,25 +42,6 @@ class KeyFrame:
     is_manual: bool = True
     method: str = "manual"
     source: str = "manual"
-
-    def __post_init__(self):
-        # Validate frame_number
-        if not isinstance(self.frame_number, int):
-            raise ValueError("frame_number must be an integer")
-        if self.frame_number < 0:
-            raise ValueError("frame_number must be non-negative")
-
-        # Validate is_manual
-        if not isinstance(self.is_manual, bool):
-            raise ValueError("is_manual must be a boolean")
-
-        # Validate method
-        if not isinstance(self.method, str):
-            raise ValueError("method must be a string")
-
-        # Validate source
-        if not isinstance(self.source, str):
-            raise ValueError("source must be a string")
 
 
 class LabellerrClient:
@@ -171,7 +152,7 @@ class LabellerrClient:
         """Context manager exit."""
         self.close()
 
-    def _handle_upload_response(self, response, request_id=None):
+    def handle_upload_response(self, response, request_id=None):
         """
         Specialized error handling for upload operations that may have different success patterns.
 
@@ -219,18 +200,7 @@ class LabellerrClient:
                 f"{operation_name} failed: {response.status_code} - {response.text}"
             )
 
-    def _request(self, method, url, **kwargs):
-        """
-        Wrapper around client_utils.request for backward compatibility.
-
-        :param method: HTTP method
-        :param url: Request URL
-        :param kwargs: Additional arguments
-        :return: Response data
-        """
-        return client_utils.request(method, url, **kwargs)
-
-    def _make_request(
+    def make_request(
         self,
         method,
         url,
@@ -274,19 +244,9 @@ class LabellerrClient:
 
         # Handle response if requested
         if handle_response:
-            return self._handle_response(response, request_id)
+            return client_utils.handle_response(response, request_id)
         else:
             return response
-
-    def _handle_response(self, response, request_id=None):
-        """
-        Handle API response and extract data or raise errors.
-
-        :param response: requests.Response object
-        :param request_id: Optional request tracking ID
-        :return: Response data
-        """
-        return client_utils.handle_response(response, request_id)
 
     def get_direct_upload_url(self, file_name, client_id, purpose="pre-annotations"):
         """
@@ -354,40 +314,95 @@ class LabellerrClient:
         client_id: str,
         gcs_cred_file: str,
         gcs_path: str,
-        data_type: str,
+        data_type: DataSetDataType,
         name: str,
         description: str,
         connection_type: str = "import",
         credentials: str = "svc_account_json",
     ):
-        """
-        Create/test a GCS connector connection (multipart/form-data)
-        :param client_id: The ID of the client.
-        :param gcs_cred_file: Path to the GCS service account JSON file.
-        :param gcs_path: GCS path like gs://bucket/path
-        :param data_type: Data type, e.g. "image", "video".
-        :param name: Name of the connection
-        :param description: Description of the connection
-        :param connection_type: "import" or "export" (default: import)
-        :param credentials: Credential type (default: svc_account_json)
-        :return: Parsed JSON response
-        """
-        from .connectors.gcs_connection import GCSConnection
 
-        connection_config = {
-            "client_id": client_id,
-            "gcs_cred_file": gcs_cred_file,
-            "gcs_path": gcs_path,
-            "data_type": data_type,
-            "name": name,
-            "description": description,
-            "connection_type": connection_type,
-            "credentials": credentials,
-            "api_key": self.api_key,
-            "api_secret": self.api_secret,
+        params = schemas.GCSConnectionParams(
+            client_id=client_id,
+            gcs_cred_file=gcs_cred_file,
+            gcs_path=gcs_path,
+            data_type=data_type,
+            name=name,
+            description=description,
+            connection_type=connection_type,
+            credentials=credentials,
+        )
+
+        request_uuid = str(uuid.uuid4())
+        test_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={params.client_id}&uuid={request_uuid}"
+        )
+
+        headers = client_utils.build_headers(
+            api_key=self.api_key,
+            api_secret=self.api_secret,
+            client_id=params.client_id,
+            extra_headers={"email_id": self.api_key},
+        )
+
+        test_request = {
+            "credentials": params.credentials,
+            "connector": "gcs",
+            "path": params.gcs_path,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
         }
 
-        return GCSConnection.setup_full_connection(self, connection_config)
+        with open(params.gcs_cred_file, "rb") as fp:
+            test_files = {
+                "attachment_files": (
+                    os.path.basename(params.gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+            client_utils.request(
+                "POST",
+                test_url,
+                headers=headers,
+                data=test_request,
+                files=test_files,
+                request_id=request_uuid,
+            )
+
+        # If test passed, create/save the connection
+        # use same uuid to track request
+        create_url = (
+            f"{constants.BASE_URL}/connectors/connections/create"
+            f"?uuid={request_uuid}&client_id={params.client_id}"
+        )
+
+        create_request = {
+            "client_id": params.client_id,
+            "connector": "gcs",
+            "name": params.name,
+            "description": params.description,
+            "connection_type": params.connection_type,
+            "data_type": params.data_type,
+            "credentials": params.credentials,
+        }
+
+        with open(params.gcs_cred_file, "rb") as fp:
+            create_files = {
+                "attachment_files": (
+                    os.path.basename(params.gcs_cred_file),
+                    fp,
+                    "application/json",
+                )
+            }
+        return client_utils.request(
+            "POST",
+            create_url,
+            headers=headers,
+            data=create_request,
+            files=create_files,
+            request_id=request_uuid,
+        )
 
     def list_connection(
         self, client_id: str, connection_type: str, connector: str = None
@@ -466,7 +481,7 @@ class LabellerrClient:
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={workspace_id}&uuid={unique_id}"
 
-        return self._make_request(
+        return self.make_request(
             "GET",
             url,
             client_id=workspace_id,
@@ -571,7 +586,7 @@ class LabellerrClient:
                 "report_id": export_id,
             }
 
-            response = self._make_request(
+            response = self.make_request(
                 "GET",
                 url,
                 client_id=client_id,

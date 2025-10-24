@@ -55,7 +55,7 @@ class VideoProject(LabellerrProject):
                 ],
             }
 
-            return self.client._make_request(
+            return self.client.make_request(
                 "POST",
                 url,
                 client_id=client_id,
@@ -82,7 +82,7 @@ class VideoProject(LabellerrProject):
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/actions/delete_keyframes?project_id={project_id}&uuid={unique_id}&client_id={client_id}"
 
-            return self.client._make_request(
+            return self.client.make_request(
                 "POST",
                 url,
                 client_id=client_id,

@@ -16,4 +16,4 @@ class ImageProject(LabellerrProject):
         print("Yo I am gonna fetch some datasets!")
 
 
-LabellerrProjectMeta.register("image", ImageProject)
+LabellerrProjectMeta._register("image", ImageProject)

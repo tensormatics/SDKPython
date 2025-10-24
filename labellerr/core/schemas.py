@@ -103,13 +103,22 @@ class AWSConnectionParams(BaseModel):
     connection_type: str = "import"
 
 
+# todo: ximi will make this common
+class DataSetDataType:
+    image = "image"
+    video = "video"
+    audio = "audio"
+    document = "document"
+    text = "text"
+
+
 class GCSConnectionParams(BaseModel):
     """Parameters for creating a GCS connection."""
 
     client_id: str = Field(min_length=1)
     gcs_cred_file: str
     gcs_path: str = Field(min_length=1)
-    data_type: Literal["image", "video", "audio", "document", "text"]
+    data_type: DataSetDataType
     name: str = Field(min_length=1)
     description: str
     connection_type: str = "import"

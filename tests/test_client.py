@@ -2,10 +2,9 @@ import os
 
 import pytest
 from pydantic import ValidationError
-
+from labellerr.core.projects import create_project
 from labellerr.client import LabellerrClient
 from labellerr.core.exceptions import LabellerrError
-from labellerr.core.projects import create_project
 from labellerr.core.projects.image_project import ImageProject
 from labellerr.core.users.base import LabellerrUsers
 
@@ -121,6 +120,7 @@ class TestInitiateCreateProject:
         invalid_payload["client_id"] = 123  # Not a string
 
         with pytest.raises(LabellerrError) as exc_info:
+
             create_project(client, invalid_payload)
 
         assert "client_id must be a non-empty string" in str(exc_info.value)

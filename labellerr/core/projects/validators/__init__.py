@@ -774,9 +774,9 @@ def validate_business_logic_rotation_config():
                     break
 
             if rotation_config is not None:
-                from . import client_utils
+                from ..utils import validate_rotation_config
 
-                client_utils.validate_rotation_config(rotation_config)
+                validate_rotation_config(rotation_config)
 
             return func(self, *args, **kwargs)
 

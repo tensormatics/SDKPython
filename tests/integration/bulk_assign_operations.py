@@ -11,6 +11,8 @@ Usage:
 import os
 import sys
 
+from labellerr import LabellerrError
+
 # Add the root directory to Python path
 root_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.append(root_dir)
@@ -18,7 +20,6 @@ sys.path.append(root_dir)
 import time
 
 from labellerr.client import LabellerrClient
-from labellerr.exceptions import LabellerrError
 
 
 def test_list_files_by_status(api_key, api_secret, client_id, project_id):

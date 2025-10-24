@@ -15,7 +15,7 @@ class LabellerrFileMeta(ABCMeta):
     _registry = {}
 
     @classmethod
-    def register(cls, data_type, file_class):
+    def _register(cls, data_type, file_class):
         """Register a file type handler"""
         cls._registry[data_type.lower()] = file_class
 
@@ -132,9 +132,7 @@ class LabellerrFile(metaclass=LabellerrFileMeta):
             # TODO: Add dataset_id handling if needed
 
             url = f"{constants.BASE_URL}/data/file_data"
-            response = self.client.make_api_request(
-                self.client_id, url, params, unique_id
-            )
+            response = self.client.make_request(self.client_id, url, params, unique_id)
 
             # Update cached metadata
             self.metadata = response.get("file_metadata", {})

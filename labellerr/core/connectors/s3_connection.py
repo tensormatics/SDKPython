@@ -147,4 +147,4 @@ class S3Connection(LabellerrConnection):
         return response_data["response"]["connection_id"]
 
 
-LabellerrConnectionMeta.register("s3", S3Connection)
+LabellerrConnectionMeta._register("s3", S3Connection)

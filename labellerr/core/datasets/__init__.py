@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 
+from ..connectors import create_connection
 from ... import schemas as root_schemas
 from .. import constants, schemas
 from ..client import LabellerrClient
@@ -114,9 +115,7 @@ def create_dataset(
                         validated_connector = connector_config
 
                 try:
-                    from ..connectors.connections import LabellerrConnectionMeta
-
-                    final_connection_id = LabellerrConnectionMeta.create_connection(
+                    final_connection_id = create_connection(
                         client,
                         connector_type,
                         dataset_config.client_id,
@@ -143,7 +142,7 @@ def create_dataset(
                 "connector_type": connector_type,
             }
         )
-        response_data = client._make_request(
+        response_data = client.make_request(
             "POST",
             url,
             client_id=dataset_config.client_id,

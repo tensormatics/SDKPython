@@ -303,7 +303,7 @@ def create_project_polygon_input(api_key, api_secret, client_id, email, path_to_
     }
 
     try:
-        result = client.projects.create_project(project_payload)
+        result = projects.create_project(project_payload)
         print(
             f"[polygon_input_project] Project ID: {result['project_id']['response']['project_id']}"
         )
@@ -312,10 +312,10 @@ def create_project_polygon_input(api_key, api_secret, client_id, email, path_to_
 
 
 def create_project_input_select_radio(
-    api_key, api_secret, client_id, email, path_to_images
+    api_key, api_secret, client_id, email, path_to_images, projects
 ):
 
-    client = LabellerrClient(api_key, api_secret)
+
 
     project_payload = {
         "client_id": client_id,
@@ -370,7 +370,7 @@ def create_project_input_select_radio(
     }
 
     try:
-        result = create_project(project_payload)
+        result = project.create_project(project_payload)
         print(
             f"[input_select_radio] Project ID: {result['project_id']['response']['project_id']}"
         )

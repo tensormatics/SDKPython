@@ -81,7 +81,7 @@ def poll(
         except Exception as e:
             if on_exception:
                 on_exception(e)
-            logging.error(f"Exception in poll function: {str(e)}")
+            logging.exception(f"Exception in poll function: {str(e)}")
 
         # Check if we've reached timeout
         if timeout is not None and time.time() - start_time > timeout:

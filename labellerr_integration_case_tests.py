@@ -358,7 +358,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            client.create_project(base_payload)
+            create_project(self.client, base_payload)
 
         self.assertIn(
             "Required parameter dataset_name is missing", str(context.exception)
@@ -367,7 +367,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_project_creation_missing_annotation_guide(self):
         """Test that project creation fails when annotation guide is missing"""
         base_payload = {
-            "client_id": self.client_id,
+            "client_id": self.client.client_id,
             "dataset_name": "test_dataset",
             "dataset_description": "test description",
             "data_type": "image",
@@ -378,7 +378,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            project.create_project(client, base_payload)
+            create_project(self.client, base_payload)
 
         self.assertIn(
             "Please provide either annotation guide or annotation template id",

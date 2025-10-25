@@ -2,12 +2,14 @@ import logging
 import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import List, Union
+from typing import TYPE_CHECKING, List, Union
 
 from .. import client_utils, constants, gcs, schemas
-from ..client import LabellerrClient
 from ..exceptions import LabellerrError
 from ..utils import validate_params
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 
 def get_total_folder_file_count_and_total_size(folder_path, data_type):

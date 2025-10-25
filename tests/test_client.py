@@ -2,9 +2,10 @@ import os
 
 import pytest
 from pydantic import ValidationError
-from labellerr.core.projects import create_project
+
 from labellerr.client import LabellerrClient
 from labellerr.core.exceptions import LabellerrError
+from labellerr.core.projects import create_project
 from labellerr.core.projects.image_project import ImageProject
 from labellerr.core.users.base import LabellerrUsers
 
@@ -35,10 +36,7 @@ def project(client):
 @pytest.fixture
 def users(client):
     """Create a test users instance with client reference"""
-    users_instance = LabellerrUsers()
-    users_instance.api_key = client.api_key
-    users_instance.api_secret = client.api_secret
-    users_instance.client = client
+    users_instance = LabellerrUsers(client)
     return users_instance
 
 

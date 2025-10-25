@@ -46,11 +46,7 @@ class VideoProject(LabellerrProject):
                 "project_id": project_id,
                 "file_id": file_id,
                 "keyframes": [
-                    (
-                        kf.__dict__
-                        if hasattr(kf, "__dict__") and not isinstance(kf, dict)
-                        else kf
-                    )
+                    (kf.model_dump() if hasattr(kf, "model_dump") else kf)
                     for kf in key_frames
                 ],
             }

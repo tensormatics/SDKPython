@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
 from labellerr.core.client import KeyFrame
@@ -80,32 +81,32 @@ class TestKeyFrame:
             kwargs["source"] = source
 
         keyframe = KeyFrame(**kwargs)
-        assert keyframe.__dict__ == expected
+        assert keyframe.model_dump() == expected
 
     @pytest.mark.parametrize(
         "invalid_params,expected_error",
         [
             # Invalid frame_number
-            ({"frame_number": "not_an_int"}, "frame_number must be an integer"),
-            ({"frame_number": 1.5}, "frame_number must be an integer"),
-            ({"frame_number": None}, "frame_number must be an integer"),
+            ({"frame_number": "not_an_int"}, "validation error"),
+            ({"frame_number": 1.5}, "validation error"),
+            ({"frame_number": None}, "validation error"),
             # Invalid is_manual
             (
                 {"frame_number": 1, "is_manual": "not_a_bool"},
-                "is_manual must be a boolean",
+                "validation error",
             ),
-            ({"frame_number": 1, "is_manual": 1}, "is_manual must be a boolean"),
+            ({"frame_number": 1, "is_manual": 1}, "validation error"),
             # Invalid method
-            ({"frame_number": 1, "method": 123}, "method must be a string"),
-            ({"frame_number": 1, "method": []}, "method must be a string"),
+            ({"frame_number": 1, "method": 123}, "validation error"),
+            ({"frame_number": 1, "method": []}, "validation error"),
             # Invalid source
-            ({"frame_number": 1, "source": 456}, "source must be a string"),
-            ({"frame_number": 1, "source": {}}, "source must be a string"),
+            ({"frame_number": 1, "source": 456}, "validation error"),
+            ({"frame_number": 1, "source": {}}, "validation error"),
         ],
     )
     def test_keyframe_invalid_creation(self, invalid_params, expected_error):
         """Test KeyFrame creation with invalid parameters"""
-        with pytest.raises(ValueError, match=expected_error):
+        with pytest.raises(ValidationError, match=expected_error):
             KeyFrame(**invalid_params)
 
 
@@ -185,7 +186,7 @@ def mock_client():
 class TestLinkKeyFrameMethod:
     """Unit tests for link_key_frame method"""
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_link_key_frame_success(self, mock_make_request, mock_client):
         """Test successful key frame linking"""
         # Arrange
@@ -318,7 +319,7 @@ class TestLinkKeyFrameMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_client.link_key_frame(client_id, project_id, file_id, keyframes)
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_link_key_frame_api_error(self, mock_make_request, mock_client):
         """Test link_key_frame when API call fails"""
         mock_make_request.side_effect = Exception("API Error")
@@ -331,7 +332,7 @@ class TestLinkKeyFrameMethod:
                 "test_client", "test_project", "test_file", keyframes
             )
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_link_key_frame_with_dict_keyframes(self, mock_make_request, mock_client):
         """Test link_key_frame with dictionary keyframes instead of KeyFrame objects"""
         mock_make_request.return_value = {"status": "success"}
@@ -362,7 +363,7 @@ class TestLinkKeyFrameMethod:
 class TestDeleteKeyFramesMethod:
     """Unit tests for delete_key_frames method"""
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_delete_key_frames_success(self, mock_make_request, mock_client):
         """Test successful key frame deletion"""
         # Arrange
@@ -406,7 +407,7 @@ class TestDeleteKeyFramesMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_client.delete_key_frames(client_id, project_id)
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_delete_key_frames_api_error(self, mock_make_request, mock_client):
         """Test delete_key_frames when API call fails"""
         mock_make_request.side_effect = Exception("API Error")
@@ -416,7 +417,7 @@ class TestDeleteKeyFramesMethod:
         ):
             mock_client.delete_key_frames("test_client", "test_project")
 
-    @patch("labellerr.core.client.LabellerrClient._make_request")
+    @patch("labellerr.core.client.LabellerrClient.make_request")
     def test_delete_key_frames_labellerr_error(self, mock_make_request, mock_client):
         """Test delete_key_frames when LabellerrError is raised"""
         mock_make_request.side_effect = LabellerrError("Custom error")

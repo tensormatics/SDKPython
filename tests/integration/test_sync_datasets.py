@@ -21,7 +21,6 @@ import dotenv
 
 from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
-from labellerr.core.datasets.datasets import DataSets
 
 dotenv.load_dotenv()
 
@@ -58,8 +57,8 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
         self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
 
-        # Create DataSets instance
-        self.datasets = DataSets(self.api_key, self.api_secret, self.client)
+        # Use datasets from client
+        self.datasets = self.client.datasets
 
         # Shared configuration (used by both AWS and GCS tests)
         self.project_id = "gabrila_artificial_duck_74237"  # Same project for both tests

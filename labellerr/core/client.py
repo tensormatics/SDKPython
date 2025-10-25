@@ -4,18 +4,18 @@ import json
 import logging
 import os
 import uuid
-from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import requests
+from pydantic import BaseModel, Field
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..validators import auto_log_and_handle_errors
 from . import client_utils, constants, schemas
 from .connectors import create_connection
 
 # Initialize DataSets handler for dataset-related operations
+from .datasets.datasets import DataSets
 from .exceptions import LabellerrError
 from .schemas import DataSetDataType
 from .utils import validate_params
@@ -23,22 +23,18 @@ from .utils import validate_params
 create_dataset_parameters: Dict[str, Any] = {}
 
 
-@auto_log_and_handle_errors(
-    include_params=False,
-    exclude_methods=[
-        "close",
-        "validate_rotation_config",
-        "get_total_folder_file_count_and_total_size",
-        "get_total_file_count_and_total_size",
-    ],
-)
-@dataclass
-class KeyFrame:
+class KeyFrame(BaseModel):
     """
-    Represents a key frame with validation.
+    Represents a key frame with validation using Pydantic.
+
+    Business constraints:
+    - frame_number must be non-negative (>= 0) as negative frame numbers don't make sense
+    - All fields are strictly typed to prevent data corruption
     """
 
-    frame_number: int
+    model_config = {"strict": True}
+
+    frame_number: int = Field(ge=0, description="Frame number must be non-negative")
     is_manual: bool = True
     method: str = "manual"
     source: str = "manual"
@@ -80,7 +76,7 @@ class LabellerrClient:
         if enable_connection_pooling:
             self._setup_session()
 
-        # self.datasets = DataSets(api_key, api_secret, self)
+        self.datasets = DataSets(api_key, api_secret, self)
 
         # self.projects = LabellerrProject.__new__(LabellerrProject)
         # self.projects.api_key = api_key
@@ -294,7 +290,6 @@ class LabellerrClient:
         :param connection_type: The connection type.
         :return: Parsed JSON response
         """
-        from .connectors.s3_connection import S3Connection
 
         connection_config = {
             "client_id": client_id,
@@ -307,7 +302,7 @@ class LabellerrClient:
             "connection_type": connection_type,
         }
 
-        return create_connection(self, client, connection_config)
+        return create_connection(self, "aws", client_id, connection_config)
 
     def create_gcs_connection(
         self,

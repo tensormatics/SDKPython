@@ -1,16 +1,19 @@
 import json
 import logging
 import uuid
+from typing import TYPE_CHECKING
 
-from ..connectors import create_connection
 from ... import schemas as root_schemas
 from .. import constants, schemas
-from ..client import LabellerrClient
+from ..connectors import create_connection
 from ..exceptions import LabellerrError
 from .base import LabellerrDataset
 from .image_dataset import ImageDataset as LabellerrImageDataset
 from .utils import upload_files, upload_folder_files_to_dataset
 from .video_dataset import VideoDataset as LabellerrVideoDataset
+
+if TYPE_CHECKING:
+    from ..client import LabellerrClient
 
 __all__ = ["LabellerrImageDataset", "LabellerrVideoDataset", "LabellerrDataset"]
 

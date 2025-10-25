@@ -5,8 +5,8 @@ import uuid
 import requests
 
 from labellerr import LabellerrClient
-from .. import client_utils, utils, schemas
-from .. import constants
+
+from .. import client_utils, constants, schemas, utils
 from ..datasets import LabellerrDataset, create_dataset
 from ..exceptions import LabellerrError
 from .base import LabellerrProject
@@ -26,6 +26,9 @@ def create_project(client: "LabellerrClient", payload: dict):
     try:
         # validate all the parameters
         required_params = [
+            "client_id",
+            "dataset_name",
+            "dataset_description",
             "data_type",
             "created_by",
             "project_name",
@@ -36,10 +39,15 @@ def create_project(client: "LabellerrClient", payload: dict):
             if param not in payload:
                 raise LabellerrError(f"Required parameter {param} is missing")
 
-        # Validate absence of dataset_name 
-        if "dataset_name" not in payload:
-            dataset_name = payload.get("project_name")
-            dataset_description = f"Dataset for Project - {payload.get('project_name')}"
+        # Validate client_id is a non-empty string
+        client_id = payload.get("client_id")
+        if not isinstance(client_id, str) or not client_id.strip():
+            raise LabellerrError("client_id must be a non-empty string")
+
+        # Get dataset_name and dataset_description from payload
+        dataset_name = payload.get("dataset_name")
+        dataset_description = payload.get("dataset_description")
+
         # Validate created_by email format
         created_by = payload.get("created_by")
         if (
@@ -122,7 +130,9 @@ def create_project(client: "LabellerrClient", payload: dict):
         )
 
         def dataset_ready():
-            dataset = LabellerrDataset.get_dataset(client, dataset.dataset_id) # Fetch dataset again to get the status code
+            dataset = LabellerrDataset.get_dataset(
+                client, dataset.dataset_id
+            )  # Fetch dataset again to get the status code
             return dataset.status_code == 300
 
         utils.poll(
@@ -155,78 +165,85 @@ def create_project(client: "LabellerrClient", payload: dict):
             use_ai=payload.get("use_ai", False),
             created_by=payload["created_by"],
         )
-        print (project_response)
-        return LabellerrProject(client, project_id=project_response["response"]["project_id"])
+        print(project_response)
+        return LabellerrProject(
+            client, project_id=project_response["response"]["project_id"]
+        )
     except LabellerrError:
         raise
     except Exception:
         logging.exception("Unexpected error in project creation")
         raise
 
+
 def __create_project_api_call(
-    client: "LabellerrClient", project_name,
-        data_type,
-        client_id,
-        attached_datasets,
-        annotation_template_id,
-        rotations,
-        use_ai=False,
-        created_by=None,
-    ):
-        """
-        Creates a project with the given configuration.
+    client: "LabellerrClient",
+    project_name,
+    data_type,
+    client_id,
+    attached_datasets,
+    annotation_template_id,
+    rotations,
+    use_ai=False,
+    created_by=None,
+):
+    """
+    Creates a project with the given configuration.
 
-        :param project_name: Name of the project
-        :param data_type: Type of data (image, video, etc.)
-        :param client_id: ID of the client
-        :param attached_datasets: List of dataset IDs to attach to the project
-        :param annotation_template_id: ID of the annotation template
-        :param rotations: Dictionary containing rotation configuration
-        :param use_ai: Boolean flag for AI usage (default: False)
-        :param created_by: Optional creator information
-        :return: Project creation response
-        :raises LabellerrError: If the creation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.CreateProjectParams(
-            project_name=project_name,
-            data_type=data_type,
-            client_id=client_id,
-            attached_datasets=attached_datasets,
-            annotation_template_id=annotation_template_id,
-            rotations=rotations,
-            use_ai=use_ai,
-            created_by=created_by,
-        )
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
+    :param project_name: Name of the project
+    :param data_type: Type of data (image, video, etc.)
+    :param client_id: ID of the client
+    :param attached_datasets: List of dataset IDs to attach to the project
+    :param annotation_template_id: ID of the annotation template
+    :param rotations: Dictionary containing rotation configuration
+    :param use_ai: Boolean flag for AI usage (default: False)
+    :param created_by: Optional creator information
+    :return: Project creation response
+    :raises LabellerrError: If the creation fails
+    """
+    # Validate parameters using Pydantic
+    params = schemas.CreateProjectParams(
+        project_name=project_name,
+        data_type=data_type,
+        client_id=client_id,
+        attached_datasets=attached_datasets,
+        annotation_template_id=annotation_template_id,
+        rotations=rotations,
+        use_ai=use_ai,
+        created_by=created_by,
+    )
+    unique_id = str(uuid.uuid4())
+    url = f"{constants.BASE_URL}/projects/create?client_id={params.client_id}&uuid={unique_id}"
 
-        payload = json.dumps(
-            {
-                "project_name": params.project_name,
-                "attached_datasets": params.attached_datasets,
-                "data_type": params.data_type,
-                "annotation_template_id": str(params.annotation_template_id),
-                "rotations": params.rotations.model_dump(),
-                "use_ai": params.use_ai,
-                "created_by": params.created_by,
-            }
-        )
-        headers = client_utils.build_headers(
-            api_key=client.api_key,
-            api_secret=client.api_secret,
-            client_id=params.client_id,
-            extra_headers={
-                "Origin": constants.ALLOWED_ORIGINS,
-                "Content-Type": "application/json",
-            },
-        )
+    payload = json.dumps(
+        {
+            "project_name": params.project_name,
+            "attached_datasets": params.attached_datasets,
+            "data_type": params.data_type,
+            "annotation_template_id": str(params.annotation_template_id),
+            "rotations": params.rotations.model_dump(),
+            "use_ai": params.use_ai,
+            "created_by": params.created_by,
+        }
+    )
+    headers = client_utils.build_headers(
+        api_key=client.api_key,
+        api_secret=client.api_secret,
+        client_id=params.client_id,
+        extra_headers={
+            "Origin": constants.ALLOWED_ORIGINS,
+            "Content-Type": "application/json",
+        },
+    )
 
-        return client.make_request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
-        )
+    return client.make_request(
+        "POST", url, headers=headers, data=payload, request_id=unique_id
+    )
 
-def create_annotation_guideline(client: "LabellerrClient", questions, template_name, data_type):
+
+def create_annotation_guideline(
+    client: "LabellerrClient", questions, template_name, data_type
+):
     unique_id = str(uuid.uuid4())
     url = f"{constants.BASE_URL}/annotations/create_template?data_type={data_type}&client_id={client.client_id}&uuid={unique_id}"
 

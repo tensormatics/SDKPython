@@ -2,8 +2,7 @@ import json
 import logging
 import os
 import uuid
-from asyncio import as_completed
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -198,35 +197,35 @@ class DataSets(object):
 
             dataset_id = dataset_response["dataset_id"]
 
-            def dataset_ready():
-                try:
-                    dataset_status = self.client.get_dataset(
-                        payload["client_id"], dataset_id
-                    )
+            def check_dataset_status():
+                dataset_status = self.client.get_dataset(
+                    payload["client_id"], dataset_id
+                )
 
-                    if isinstance(dataset_status, dict):
+                if isinstance(dataset_status, dict):
+                    if "response" in dataset_status:
+                        return dataset_status["response"].get("status_code", 200) == 300
+                    else:
+                        return True
+                return False
 
-                        if "response" in dataset_status:
-                            return (
-                                dataset_status["response"].get("status_code", 200)
-                                == 300
-                            )
-                        else:
+            def is_dataset_ready(status):
+                return status is True
 
-                            return True
-                    return False
-                except Exception as e:
-                    logging.error(f"Error checking dataset status: {e}")
-                    return False
+            def on_success(status):
+                logging.info("Dataset created and ready for use")
+
+            def on_exception(e):
+                logging.error(f"Error checking dataset status: {str(e)}")
+                raise LabellerrError(f"Failed to check dataset status: {str(e)}")
 
             utils.poll(
-                function=dataset_ready,
-                condition=lambda x: x is True,
+                function=check_dataset_status,
+                condition=is_dataset_ready,
                 interval=5,
-                timeout=60,
+                on_success=on_success,
+                on_exception=on_exception
             )
-
-            logging.info("Dataset created and ready for use")
 
             if payload.get("annotation_template_id"):
                 annotation_template_id = payload["annotation_template_id"]

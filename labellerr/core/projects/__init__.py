@@ -34,9 +34,6 @@ def create_project(client: "LabellerrClient", payload: dict):
     try:
         # validate all the parameters
         required_params = [
-            "client_id",
-            "dataset_name",
-            "dataset_description",
             "data_type",
             "created_by",
             "project_name",
@@ -46,15 +43,6 @@ def create_project(client: "LabellerrClient", payload: dict):
         for param in required_params:
             if param not in payload:
                 raise LabellerrError(f"Required parameter {param} is missing")
-
-        # Validate client_id is a non-empty string
-        client_id = payload.get("client_id")
-        if not isinstance(client_id, str) or not client_id.strip():
-            raise LabellerrError("client_id must be a non-empty string")
-
-        # Get dataset_name and dataset_description from payload
-        dataset_name = payload.get("dataset_name")
-        dataset_description = payload.get("dataset_description")
 
         # Validate created_by email format
         created_by = payload.get("created_by")
@@ -83,29 +71,6 @@ def create_project(client: "LabellerrClient", payload: dict):
                         f"option_type must be one of {constants.OPTION_TYPE_LIST}"
                     )
 
-        if "folder_to_upload" in payload and "files_to_upload" in payload:
-            raise LabellerrError(
-                "Cannot provide both files_to_upload and folder_to_upload"
-            )
-
-        if "folder_to_upload" not in payload and "files_to_upload" not in payload:
-            raise LabellerrError(
-                "Either files_to_upload or folder_to_upload must be provided"
-            )
-
-        # Check for empty files_to_upload list
-        if (
-            isinstance(payload.get("files_to_upload"), list)
-            and len(payload["files_to_upload"]) == 0
-        ):
-            raise LabellerrError("files_to_upload cannot be an empty list")
-
-        # Check for empty/whitespace folder_to_upload
-        if "folder_to_upload" in payload:
-            folder_path = payload.get("folder_to_upload", "").strip()
-            if not folder_path:
-                raise LabellerrError("Folder path does not exist")
-
         if "rotation_config" not in payload:
             payload["rotation_config"] = {
                 "annotation_rotation_count": 1,
@@ -121,36 +86,84 @@ def create_project(client: "LabellerrClient", payload: dict):
 
         logging.info("Rotation configuration validated . . .")
 
-        # Create DataSets instance for API operations
+        # Handle dataset logic - either use existing datasets or create new ones
+        if "datasets" in payload:
+            # Use existing datasets
+            datasets = payload["datasets"]
+            if not isinstance(datasets, list) or len(datasets) == 0:
+                raise LabellerrError("datasets must be a non-empty list of dataset IDs")
+            
+            # Validate that all datasets exist and have files
+            logging.info("Validating existing datasets . . .")
+            for dataset_id in datasets:
+                try:
+                    dataset = LabellerrDataset(client, dataset_id)
+                    if dataset.files_count <= 0:
+                        raise LabellerrError(f"Dataset {dataset_id} has no files")
+                except Exception as e:
+                    raise LabellerrError(f"Dataset {dataset_id} does not exist or is invalid: {str(e)}")
+            
+            attached_datasets = datasets
+            logging.info("All datasets validated successfully")
+        else:
+            # Create new dataset (existing logic)
+            # Validate absence of dataset_name 
+            if "dataset_name" not in payload:
+                dataset_name = payload.get("project_name")
+                dataset_description = f"Dataset for Project - {payload.get('project_name')}"
 
-        logging.info("Creating dataset . . .")
-        dataset = create_dataset(
-            client,
-            schemas.DatasetConfig(
-                client_id=client.client_id,
-                dataset_name=dataset_name,
-                data_type=payload["data_type"],
-                dataset_description=dataset_description,
-                connector_type="local",
-            ),
-            files_to_upload=payload.get("files_to_upload"),
-            folder_to_upload=payload.get("folder_to_upload"),
-        )
+            if "folder_to_upload" in payload and "files_to_upload" in payload:
+                raise LabellerrError(
+                    "Cannot provide both files_to_upload and folder_to_upload"
+                )
 
-        def dataset_ready():
-            datasets = LabellerrDataset.get_dataset(
-                client, dataset.dataset_id
-            )  # Fetch dataset again to get the status code
-            return datasets.status_code == 300
+            if "folder_to_upload" not in payload and "files_to_upload" not in payload:
+                raise LabellerrError(
+                    "Either files_to_upload or folder_to_upload must be provided"
+                )
 
-        utils.poll(
-            function=dataset_ready,
-            condition=lambda x: x is True,
-            interval=5,
-            timeout=60,
-        )
+            # Check for empty files_to_upload list
+            if (
+                isinstance(payload.get("files_to_upload"), list)
+                and len(payload["files_to_upload"]) == 0
+            ):
+                raise LabellerrError("files_to_upload cannot be an empty list")
 
-        logging.info("Dataset created and ready for use")
+            # Check for empty/whitespace folder_to_upload
+            if "folder_to_upload" in payload:
+                folder_path = payload.get("folder_to_upload", "").strip()
+                if not folder_path:
+                    raise LabellerrError("Folder path does not exist")
+
+            logging.info("Creating dataset . . .")
+                
+            dataset = create_dataset(
+                client,
+                schemas.DatasetConfig(
+                    client_id=client.client_id,
+                    dataset_name=dataset_name,
+                    data_type=payload["data_type"],
+                    dataset_description=dataset_description,
+                    connector_type="local",
+                ),
+                files_to_upload=payload.get("files_to_upload"),
+                folder_to_upload=payload.get("folder_to_upload"),
+            )
+
+            def dataset_ready():
+                response = LabellerrDataset(
+                    client, dataset.dataset_id
+                )  # Fetch dataset again to get the status code
+                return response.status_code == 300 and response.files_count > 0
+
+            utils.poll(
+                function=dataset_ready,
+                condition=lambda x: x is True,
+                interval=5,
+            )
+
+            attached_datasets = [dataset.dataset_id]
+            logging.info("Dataset created and ready for use")
 
         if payload.get("annotation_template_id"):
             annotation_template_id = payload["annotation_template_id"]
@@ -167,13 +180,12 @@ def create_project(client: "LabellerrClient", payload: dict):
             project_name=payload["project_name"],
             data_type=payload["data_type"],
             client_id=client.client_id,
-            attached_datasets=[dataset.dataset_id],
+            attached_datasets=attached_datasets,
             annotation_template_id=annotation_template_id,
             rotations=payload["rotation_config"],
             use_ai=payload.get("use_ai", False),
             created_by=payload["created_by"],
         )
-        print(project_response)
         return LabellerrProject(
             client, project_id=project_response["response"]["project_id"]
         )

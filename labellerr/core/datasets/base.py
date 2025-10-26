@@ -75,6 +75,10 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         self.dataset_data = kwargs["dataset_data"]
 
     @property
+    def files_count(self):
+        return self.dataset_data.get('files_count', 0)
+
+    @property
     def status_code(self):
         return self.dataset_data.get("status_code", 501)  # if not found, return 501
 

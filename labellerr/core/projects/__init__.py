@@ -9,12 +9,20 @@ from labellerr import LabellerrClient
 from .. import client_utils, constants, schemas, utils
 from ..datasets import LabellerrDataset, create_dataset
 from ..exceptions import LabellerrError
+from .audio_project import AudioProject as LabellerrAudioProject
 from .base import LabellerrProject
+from .document_project import DocucmentProject as LabellerrDocumentProject
 from .image_project import ImageProject as LabellerrImageProject
 from .utils import validate_rotation_config
 from .video_project import VideoProject as LabellerrVideoProject
 
-__all__ = ["LabellerrImageProject", "LabellerrVideoProject", "LabellerrProject"]
+__all__ = [
+    "LabellerrImageProject",
+    "LabellerrVideoProject",
+    "LabellerrProject",
+    "LabellerrDocumentProject",
+    "LabellerrAudioProject",
+]
 
 
 def create_project(client: "LabellerrClient", payload: dict):
@@ -130,10 +138,10 @@ def create_project(client: "LabellerrClient", payload: dict):
         )
 
         def dataset_ready():
-            dataset = LabellerrDataset.get_dataset(
+            datasets = LabellerrDataset.get_dataset(
                 client, dataset.dataset_id
             )  # Fetch dataset again to get the status code
-            return dataset.status_code == 300
+            return datasets.status_code == 300
 
         utils.poll(
             function=dataset_ready,
@@ -148,7 +156,7 @@ def create_project(client: "LabellerrClient", payload: dict):
             annotation_template_id = payload["annotation_template_id"]
         else:
             annotation_template_id = create_annotation_guideline(
-                client.client_id,
+                client,
                 payload["annotation_guide"],
                 payload["project_name"],
                 payload["data_type"],

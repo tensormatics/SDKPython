@@ -118,6 +118,7 @@ class S3Connection(LabellerrConnection):
         """
         from ... import LabellerrError
 
+        # TODO: gaurav  recheck this for bucket name in connection string
         required_fields = ["bucket_name"]
         for field in required_fields:
             if field not in aws_config:

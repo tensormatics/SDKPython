@@ -5,12 +5,11 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Dict
 
-
 from ... import schemas
-from .. import constants
-from ..exceptions import InvalidDatasetError, LabellerrError
-from ..utils import validate_params
 from ...schemas import DataSetScope
+from .. import constants
+from ..exceptions import InvalidDatasetError
+from ..utils import validate_params
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -77,7 +76,8 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
     @property
     def status_code(self):
-        return self.dataset_data.get("status_code", 501) # if not found, return 501
+        return self.dataset_data.get("status_code", 501)  # if not found, return 501
+
     @property
     def data_type(self):
         return self.dataset_data.get("data_type")
@@ -86,112 +86,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     def fetch_files(self):
         """Each file type must implement its own download logic"""
         pass
-
-    def attach_dataset_to_project(
-        self, client_id, project_id, dataset_id=None, dataset_ids=None
-    ):
-        """
-        Attaches one or more datasets to an existing project.
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param dataset_id: The ID of a single dataset to attach (for backward compatibility)
-        :param dataset_ids: List of dataset IDs to attach (for batch operations)
-        :return: Dictionary containing attachment status
-        :raises LabellerrError: If the operation fails or if neither dataset_id nor dataset_ids is provided
-        """
-        # Handle both single and batch operations
-        if dataset_id is None and dataset_ids is None:
-            raise LabellerrError("Either dataset_id or dataset_ids must be provided")
-
-        if dataset_id is not None and dataset_ids is not None:
-            raise LabellerrError(
-                "Cannot provide both dataset_id and dataset_ids. Use dataset_ids for batch operations."
-            )
-
-        # Convert single dataset_id to list for uniform processing
-        if dataset_id is not None:
-            dataset_ids = [dataset_id]
-
-        # Validate parameters using Pydantic for each dataset
-        validated_dataset_ids = []
-        for ds_id in dataset_ids:
-            params = schemas.AttachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=ds_id
-            )
-            validated_dataset_ids.append(str(params.dataset_id))
-
-        # Use the first params validation for client_id and project_id
-        params = schemas.AttachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
-        )
-
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/actions/jobs/add_datasets_to_project?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
-
-        payload = json.dumps({"attached_datasets": validated_dataset_ids})
-
-        return self.client.make_request(
-            "POST",
-            url,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-            request_id=unique_id,
-            data=payload,
-        )
-
-    def detach_dataset_from_project(
-        self, client_id, project_id, dataset_id=None, dataset_ids=None
-    ):
-        """
-        Detaches one or more datasets from an existing project.
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param dataset_id: The ID of a single dataset to detach (for backward compatibility)
-        :param dataset_ids: List of dataset IDs to detach (for batch operations)
-        :return: Dictionary containing detachment status
-        :raises LabellerrError: If the operation fails or if neither dataset_id nor dataset_ids is provided
-        """
-        # Handle both single and batch operations
-        if dataset_id is None and dataset_ids is None:
-            raise LabellerrError("Either dataset_id or dataset_ids must be provided")
-
-        if dataset_id is not None and dataset_ids is not None:
-            raise LabellerrError(
-                "Cannot provide both dataset_id and dataset_ids. Use dataset_ids for batch operations."
-            )
-
-        # Convert single dataset_id to list for uniform processing
-        if dataset_id is not None:
-            dataset_ids = [dataset_id]
-
-        # Validate parameters using Pydantic for each dataset
-        validated_dataset_ids = []
-        for ds_id in dataset_ids:
-            params = schemas.DetachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=ds_id
-            )
-            validated_dataset_ids.append(str(params.dataset_id))
-
-        # Use the first params validation for client_id and project_id
-        params = schemas.DetachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
-        )
-
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/actions/jobs/delete_datasets_from_project?project_id={params.project_id}&uuid={unique_id}"
-
-        payload = json.dumps({"attached_datasets": validated_dataset_ids})
-
-        return self.client.make_request(
-            "POST",
-            url,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-            request_id=unique_id,
-            data=payload,
-        )
 
     @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
     def get_all_datasets(
@@ -247,4 +141,62 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
+        )
+
+    def sync_datasets(
+        self,
+        client_id,
+        project_id,
+        dataset_id,
+        path,
+        data_type,
+        email_id,
+        connection_id,
+    ):
+        """
+        Syncs datasets with the backend.
+
+        :param client_id: The ID of the client
+        :param project_id: The ID of the project
+        :param dataset_id: The ID of the dataset to sync
+        :param path: The path to sync
+        :param data_type: Type of data (image, video, audio, document, text)
+        :param email_id: Email ID of the user
+        :param connection_id: The connection ID
+        :return: Dictionary containing sync status
+        :raises LabellerrError: If the sync fails
+        """
+        # Validate parameters using Pydantic
+        params = schemas.SyncDataSetParams(
+            client_id=client_id,
+            project_id=project_id,
+            dataset_id=dataset_id,
+            path=path,
+            data_type=data_type,
+            email_id=email_id,
+            connection_id=connection_id,
+        )
+
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/connectors/datasets/sync?uuid={unique_id}&client_id={params.client_id}"
+
+        payload = json.dumps(
+            {
+                "client_id": params.client_id,
+                "project_id": params.project_id,
+                "dataset_id": params.dataset_id,
+                "path": params.path,
+                "data_type": params.data_type,
+                "email_id": params.email_id,
+                "connection_id": params.connection_id,
+            }
+        )
+
+        return self.client.make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
         )

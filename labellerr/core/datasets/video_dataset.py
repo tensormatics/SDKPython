@@ -3,6 +3,7 @@ import uuid
 from .. import constants
 from ..exceptions import LabellerrError
 from ..files import LabellerrFile
+from ..schemas import DataSetDataType
 from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
@@ -80,7 +81,7 @@ class VideoDataset(LabellerrDataset):
                     video_file = LabellerrFile(
                         client=self.client,
                         file_id=file_id,
-                        project_id=self.project_id,
+                        project_id="self.project_id",  # noqa: # todo: ximi we don't have project id here
                         dataset_id=self.dataset_id,
                     )
                     video_files.append(video_file)
@@ -162,4 +163,4 @@ class VideoDataset(LabellerrDataset):
             raise LabellerrError(f"Failed to process dataset videos: {str(e)}")
 
 
-LabellerrDatasetMeta._register("video", VideoDataset)
+LabellerrDatasetMeta._register(DataSetDataType.video, VideoDataset)

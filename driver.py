@@ -1,12 +1,11 @@
+import logging
 import os
 
 from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
-from labellerr.core import schemas
-from labellerr.core.datasets import LabellerrDataset, create_dataset
-from labellerr.core.projects import LabellerrProject, create_project
-import logging
+from labellerr.core.datasets import LabellerrDataset
+from labellerr.core.projects import create_project
 
 # Set logging level to DEBUG
 logging.basicConfig(level=logging.DEBUG)

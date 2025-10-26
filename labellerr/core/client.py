@@ -15,7 +15,6 @@ from . import client_utils, constants, schemas
 from .connectors import create_connection
 
 # Initialize DataSets handler for dataset-related operations
-from .datasets.datasets import DataSets
 from .exceptions import LabellerrError
 from .schemas import DataSetDataType
 from .utils import validate_params
@@ -76,20 +75,11 @@ class LabellerrClient:
         if enable_connection_pooling:
             self._setup_session()
 
-        self.datasets = DataSets(api_key, api_secret, self)
-
-        # self.projects = LabellerrProject.__new__(LabellerrProject)
-        # self.projects.api_key = api_key
-        # self.projects.api_secret = api_secret
-        # self.projects.client = self
+        # Import here to avoid circular imports
+        from .users.base import LabellerrUsers
 
         # Initialize Users handler for user-related operations
-        # from .users.base import LabellerrUsers
-
-        # self.users = LabellerrUsers()
-        # self.users.api_key = api_key
-        # self.users.api_secret = api_secret
-        # self.users.client = self
+        self.users = LabellerrUsers(self)
 
     def _setup_session(self):
         """

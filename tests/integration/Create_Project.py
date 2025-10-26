@@ -146,7 +146,7 @@ def create_project_polygon_boundingbox_project(
     api_key, api_secret, client_id, email, path_to_images
 ):
 
-    client = LabellerrClient(api_key, api_secret)
+    client = LabellerrClient(api_key, api_secret, client_id)
 
     project_payload = {
         "client_id": client_id,

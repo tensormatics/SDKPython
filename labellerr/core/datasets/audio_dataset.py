@@ -2,9 +2,9 @@ from ..schemas import DataSetDataType
 from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
-class ImageDataset(LabellerrDataset):
+class AudioDataSet(LabellerrDataset):
     def fetch_files(self):
         print("Yo I am gonna fetch some files!")
 
 
-LabellerrDatasetMeta._register(DataSetDataType.image, ImageDataset)
+LabellerrDatasetMeta._register(DataSetDataType.audio, AudioDataSet)

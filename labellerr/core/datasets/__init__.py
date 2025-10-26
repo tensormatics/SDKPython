@@ -7,7 +7,9 @@ from ... import schemas as root_schemas
 from .. import constants, schemas
 from ..connectors import create_connection
 from ..exceptions import LabellerrError
+from .audio_dataset import AudioDataSet as LabellerrAudioDataset
 from .base import LabellerrDataset
+from .document_dataset import DocumentDataSet as LabellerrDocumentDataset
 from .image_dataset import ImageDataset as LabellerrImageDataset
 from .utils import upload_files, upload_folder_files_to_dataset
 from .video_dataset import VideoDataset as LabellerrVideoDataset
@@ -15,7 +17,13 @@ from .video_dataset import VideoDataset as LabellerrVideoDataset
 if TYPE_CHECKING:
     from ..client import LabellerrClient
 
-__all__ = ["LabellerrImageDataset", "LabellerrVideoDataset", "LabellerrDataset"]
+__all__ = [
+    "LabellerrImageDataset",
+    "LabellerrVideoDataset",
+    "LabellerrDataset",
+    "LabellerrAudioDataset",
+    "LabellerrDocumentDataset",
+]
 
 
 def create_dataset(

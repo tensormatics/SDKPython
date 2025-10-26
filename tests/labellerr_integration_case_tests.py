@@ -136,8 +136,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "LABELLERR_API_KEY, LABELLERR_API_SECRET, LABELLERR_CLIENT_ID, LABELLERR_TEST_EMAIL, AWS_CONNECTION_VIDEO, AWS_CONNECTION_IMAGE"
             )
 
-        self.client = LabellerrClient(self.api_key, self.api_secret)
-
+        self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
         self.test_project_name = f"SDK_Test_Project_{int(time.time())}"
         self.test_dataset_name = f"SDK_Test_Dataset_{int(time.time())}"
 
@@ -187,7 +186,7 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 2: Execute complete project creation workflow
 
-            result = self.client.projects.create_project(project_payload)
+            result = self.client.datasets.initiate_create_project(project_payload)
 
             # Step 3: Validate the workflow execution
             self.assertIsInstance(
@@ -227,7 +226,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.create_project(base_payload)
+            self.client.datasets.initiate_create_project(base_payload)
 
         self.assertIn("Required parameter client_id is missing", str(context.exception))
 
@@ -246,7 +245,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.create_project(base_payload)
+            self.client.datasets.initiate_create_project(base_payload)
 
         self.assertIn("Please enter email id in created_by", str(context.exception))
 
@@ -265,7 +264,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.create_project(base_payload)
+            self.client.datasets.initiate_create_project(base_payload)
 
         self.assertIn("Invalid data_type", str(context.exception))
 
@@ -283,7 +282,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.create_project(base_payload)
+            self.client.datasets.initiate_create_project(base_payload)
 
         self.assertIn(
             "Required parameter dataset_name is missing", str(context.exception)
@@ -303,7 +302,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         }
 
         with self.assertRaises(LabellerrError) as context:
-            self.client.projects.create_project(base_payload)
+            self.client.datasets.initiate_create_project(base_payload)
 
         self.assertIn(
             "Please provide either annotation guide or annotation template id",
@@ -346,7 +345,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.projects.create_project(project_payload)
+            result = self.client.datasets.initiate_create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -390,7 +389,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "rotation_config": self.rotation_config,
             }
 
-            result = self.client.projects.create_project(project_payload)
+            result = self.client.datasets.initiate_create_project(project_payload)
 
             self.assertIsInstance(result, dict)
             self.assertEqual(result.get("status"), "success")
@@ -1023,7 +1022,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 1: Detach single dataset first to get to a known state
         print(f"Step 1: Detaching single dataset {self.test_dataset_id}...")
         try:
-            single_detach_result = self.client.initiate_detach_dataset_from_project(
+            single_detach_result = self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1040,7 +1039,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 2: Attach single dataset
         print("Step 2: Attaching single dataset...")
         try:
-            single_attach_result = self.client.initiate_attach_dataset_to_project(
+            single_attach_result = self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1065,7 +1064,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 3: Detach batch datasets first to get to a known state
         print(f"Step 3: Detaching batch datasets {test_dataset_ids}...")
         try:
-            batch_detach_result = self.client.initiate_detach_datasets_from_project(
+            batch_detach_result = self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1079,7 +1078,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 4: Attach batch datasets
         print("Step 4: Attaching batch datasets...")
         try:
-            batch_attach_result = self.client.initiate_attach_datasets_to_project(
+            batch_attach_result = self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1104,7 +1103,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_invalid_project_id(self):
         """Test dataset attachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
@@ -1114,7 +1113,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_invalid_dataset_id(self):
         """Test dataset attachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_dataset_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1131,7 +1130,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_missing_client_id(self):
         """Test dataset attachment with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_dataset_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id="",
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1145,7 +1144,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_nonexistent_project(self):
         """Test dataset attachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
@@ -1155,7 +1154,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_nonexistent_dataset(self):
         """Test dataset attachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_attach_dataset_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
@@ -1165,7 +1164,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_invalid_project_id(self):
         """Test dataset detachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="invalid-project-id",
                 dataset_id=self.test_dataset_id,
@@ -1175,7 +1174,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_invalid_dataset_id(self):
         """Test dataset detachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_dataset_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="invalid-dataset-id",
@@ -1192,7 +1191,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_missing_client_id(self):
         """Test dataset detachment with missing client_id"""
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_dataset_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id="",
                 project_id=self.test_project_id,
                 dataset_id=self.test_dataset_id,
@@ -1206,7 +1205,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_nonexistent_project(self):
         """Test dataset detachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id="00000000-0000-0000-0000-000000000000",
                 dataset_id=self.test_dataset_id,
@@ -1216,7 +1215,7 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_nonexistent_dataset(self):
         """Test dataset detachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.initiate_detach_dataset_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",
@@ -1229,7 +1228,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_attach_datasets_to_project(
+            self.client.datasets.attach_dataset_to_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1248,7 +1247,7 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.initiate_detach_datasets_from_project(
+            self.client.datasets.detach_dataset_from_project(
                 client_id=self.client_id,
                 project_id=self.test_project_id,
                 dataset_ids=test_dataset_ids,
@@ -1773,7 +1772,7 @@ if __name__ == "__main__":
     - test_detach_datasets_batch_invalid_dataset_id: Test batch detach with invalid IDs
 
     Run with:
-    python labellerr_integration_case_tests.py
+    python labellerr_integration_tests.py
     """
     # Check for required environment variables
     required_env_vars = [

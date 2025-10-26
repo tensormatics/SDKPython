@@ -3,7 +3,7 @@ import uuid
 from .. import constants
 from ..exceptions import LabellerrError
 from ..files import LabellerrFile
-from ..schemas import DataSetDataType
+from ..schemas import DatasetDataType
 from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
@@ -163,4 +163,4 @@ class VideoDataset(LabellerrDataset):
             raise LabellerrError(f"Failed to process dataset videos: {str(e)}")
 
 
-LabellerrDatasetMeta._register(DataSetDataType.video, VideoDataset)
+LabellerrDatasetMeta._register(DatasetDataType.video, VideoDataset)

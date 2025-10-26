@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from ..schemas import DataSetDataType
+from ..schemas import DatasetDataType
 from .base import LabellerrProject, LabellerrProjectMeta
 
 if TYPE_CHECKING:
@@ -13,4 +13,4 @@ class AudioProject(LabellerrProject):
         print("Yo I am gonna fetch some datasets!")
 
 
-LabellerrProjectMeta._register(DataSetDataType.audio, AudioProject)
+LabellerrProjectMeta._register(DatasetDataType.audio, AudioProject)

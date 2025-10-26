@@ -92,7 +92,7 @@ def create_project(client: "LabellerrClient", payload: dict):
             datasets = payload["datasets"]
             if not isinstance(datasets, list) or len(datasets) == 0:
                 raise LabellerrError("datasets must be a non-empty list of dataset IDs")
-            
+
             # Validate that all datasets exist and have files
             logging.info("Validating existing datasets . . .")
             for dataset_id in datasets:
@@ -101,16 +101,20 @@ def create_project(client: "LabellerrClient", payload: dict):
                     if dataset.files_count <= 0:
                         raise LabellerrError(f"Dataset {dataset_id} has no files")
                 except Exception as e:
-                    raise LabellerrError(f"Dataset {dataset_id} does not exist or is invalid: {str(e)}")
-            
+                    raise LabellerrError(
+                        f"Dataset {dataset_id} does not exist or is invalid: {str(e)}"
+                    )
+
             attached_datasets = datasets
             logging.info("All datasets validated successfully")
         else:
             # Create new dataset (existing logic)
-            # Validate absence of dataset_name 
+            # Validate absence of dataset_name
             if "dataset_name" not in payload:
                 dataset_name = payload.get("project_name")
-                dataset_description = f"Dataset for Project - {payload.get('project_name')}"
+                dataset_description = (
+                    f"Dataset for Project - {payload.get('project_name')}"
+                )
 
             if "folder_to_upload" in payload and "files_to_upload" in payload:
                 raise LabellerrError(
@@ -136,7 +140,7 @@ def create_project(client: "LabellerrClient", payload: dict):
                     raise LabellerrError("Folder path does not exist")
 
             logging.info("Creating dataset . . .")
-                
+
             dataset = create_dataset(
                 client,
                 schemas.DatasetConfig(

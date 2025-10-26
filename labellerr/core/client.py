@@ -16,7 +16,7 @@ from .connectors import create_connection
 
 # Initialize DataSets handler for dataset-related operations
 from .exceptions import LabellerrError
-from .schemas import DataSetDataType
+from .schemas import DatasetDataType
 from .utils import validate_params
 
 create_dataset_parameters: Dict[str, Any] = {}
@@ -299,7 +299,7 @@ class LabellerrClient:
         client_id: str,
         gcs_cred_file: str,
         gcs_path: str,
-        data_type: DataSetDataType,
+        data_type: DatasetDataType,
         name: str,
         description: str,
         connection_type: str = "import",

@@ -1,5 +1,4 @@
-"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc.
-"""
+"""This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc."""
 
 import uuid
 from abc import ABCMeta, abstractmethod

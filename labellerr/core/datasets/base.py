@@ -76,7 +76,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
     @property
     def files_count(self):
-        return self.dataset_data.get('files_count', 0)
+        return self.dataset_data.get("files_count", 0)
 
     @property
     def status_code(self):

@@ -104,8 +104,7 @@ class AWSConnectionParams(BaseModel):
     connection_type: str = "import"
 
 
-# todo: ximi will make this common
-class DataSetDataType(str, Enum):
+class DatasetDataType(str, Enum):
     """Enum for dataset data types."""
 
     image = "image"
@@ -121,7 +120,7 @@ class GCSConnectionParams(BaseModel):
     client_id: str = Field(min_length=1)
     gcs_cred_file: str
     gcs_path: str = Field(min_length=1)
-    data_type: DataSetDataType
+    data_type: DatasetDataType
     name: str = Field(min_length=1)
     description: str
     connection_type: str = "import"

@@ -16,7 +16,7 @@ from labellerr.core.connectors import create_connection
 from labellerr.core.connectors.gcs_connection import GCSConnection
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import LabellerrProject, create_project
-from labellerr.core.schemas import DataSetDataType
+from labellerr.core.schemas import DatasetDataType
 
 dotenv.load_dotenv()
 
@@ -88,7 +88,7 @@ class GCSConnectionTestCase:
     client_id: str
     cred_file_content: str
     gcs_path: str
-    data_type: DataSetDataType
+    data_type: DatasetDataType
     name: str
     description: str
     connection_type: str = "import"
@@ -432,7 +432,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 "client_id": self.client_id,
                 "dataset_name": f"SDK_Test_document_{int(time.time())}",
                 "dataset_description": "Test dataset for Document Processing Project",
-                "data_type": DataSetDataType.document,
+                "data_type": DatasetDataType.document,
                 "created_by": self.test_email,
                 "project_name": f"SDK_Test_Project_document_{int(time.time())}",
                 "autolabel": False,
@@ -755,7 +755,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 access_key="",
                 secret_key="",
                 s3_path="s3://bucket/path",
-                data_type=DataSetDataType.document,
+                data_type=DatasetDataType.document,
                 name="aws_invalid_connection_test",
                 description="missing_secrets",
                 expect_error_substr=[
@@ -774,7 +774,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 access_key=image_access_key,
                 secret_key=image_secret_key,
                 s3_path=image_s3_path,
-                data_type=DataSetDataType.image,
+                data_type=DatasetDataType.image,
                 name="aws_connection_image",
                 description="test_description",
             ),
@@ -784,7 +784,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 access_key=video_access_key,
                 secret_key=video_secret_key,
                 s3_path=video_s3_path,
-                data_type=DataSetDataType.video,
+                data_type=DatasetDataType.video,
                 name="aws_connection_video",
                 description="test_description",
             ),
@@ -903,7 +903,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                 client_id=self.client_id,
                 cred_file_content="",
                 gcs_path="gs://bucket/path",
-                data_type=DataSetDataType.image,
+                data_type=DatasetDataType.image,
                 name="gcs_invalid_connection_test",
                 description="missing_cred_file",
                 expect_error_substr=[
@@ -923,7 +923,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                     client_id=self.client_id,
                     cred_file_content=image_cred_file,
                     gcs_path=image_gcs_path,
-                    data_type=DataSetDataType.image,
+                    data_type=DatasetDataType.image,
                     name="gcs_connection_image",
                     description="test_description",
                 )
@@ -936,7 +936,7 @@ class LabelerIntegrationTests(unittest.TestCase):
                     client_id=self.client_id,
                     cred_file_content=video_cred_file,
                     gcs_path=video_gcs_path,
-                    data_type=DataSetDataType.video,
+                    data_type=DatasetDataType.video,
                     name="gcs_connection_video",
                     description="test_description",
                 )

@@ -1,4 +1,4 @@
-from ..schemas import DataSetDataType
+from ..schemas import DatasetDataType
 from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
@@ -7,4 +7,4 @@ class ImageDataset(LabellerrDataset):
         print("Yo I am gonna fetch some files!")
 
 
-LabellerrDatasetMeta._register(DataSetDataType.image, ImageDataset)
+LabellerrDatasetMeta._register(DatasetDataType.image, ImageDataset)

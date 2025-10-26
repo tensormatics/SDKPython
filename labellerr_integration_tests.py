@@ -823,7 +823,6 @@ class LabelerIntegrationTests(unittest.TestCase):
                                 "client_id": case.client_id,
                                 "aws_access_key": case.access_key,
                                 "aws_secrets_key": case.secret_key,
-                                "bucket_name": case.bucket_name,
                                 "s3_path": case.s3_path,
                                 "data_type": case.data_type,
                                 "name": case.name,

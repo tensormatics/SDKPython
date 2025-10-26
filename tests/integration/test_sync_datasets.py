@@ -21,6 +21,7 @@ import dotenv
 
 from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
+from labellerr.core.datasets import LabellerrDataset
 
 dotenv.load_dotenv()
 
@@ -57,9 +58,6 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
         self.client = LabellerrClient(self.api_key, self.api_secret, self.client_id)
 
-        # Use datasets from client
-        self.datasets = self.client.datasets
-
         # Shared configuration (used by both AWS and GCS tests)
         self.project_id = "gabrila_artificial_duck_74237"  # Same project for both tests
         self.email_id = "dev@labellerr.com"  # Same email for both tests
@@ -77,6 +75,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_aws(self):
         """Test syncing datasets from AWS S3"""
+        datasets = LabellerrDataset(client=self.client, dataset_id=self.aws_dataset_id)
         print("\n" + "=" * 60)
         print("TEST: Sync Datasets - AWS S3")
         print("=" * 60)
@@ -90,7 +89,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
             print(f"Data Type: {self.data_type}")
             print(f"Email ID: {self.email_id}")
 
-            response = self.datasets.sync_datasets(
+            response = datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -113,6 +112,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_gcs(self):
         """Test syncing datasets from Google Cloud Storage (GCS)"""
+        datasets = LabellerrDataset(client=self.client, dataset_id=self.gcs_dataset_id)
         if not all(
             [
                 self.gcs_dataset_id,
@@ -134,7 +134,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 print(f"Data Type: {self.data_type}")
                 print(f"Email ID: {self.email_id}")
 
-                response = self.datasets.sync_datasets(
+                response = datasets.sync_datasets(
                     client_id=self.client_id,
                     project_id=self.project_id,
                     dataset_id=self.gcs_dataset_id,
@@ -157,6 +157,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_with_multiple_data_types(self):
         """Test syncing datasets with different data types (AWS)"""
+        datasets = LabellerrDataset(client=self.client, dataset_id=self.aws_dataset_id)
         print("\n" + "=" * 60)
         print("TEST: Sync Datasets with Multiple Data Types")
         print("=" * 60)
@@ -168,7 +169,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 print(f"\n  Testing with data_type: {data_type}")
 
                 try:
-                    response = self.datasets.sync_datasets(
+                    response = datasets.sync_datasets(
                         client_id=self.client_id,
                         project_id=self.project_id,
                         dataset_id=self.aws_dataset_id,
@@ -187,12 +188,13 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_invalid_connection_id(self):
         """Test sync datasets with invalid connection ID"""
+        datasets = LabellerrDataset(client=self.client, dataset_id=self.aws_dataset_id)
         print("\n" + "=" * 60)
         print("TEST: Sync Datasets with Invalid Connection ID")
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            self.datasets.sync_datasets(
+            datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -206,12 +208,13 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
 
     def test_sync_datasets_invalid_dataset_id(self):
         """Test sync datasets with invalid dataset ID"""
+        datasets = LabellerrDataset(client=self.client, dataset_id=self.aws_dataset_id)
         print("\n" + "=" * 60)
         print("TEST: Sync Datasets with Invalid Dataset ID")
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            self.datasets.sync_datasets(
+            datasets.sync_datasets(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",

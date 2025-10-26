@@ -15,7 +15,7 @@ def create_connection(
     connector_type: str,
     client_id: str,
     connector_config: dict,
-) -> str:
+):
     """
     Sets up cloud connector (GCP/AWS) for dataset creation using factory pattern.
 
@@ -23,7 +23,7 @@ def create_connection(
     :param connector_type: Type of connector ('gcp' or 'aws')
     :param client_id: Client ID
     :param connector_config: Configuration dictionary for the connector
-    :return: Connection ID for the cloud connector
+    :return: Connection ID (str) for quick connection or full response (dict) for full connection
     """
     import logging
 
@@ -37,7 +37,17 @@ def create_connection(
         elif connector_type == "aws":
             from .s3_connection import S3Connection
 
-            return S3Connection.create_connection(client, client_id, connector_config)
+            # Determine which method to call based on config parameters
+            # Full connection has: aws_access_key, aws_secrets_key, s3_path, name, description
+            # Quick connection has: bucket_name, folder_path, access_key_id, secret_access_key
+            if "aws_access_key" in connector_config and "name" in connector_config:
+                # Full connection flow - creates a saved connection
+                return S3Connection.setup_full_connection(client, connector_config)
+            else:
+                # Quick connection flow - for dataset creation
+                return S3Connection.create_connection(
+                    client, client_id, connector_config
+                )
         else:
             raise InvalidConnectionError(
                 f"Unsupported connector type: {connector_type}"

@@ -14,7 +14,7 @@ class S3Connection(LabellerrConnection):
     @staticmethod
     def setup_full_connection(
         client: "LabellerrClient", connection_config: dict
-    ) -> "S3Connection":
+    ) -> dict:
         """
         AWS S3 connector and, if valid, save the connection.
         :param client: The LabellerrClient instance
@@ -61,19 +61,25 @@ class S3Connection(LabellerrConnection):
             }
         )
 
+        # Test endpoint also expects multipart/form-data format
         test_request = {
-            "credentials": aws_credentials_json,
-            "connector": "s3",
-            "path": params.s3_path,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
+            "credentials": (None, aws_credentials_json),
+            "connector": (None, "s3"),
+            "path": (None, params.s3_path),
+            "connection_type": (None, str(params.connection_type)),
+            "data_type": (None, str(params.data_type)),
+        }
+
+        # Remove content-type from headers to let requests set it with boundary
+        headers_without_content_type = {
+            k: v for k, v in headers.items() if k.lower() != "content-type"
         }
 
         client_utils.request(
             "POST",
             test_connection_url,
-            headers=headers,
-            data=test_request,
+            headers=headers_without_content_type,
+            files=test_request,
             request_id=request_uuid,
         )
 
@@ -82,21 +88,27 @@ class S3Connection(LabellerrConnection):
             f"?uuid={request_uuid}&client_id={params.client_id}"
         )
 
+        # Use multipart/form-data as expected by the API
         create_request = {
-            "client_id": params.client_id,
-            "connector": "s3",
-            "name": params.name,
-            "description": params.description,
-            "connection_type": params.connection_type,
-            "data_type": params.data_type,
-            "credentials": aws_credentials_json,
+            "client_id": (None, str(params.client_id)),
+            "connector": (None, "s3"),
+            "name": (None, params.name),
+            "description": (None, params.description),
+            "connection_type": (None, str(params.connection_type)),
+            "data_type": (None, str(params.data_type)),
+            "credentials": (None, aws_credentials_json),
+        }
+
+        # Remove content-type from headers to let requests set it with boundary
+        headers_without_content_type = {
+            k: v for k, v in headers.items() if k.lower() != "content-type"
         }
 
         return client_utils.request(
             "POST",
             create_url,
-            headers=headers,
-            data=create_request,
+            headers=headers_without_content_type,
+            files=create_request,
             request_id=request_uuid,
         )
 

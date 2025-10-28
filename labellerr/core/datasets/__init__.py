@@ -72,7 +72,7 @@ def create_dataset(
                     try:
                         final_connection_id = upload_files(
                             client,
-                            client_id=dataset_config.client_id,
+                            client_id=client.client_id,
                             files_list=files_to_upload,
                         )
                     except Exception as e:
@@ -85,7 +85,7 @@ def create_dataset(
                         result = upload_folder_files_to_dataset(
                             client,
                             {
-                                "client_id": dataset_config.client_id,
+                                "client_id": client.client_id,
                                 "folder_path": folder_to_upload,
                                 "data_type": dataset_config.data_type,
                             },
@@ -129,7 +129,7 @@ def create_dataset(
                     final_connection_id = create_connection(
                         client,
                         connector_type,
-                        dataset_config.client_id,
+                        client.client_id,
                         validated_connector.model_dump(),
                     )
                 except Exception as e:
@@ -140,7 +140,7 @@ def create_dataset(
                 raise LabellerrError(f"Unsupported connector type: {connector_type}")
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/create?client_id={dataset_config.client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/datasets/create?client_id={client.client_id}&uuid={unique_id}"
 
         payload = json.dumps(
             {
@@ -149,14 +149,14 @@ def create_dataset(
                 "data_type": dataset_config.data_type,
                 "connection_id": final_connection_id,
                 "path": path,
-                "client_id": dataset_config.client_id,
+                "client_id": client.client_id,
                 "connector_type": connector_type,
             }
         )
         response_data = client.make_request(
             "POST",
             url,
-            client_id=dataset_config.client_id,
+            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,

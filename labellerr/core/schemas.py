@@ -367,7 +367,6 @@ class SyncDataSetParams(BaseModel):
 class DatasetConfig(BaseModel):
     """Configuration for creating a dataset."""
 
-    client_id: str = Field(min_length=1)
     dataset_name: str = Field(min_length=1)
     data_type: Literal["image", "video", "audio", "document", "text"]
     dataset_description: str = ""

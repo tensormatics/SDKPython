@@ -239,25 +239,6 @@ class LabelerIntegrationTests(unittest.TestCase):
                 except OSError:
                     pass
 
-    def test_project_creation_missing_client_id(self):
-        """Test that project creation fails when client_id is missing"""
-        base_payload = {
-            "dataset_name": "test_dataset",
-            "dataset_description": "test description",
-            "data_type": "image",
-            "created_by": "test@example.com",
-            "project_name": "test_project",
-            "autolabel": False,
-            "files_to_upload": [],
-            "annotation_guide": self.annotation_guide,
-        }
-
-        with self.assertRaises(LabellerrError) as context:
-            # TODO: @ximi need to check this
-            create_project(self.client, base_payload)
-
-        self.assertIn("Required parameter client_id is missing", str(context.exception))
-
     def test_project_creation_invalid_email(self):
         """Test that project creation fails with invalid email format"""
         base_payload = {

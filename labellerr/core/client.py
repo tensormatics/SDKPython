@@ -6,7 +6,6 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from ..schemas import GCSConnectionParams
 from . import client_utils, constants
 
 # Initialize DataSets handler for dataset-related operations

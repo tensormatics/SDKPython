@@ -182,3 +182,9 @@ print("\n=== Driver execution completed ===")
 
 # project: LabellerrVideoProject = LabellerrProject(client=client, project_id="pam_rear_worm_89383")
 # print(project.add_keyframes(file_id="fd42f5da-7a0c-4d5d-be16-3a9c4fa078bf", keyframes=[KeyFrame(frame_number=1, is_manual=True, method="manual", source="manual")]))
+
+datasets = LabellerrDataset.get_all_datasets(
+    client=client, datatype="image", scope="project"
+)
+
+print(len(datasets["response"]["datasets"]))

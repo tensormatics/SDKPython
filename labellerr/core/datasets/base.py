@@ -5,11 +5,9 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from typing import TYPE_CHECKING, Dict
 
-from ... import schemas
 from ...schemas import DataSetScope
 from .. import constants
 from ..exceptions import InvalidDatasetError
-from ..utils import validate_params
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -90,63 +88,51 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         """Each file type must implement its own download logic"""
         pass
 
-    @validate_params(client_id=str, datatype=str, project_id=str, scope=str)
-    def get_all_datasets(
-        self, client_id: str, datatype: str, project_id: str, scope: DataSetScope
-    ):
+    @staticmethod
+    def get_all_datasets(client: "LabellerrClient", datatype: str, scope: DataSetScope):
         """
         Retrieves datasets by parameters.
 
-        :param client_id: The ID of the client.
+        :param client: The client object.
         :param datatype: The type of data for the dataset.
-        :param project_id: The ID of the project.
         :param scope: The permission scope for the dataset.
         :return: The dataset list as JSON.
         """
-        # Validate parameters using Pydantic
-        params = schemas.GetAllDatasetParams(
-            client_id=client_id,
-            datatype=datatype,
-            project_id=project_id,
-            scope=scope,
-        )
         unique_id = str(uuid.uuid4())
         url = (
-            f"{constants.BASE_URL}/datasets/list?client_id={params.client_id}&data_type={params.datatype}&permission_level={params.scope}"
-            f"&project_id={params.project_id}&uuid={unique_id}"
+            f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
+            f"&uuid={unique_id}"
         )
 
-        return self.client.make_request(
+        return client.make_request(
             "GET",
             url,
+            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
 
-    def delete_dataset(self, client_id, dataset_id):
+    def delete_dataset(self, dataset_id):
         """
         Deletes a dataset from the system.
 
-        :param client_id: The ID of the client
         :param dataset_id: The ID of the dataset to delete
         :return: Dictionary containing deletion status
         :raises LabellerrError: If the deletion fails
         """
-        # Validate parameters using Pydantic
-        params = schemas.DeleteDatasetParams(client_id=client_id, dataset_id=dataset_id)
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{params.dataset_id}/delete?client_id={params.client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={self.client.client_id}&uuid={unique_id}"
 
         return self.client.make_request(
             "DELETE",
             url,
+            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
 
     def sync_datasets(
         self,
-        client_id,
         project_id,
         dataset_id,
         path,
@@ -157,7 +143,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         """
         Syncs datasets with the backend.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param dataset_id: The ID of the dataset to sync
         :param path: The path to sync
@@ -167,35 +152,26 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         :return: Dictionary containing sync status
         :raises LabellerrError: If the sync fails
         """
-        # Validate parameters using Pydantic
-        params = schemas.SyncDataSetParams(
-            client_id=client_id,
-            project_id=project_id,
-            dataset_id=dataset_id,
-            path=path,
-            data_type=data_type,
-            email_id=email_id,
-            connection_id=connection_id,
-        )
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/connectors/datasets/sync?uuid={unique_id}&client_id={params.client_id}"
+        url = f"{constants.BASE_URL}/connectors/datasets/sync?uuid={unique_id}&client_id={self.client.client_id}"
 
         payload = json.dumps(
             {
-                "client_id": params.client_id,
-                "project_id": params.project_id,
-                "dataset_id": params.dataset_id,
-                "path": params.path,
-                "data_type": params.data_type,
-                "email_id": params.email_id,
-                "connection_id": params.connection_id,
+                "client_id": self.client.client_id,
+                "project_id": project_id,
+                "dataset_id": dataset_id,
+                "path": path,
+                "data_type": data_type,
+                "email_id": email_id,
+                "connection_id": connection_id,
             }
         )
 
         return self.client.make_request(
             "POST",
             url,
+            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -210,28 +186,22 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         :raises LabellerrError: If the operation fails
         """
         assert is_multimodal is True, "Disabling multimodal indexing is not supported"
-        # Validate parameters using Pydantic
-        params = schemas.EnableMultimodalIndexingParams(
-            client_id=self.client.client_id,
-            is_multimodal=is_multimodal,
-        )
 
         unique_id = str(uuid.uuid4())
-        url = (
-            f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
-        )
+        url = f"{constants.BASE_URL}/search/multimodal_index?client_id={self.client.client_id}"
 
         payload = json.dumps(
             {
-                "dataset_id": str(params.dataset_id),
-                "client_id": params.client_id,
-                "is_multimodal": params.is_multimodal,
+                "dataset_id": str(self.dataset_id),
+                "client_id": self.client.client_id,
+                "is_multimodal": is_multimodal,
             }
         )
 
         return self.client.make_request(
             "POST",
             url,
+            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,

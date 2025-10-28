@@ -14,7 +14,6 @@ class LabellerrUsers(Singleton):
 
     def create_user(
         self,
-        client_id,
         first_name,
         last_name,
         email_id,
@@ -28,7 +27,6 @@ class LabellerrUsers(Singleton):
         """
         Creates a new user in the system.
 
-        :param client_id: The ID of the client
         :param first_name: User's first name
         :param last_name: User's last name
         :param email_id: User's email address
@@ -43,7 +41,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.CreateUserParams(
-            client_id=client_id,
+            client_id=self.client.client_id,
             first_name=first_name,
             last_name=last_name,
             email_id=email_id,
@@ -86,7 +84,6 @@ class LabellerrUsers(Singleton):
 
     def update_user_role(
         self,
-        client_id,
         project_id,
         email_id,
         roles,
@@ -101,7 +98,6 @@ class LabellerrUsers(Singleton):
         """
         Updates a user's role and profile information.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param email_id: User's email address
         :param roles: List of role objects with project_id and role_id
@@ -117,7 +113,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.UpdateUserRoleParams(
-            client_id=client_id,
+            client_id=self.client.client_id,
             project_id=project_id,
             email_id=email_id,
             roles=roles,
@@ -172,7 +168,6 @@ class LabellerrUsers(Singleton):
 
     def delete_user(
         self,
-        client_id,
         project_id,
         email_id,
         user_id,
@@ -191,7 +186,6 @@ class LabellerrUsers(Singleton):
         """
         Deletes a user from the system.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param email_id: User's email address
         :param user_id: User's unique identifier
@@ -211,7 +205,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.DeleteUserParams(
-            client_id=client_id,
+            client_id=self.client.client_id,
             project_id=project_id,
             email_id=email_id,
             user_id=user_id,
@@ -270,11 +264,10 @@ class LabellerrUsers(Singleton):
             data=payload,
         )
 
-    def add_user_to_project(self, client_id, project_id, email_id, role_id=None):
+    def add_user_to_project(self, project_id, email_id, role_id=None):
         """
         Adds a user to a project.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param email_id: User's email address
         :param role_id: Optional role ID to assign to the user
@@ -283,7 +276,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.AddUserToProjectParams(
-            client_id=client_id,
+            client_id=self.client.client_id,
             project_id=project_id,
             email_id=email_id,
             role_id=role_id,
@@ -306,11 +299,10 @@ class LabellerrUsers(Singleton):
             data=payload,
         )
 
-    def remove_user_from_project(self, client_id, project_id, email_id):
+    def remove_user_from_project(self, project_id, email_id):
         """
         Removes a user from a project.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param email_id: User's email address
         :return: Dictionary containing removal response
@@ -318,7 +310,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.RemoveUserFromProjectParams(
-            client_id=client_id, project_id=project_id, email_id=email_id
+            client_id=self.client.client_id, project_id=project_id, email_id=email_id
         )
 
         unique_id = str(uuid.uuid4())
@@ -337,11 +329,10 @@ class LabellerrUsers(Singleton):
         )
 
     # TODO: this is not working from UI
-    def change_user_role(self, client_id, project_id, email_id, new_role_id):
+    def change_user_role(self, project_id, email_id, new_role_id):
         """
         Changes a user's role in a project.
 
-        :param client_id: The ID of the client
         :param project_id: The ID of the project
         :param email_id: User's email address
         :param new_role_id: The new role ID to assign to the user
@@ -350,7 +341,7 @@ class LabellerrUsers(Singleton):
         """
         # Validate parameters using Pydantic
         params = schemas.ChangeUserRoleParams(
-            client_id=client_id,
+            client_id=self.client.client_id,
             project_id=project_id,
             email_id=email_id,
             new_role_id=new_role_id,

@@ -4,10 +4,8 @@ import json
 import logging
 import os
 import uuid
-from typing import Any, Dict, List
 
 import requests
-from pydantic import BaseModel, Field
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -17,26 +15,6 @@ from .connectors import create_connection
 # Initialize DataSets handler for dataset-related operations
 from .exceptions import LabellerrError
 from .schemas import DatasetDataType
-from .utils import validate_params
-
-create_dataset_parameters: Dict[str, Any] = {}
-
-
-class KeyFrame(BaseModel):
-    """
-    Represents a key frame with validation using Pydantic.
-
-    Business constraints:
-    - frame_number must be non-negative (>= 0) as negative frame numbers don't make sense
-    - All fields are strictly typed to prevent data corruption
-    """
-
-    model_config = {"strict": True}
-
-    frame_number: int = Field(ge=0, description="Frame number must be non-negative")
-    is_manual: bool = True
-    method: str = "manual"
-    source: str = "manual"
 
 
 class LabellerrClient:
@@ -528,43 +506,3 @@ class LabellerrClient:
         except Exception as e:
             logging.error(f"Unexpected error in download_function: {str(e)}")
             raise
-
-    @validate_params(client_id=str, project_id=str, file_id=str, key_frames=list)
-    def link_key_frame(
-        self, client_id: str, project_id: str, file_id: str, key_frames: List[KeyFrame]
-    ):
-        """
-        Links key frames to a file in a video project.
-        Delegates to VideoProject.link_key_frame().
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :param file_id: The ID of the file
-        :param key_frames: List of KeyFrame objects to link
-        :return: Response from the API
-        """
-        from .projects.video_project import VideoProject
-
-        # Create a temporary VideoProject instance for delegation
-        video_project = VideoProject.__new__(VideoProject)
-        video_project.client = self
-
-        return video_project.link_key_frame(client_id, project_id, file_id, key_frames)
-
-    @validate_params(client_id=str, project_id=str)
-    def delete_key_frames(self, client_id: str, project_id: str):
-        """
-        Deletes key frames from a video project.
-        Delegates to VideoProject.delete_key_frames().
-
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
-        :return: Response from the API
-        """
-        from .projects.video_project import VideoProject
-
-        # Create a temporary VideoProject instance for delegation
-        video_project = VideoProject.__new__(VideoProject)
-        video_project.client = self
-
-        return video_project.delete_key_frames(client_id, project_id)

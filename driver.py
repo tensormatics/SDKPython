@@ -4,12 +4,13 @@ import os
 from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
-from labellerr.core.schemas import DatasetConfig
+from labellerr.core.schemas import DatasetConfig, KeyFrame
 from labellerr.core.datasets import create_dataset, LabellerrDataset
 from labellerr.core.projects import (
     create_project,
     create_annotation_guideline,
     LabellerrProject,
+    LabellerrVideoProject,
 )
 from labellerr.core.files import LabellerrFile
 
@@ -98,4 +99,7 @@ client = LabellerrClient(
 # )
 # print(res)
 
-print(LabellerrProject.list_all_projects(client=client))
+# print(LabellerrProject.list_all_projects(client=client))
+
+# project: LabellerrVideoProject = LabellerrProject(client=client, project_id="pam_rear_worm_89383")
+# print(project.add_keyframes(file_id="fd42f5da-7a0c-4d5d-be16-3a9c4fa078bf", keyframes=[KeyFrame(frame_number=1, is_manual=True, method="manual", source="manual")]))

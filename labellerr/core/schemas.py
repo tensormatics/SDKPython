@@ -372,3 +372,20 @@ class DatasetConfig(BaseModel):
     data_type: Literal["image", "video", "audio", "document", "text"]
     dataset_description: str = ""
     connector_type: Literal["local", "aws", "gcp"] = "local"
+
+
+class KeyFrame(BaseModel):
+    """
+    Represents a key frame with validation using Pydantic.
+
+    Business constraints:
+    - frame_number must be non-negative (>= 0) as negative frame numbers don't make sense
+    - All fields are strictly typed to prevent data corruption
+    """
+
+    model_config = {"strict": True}
+
+    frame_number: int = Field(ge=0, description="Frame number must be non-negative")
+    is_manual: bool = True
+    method: str = "manual"
+    source: str = "manual"

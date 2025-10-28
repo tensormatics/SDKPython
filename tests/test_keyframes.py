@@ -4,8 +4,8 @@ import pytest
 from pydantic import ValidationError
 
 from labellerr.client import LabellerrClient
-from labellerr.core.client import KeyFrame
 from labellerr.core.exceptions import LabellerrError
+from labellerr.core.schemas import KeyFrame
 from labellerr.core.utils import validate_params
 
 

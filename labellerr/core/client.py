@@ -174,7 +174,6 @@ class LabellerrClient:
 
         :param method: HTTP method (GET, POST, etc.)
         :param url: Request URL
-        :param client_id: Optional client ID for header authentication
         :param extra_headers: Optional extra headers to include
         :param request_id: Optional request tracking ID
         :param handle_response: Whether to parse response (default True)

@@ -89,28 +89,97 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         pass
 
     @staticmethod
-    def get_all_datasets(client: "LabellerrClient", datatype: str, scope: DataSetScope):
+    def get_all_datasets(
+        client: "LabellerrClient",
+        datatype: str,
+        scope: DataSetScope,
+        page_size: int = None,
+        last_dataset_id: str = None,
+    ):
         """
-        Retrieves datasets by parameters.
+        Retrieves datasets by parameters with pagination support.
+        Always returns a generator that yields individual datasets.
 
         :param client: The client object.
         :param datatype: The type of data for the dataset.
         :param scope: The permission scope for the dataset.
-        :return: The dataset list as JSON.
-        """
-        unique_id = str(uuid.uuid4())
-        url = (
-            f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
-            f"&uuid={unique_id}"
-        )
+        :param page_size: Number of datasets to return per page (default: 10)
+                         Use -1 to auto-paginate through all pages
+                         Use specific number to fetch only that many datasets from first page
+        :param last_dataset_id: ID of the last dataset from previous page for pagination
+                               (only used when page_size is a specific number, ignored for -1)
+        :return: Generator yielding individual datasets
 
-        return client.make_request(
-            "GET",
-            url,
-            client_id=client.client_id,
-            extra_headers={"content-type": "application/json"},
-            request_id=unique_id,
-        )
+        Examples:
+            # Auto-paginate through all datasets
+            for dataset in get_all_datasets(client, "image", DataSetScope.client, page_size=-1):
+                print(dataset)
+
+            # Get first 20 datasets
+            datasets = list(get_all_datasets(client, "image", DataSetScope.client, page_size=20))
+
+            # Manual pagination - first page of 10
+            gen = get_all_datasets(client, "image", DataSetScope.client, page_size=10)
+            first_10 = list(gen)
+        """
+        # Set default page size if not specified
+        if page_size is None:
+            page_size = constants.DEFAULT_PAGE_SIZE
+
+        # Auto-pagination mode: yield datasets across all pages
+        if page_size == -1:
+            actual_page_size = constants.DEFAULT_PAGE_SIZE
+            current_last_dataset_id = None
+            has_more = True
+
+            while has_more:
+                unique_id = str(uuid.uuid4())
+                url = (
+                    f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
+                    f"&page_size={actual_page_size}&uuid={unique_id}"
+                )
+
+                if current_last_dataset_id:
+                    url += f"&last_dataset_id={current_last_dataset_id}"
+
+                response = client.make_request(
+                    "GET",
+                    url,
+                    client_id=client.client_id,
+                    extra_headers={"content-type": "application/json"},
+                    request_id=unique_id,
+                )
+
+                datasets = response.get("datasets", [])
+                for dataset in datasets:
+                    yield dataset
+
+                # Check if there are more pages
+                has_more = response.get("has_more", False)
+                current_last_dataset_id = response.get("last_dataset_id")
+
+        else:
+            unique_id = str(uuid.uuid4())
+            url = (
+                f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
+                f"&page_size={page_size}&uuid={unique_id}"
+            )
+
+            # Add last_dataset_id for pagination if provided
+            if last_dataset_id:
+                url += f"&last_dataset_id={last_dataset_id}"
+
+            response = client.make_request(
+                "GET",
+                url,
+                client_id=client.client_id,
+                extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
+            )
+
+            datasets = response.get("datasets", [])
+            for dataset in datasets:
+                yield dataset
 
     def delete_dataset(self, dataset_id):
         """

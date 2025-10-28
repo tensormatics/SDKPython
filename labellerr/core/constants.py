@@ -28,6 +28,7 @@ DATA_TYPE_FILE_EXT = {
 }
 
 SCOPE_LIST = ["project", "client", "public"]
+DEFAULT_PAGE_SIZE = 10
 OPTION_TYPE_LIST = [
     "input",
     "radio",

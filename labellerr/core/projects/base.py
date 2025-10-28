@@ -192,6 +192,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         Updates the rotation count for a project.
 
+        :param rotation_config: Dictionary containing rotation configuration settings
         :return: A dictionary indicating the success of the operation.
         """
         try:
@@ -441,16 +442,9 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         Get the status of a preannotation job asynchronously with timeout protection.
 
-        Args:
-            job_id: The job ID to check status for
-            max_retries: Maximum number of retries before timing out (default: 60 retries = 5 minutes)
-            retry_interval: Seconds to wait between retries (default: 5 seconds)
-
-        Returns:
-            concurrent.futures.Future: A future that will contain the final job status
-
-        Raises:
-            LabellerrError: If max retries exceeded or job status check fails
+        :param job_id: The job ID to check status for
+        :return: concurrent.futures.Future object that will contain the final job status
+        :raises LabellerrError: If job status check fails
         """
 
         def check_status():
@@ -570,11 +564,9 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         Creates a local export with the given configuration.
 
-        :param project_id: The ID of the project.
-        :param client_id: The ID of the client.
-        :param export_config: Export configuration dictionary.
-        :return: The response from the API.
-        :raises LabellerrError: If the export creation fails.
+        :param export_config: Export configuration dictionary
+        :return: The response from the API
+        :raises LabellerrError: If the export creation fails
         """
         # Validate parameters using Pydantic
         schemas.CreateLocalExportParams(
@@ -647,6 +639,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             raise
 
     def list_files(self, search_queries, size=10, next_search_after=None):
+        """
+        Lists files in the project based on search queries.
+
+        :param search_queries: Search query filters for finding files
+        :param size: Number of results to return (default: 10)
+        :param next_search_after: Pagination cursor for retrieving next page of results
+        :return: Dictionary containing list of files and pagination info
+        :raises LabellerrError: If the request fails
+        """
         # Validate parameters using Pydantic
         params = schemas.ListFileParams(
             client_id=self.client.client_id,
@@ -676,6 +677,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         )
 
     def bulk_assign_files(self, file_ids, new_status, assign_to=None):
+        """
+        Assigns multiple files to a new status or user in bulk.
+
+        :param file_ids: List of file IDs to assign
+        :param new_status: New status to assign to the files
+        :param assign_to: Optional user email to assign files to
+        :return: Dictionary containing bulk assignment results
+        :raises LabellerrError: If the bulk assignment fails
+        """
         # Validate parameters using Pydantic
         params = schemas.BulkAssignFilesParams(
             client_id=self.client.client_id,

@@ -17,15 +17,7 @@ class LabellerrUsers(Singleton):
         """
         Creates a new user in the system.
 
-        :param first_name: User's first name
-        :param last_name: User's last name
-        :param email_id: User's email address
-        :param projects: List of project IDs to assign the user to
-        :param roles: List of role objects with project_id and role_id
-        :param work_phone: User's work phone number (optional)
-        :param job_title: User's job title (optional)
-        :param language: User's preferred language (default: "en")
-        :param timezone: User's timezone (default: "GMT")
+        :param params: CreateUserParams object containing user details (first_name, last_name, email_id, projects, roles, work_phone, job_title, language, timezone)
         :return: Dictionary containing user creation response
         :raises LabellerrError: If the creation fails
         """
@@ -64,16 +56,7 @@ class LabellerrUsers(Singleton):
         """
         Updates a user's role and profile information.
 
-        :param project_id: The ID of the project
-        :param email_id: User's email address
-        :param roles: List of role objects with project_id and role_id
-        :param first_name: User's first name (optional)
-        :param last_name: User's last name (optional)
-        :param work_phone: User's work phone number (optional)
-        :param job_title: User's job title (optional)
-        :param language: User's preferred language (default: "en")
-        :param timezone: User's timezone (default: "GMT")
-        :param profile_image: User's profile image (optional)
+        :param params: UpdateUserRoleParams object containing user update details (project_id, email_id, roles, first_name, last_name, work_phone, job_title, language, timezone, profile_image)
         :return: Dictionary containing update response
         :raises LabellerrError: If the update fails
         """
@@ -122,20 +105,8 @@ class LabellerrUsers(Singleton):
         """
         Deletes a user from the system.
 
-        :param project_id: The ID of the project
-        :param email_id: User's email address
-        :param user_id: User's unique identifier
-        :param first_name: User's first name (optional)
-        :param last_name: User's last name (optional)
-        :param is_active: User's active status (default: 1)
-        :param role: User's role (default: "Annotator")
-        :param user_created_at: User creation timestamp (optional)
-        :param max_activity_created_at: Max activity timestamp (optional)
-        :param image_url: User's profile image URL (optional)
-        :param name: User's display name (optional)
-        :param activity: User's activity status (default: "No Activity")
-        :param creation_date: User creation date (optional)
-        :param status: User's status (default: "Activated")
+        :param params: DeleteUserParams object containing user deletion details
+        (project_id, email_id, user_id, first_name, last_name, is_active, role, user_created_at, max_activity_created_at, image_url, name, activity, creation_date, status)
         :return: Dictionary containing deletion response
         :raises LabellerrError: If the deletion fails
         """

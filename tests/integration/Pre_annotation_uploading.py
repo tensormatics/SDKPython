@@ -14,6 +14,7 @@ sys.path.append(root_dir)
 from labellerr.client import LabellerrClient
 
 
+# todo: ximi/yash this need to use new sdk
 def pre_annotation_uploading(
     api_key, api_secret, client_id, project_id, annotation_format, annotation_file
 ):

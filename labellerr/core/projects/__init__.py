@@ -277,7 +277,6 @@ def create_annotation_guideline(
         response_data = client.make_request(
             "POST",
             url,
-            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=guide_payload,

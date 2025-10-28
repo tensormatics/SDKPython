@@ -12,7 +12,7 @@ import requests
 
 from .. import client_utils, constants, gcs, schemas
 from ..exceptions import InvalidProjectError, LabellerrError
-from ..utils import validate_params, poll
+from ..utils import poll, validate_params
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -39,7 +39,6 @@ class LabellerrProjectMeta(ABCMeta):
         response = client.make_request(
             "GET",
             url,
-            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
@@ -132,7 +131,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -185,7 +183,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -207,7 +204,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             self.client.make_request(
                 "POST",
                 url,
-                client_id=self.client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
                 data=payload,
@@ -236,7 +232,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             return client.make_request(
                 "GET",
                 url,
-                client_id=client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
             )
@@ -298,7 +293,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             response = self.client.make_request(
                 "POST",
                 url,
-                client_id=client_id,
                 extra_headers={"email_id": self.client.api_key},
                 request_id=request_uuid,
                 handle_response=False,
@@ -388,7 +382,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 response = self.client.make_request(
                     "POST",
                     url,
-                    client_id=self.client.client_id,
                     extra_headers={"email_id": self.client.api_key},
                     request_id=request_uuid,
                     handle_response=False,
@@ -410,7 +403,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                     status_data = self.client.make_request(
                         "GET",
                         status_url,
-                        client_id=self.client.client_id,
                         extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                     )
                     logging.debug(f"Status data: {status_data}")
@@ -554,7 +546,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 response = self.client.make_request(
                     "POST",
                     url,
-                    client_id=self.client.client_id,
                     extra_headers={"email_id": self.client.api_key},
                     request_id=request_uuid,
                     handle_response=False,
@@ -602,7 +593,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return self.client.make_request(
             "POST",
             f"{constants.BASE_URL}/sdk/export/files?project_id={self.project_id}&client_id={self.client.client_id}",
-            client_id=self.client.client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
@@ -626,7 +616,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             result = self.client.make_request(
                 "POST",
                 url,
-                client_id=self.client.client_id,
                 extra_headers={"Content-Type": "application/json"},
                 request_id=request_uuid,
                 data=payload,
@@ -681,7 +670,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -710,7 +698,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=json.dumps(payload),

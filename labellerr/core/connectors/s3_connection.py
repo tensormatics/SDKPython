@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import TYPE_CHECKING
 
-from ... import schemas
+from ...schemas import AWSConnectionParams
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
 
@@ -13,13 +13,12 @@ if TYPE_CHECKING:
 class S3Connection(LabellerrConnection):
     @staticmethod
     def setup_full_connection(
-        client: "LabellerrClient", connection_config: dict
+        client: "LabellerrClient", params: AWSConnectionParams
     ) -> dict:
         """
         AWS S3 connector and, if valid, save the connection.
         :param client: The LabellerrClient instance
         :param connection_config: Dictionary containing:
-            - client_id: The ID of the client
             - aws_access_key: The AWS access key
             - aws_secrets_key: The AWS secrets key
             - s3_path: The S3 path
@@ -30,16 +29,6 @@ class S3Connection(LabellerrConnection):
         :return: Parsed JSON response
         """
         # Validate parameters using Pydantic
-        params = schemas.AWSConnectionParams(
-            client_id=connection_config["client_id"],
-            aws_access_key=connection_config["aws_access_key"],
-            aws_secrets_key=connection_config["aws_secrets_key"],
-            s3_path=connection_config["s3_path"],
-            data_type=connection_config["data_type"],
-            name=connection_config["name"],
-            description=connection_config["description"],
-            connection_type=connection_config.get("connection_type", "import"),
-        )
 
         request_uuid = str(uuid.uuid4())
         test_connection_url = (

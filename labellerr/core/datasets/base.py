@@ -36,7 +36,6 @@ class LabellerrDatasetMeta(ABCMeta):
         response = client.make_request(
             "GET",
             url,
-            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
@@ -120,7 +119,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "GET",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
@@ -142,7 +140,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "DELETE",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
@@ -199,7 +196,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -217,7 +213,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         # Validate parameters using Pydantic
         params = schemas.EnableMultimodalIndexingParams(
             client_id=self.client.client_id,
-            dataset_id=self.dataset_id,
             is_multimodal=is_multimodal,
         )
 
@@ -237,7 +232,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,

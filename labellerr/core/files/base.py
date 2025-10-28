@@ -2,8 +2,8 @@ import uuid
 from abc import ABCMeta
 
 from .. import constants
-from ..exceptions import LabellerrError
 from ..client import LabellerrClient
+from ..exceptions import LabellerrError
 
 
 class LabellerrFileMeta(ABCMeta):
@@ -55,7 +55,7 @@ class LabellerrFileMeta(ABCMeta):
             # Priority: project_id > dataset_id
             url = f"{constants.BASE_URL}/data/file_data"
             response = client.make_request(
-                "GET", url, client_id=client_id, request_id=unique_id, params=params
+                "GET", url, request_id=unique_id, params=params
             )
             data_type = response.get("data_type", "").lower()
 

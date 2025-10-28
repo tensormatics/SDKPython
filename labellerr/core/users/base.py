@@ -4,6 +4,7 @@ import uuid
 from labellerr import LabellerrClient, schemas
 from labellerr.core import constants
 from labellerr.core.base.singleton import Singleton
+from labellerr.schemas import CreateUserParams, DeleteUserParams, UpdateUserRoleParams
 
 
 class LabellerrUsers(Singleton):
@@ -12,18 +13,7 @@ class LabellerrUsers(Singleton):
         super().__init__(*args)
         self.client = client
 
-    def create_user(
-        self,
-        first_name,
-        last_name,
-        email_id,
-        projects,
-        roles,
-        work_phone="",
-        job_title="",
-        language="en",
-        timezone="GMT",
-    ):
+    def create_user(self, params: CreateUserParams):
         """
         Creates a new user in the system.
 
@@ -40,18 +30,7 @@ class LabellerrUsers(Singleton):
         :raises LabellerrError: If the creation fails
         """
         # Validate parameters using Pydantic
-        params = schemas.CreateUserParams(
-            client_id=self.client.client_id,
-            first_name=first_name,
-            last_name=last_name,
-            email_id=email_id,
-            projects=projects,
-            roles=roles,
-            work_phone=work_phone,
-            job_title=job_title,
-            language=language,
-            timezone=timezone,
-        )
+
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/register?client_id={params.client_id}&uuid={unique_id}"
 
@@ -73,7 +52,6 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -82,19 +60,7 @@ class LabellerrUsers(Singleton):
             data=payload,
         )
 
-    def update_user_role(
-        self,
-        project_id,
-        email_id,
-        roles,
-        first_name=None,
-        last_name=None,
-        work_phone="",
-        job_title="",
-        language="en",
-        timezone="GMT",
-        profile_image="",
-    ):
+    def update_user_role(self, params: UpdateUserRoleParams):
         """
         Updates a user's role and profile information.
 
@@ -111,22 +77,9 @@ class LabellerrUsers(Singleton):
         :return: Dictionary containing update response
         :raises LabellerrError: If the update fails
         """
-        # Validate parameters using Pydantic
-        params = schemas.UpdateUserRoleParams(
-            client_id=self.client.client_id,
-            project_id=project_id,
-            email_id=email_id,
-            roles=roles,
-            first_name=first_name,
-            last_name=last_name,
-            work_phone=work_phone,
-            job_title=job_title,
-            language=language,
-            timezone=timezone,
-            profile_image=profile_image,
-        )
+
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/users/update?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/users/update?client_id={self.client.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
         # Build the payload with all provided information
         # Extract project_ids from roles for API requirement
@@ -157,7 +110,6 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -166,23 +118,7 @@ class LabellerrUsers(Singleton):
             data=payload,
         )
 
-    def delete_user(
-        self,
-        project_id,
-        email_id,
-        user_id,
-        first_name=None,
-        last_name=None,
-        is_active=1,
-        role="Annotator",
-        user_created_at=None,
-        max_activity_created_at=None,
-        image_url="",
-        name=None,
-        activity="No Activity",
-        creation_date=None,
-        status="Activated",
-    ):
+    def delete_user(self, params: DeleteUserParams):
         """
         Deletes a user from the system.
 
@@ -204,23 +140,7 @@ class LabellerrUsers(Singleton):
         :raises LabellerrError: If the deletion fails
         """
         # Validate parameters using Pydantic
-        params = schemas.DeleteUserParams(
-            client_id=self.client.client_id,
-            project_id=project_id,
-            email_id=email_id,
-            user_id=user_id,
-            first_name=first_name,
-            last_name=last_name,
-            is_active=is_active,
-            role=role,
-            user_created_at=user_created_at,
-            max_activity_created_at=max_activity_created_at,
-            image_url=image_url,
-            name=name,
-            activity=activity,
-            creation_date=creation_date,
-            status=status,
-        )
+
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/users/delete?client_id={params.client_id}&project_id={params.project_id}&uuid={unique_id}"
 
@@ -255,7 +175,6 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "accept": "application/json, text/plain, */*",
@@ -293,7 +212,6 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -322,7 +240,6 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -360,16 +277,7 @@ class LabellerrUsers(Singleton):
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
         )
-
-
-def main():
-    LabellerrUsers(LabellerrClient("", "", ""))
-
-
-if __name__ == "__main__":
-    main()

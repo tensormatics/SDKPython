@@ -15,14 +15,11 @@ class GCSConnection(LabellerrConnection):
         return True
 
     @staticmethod
-    def create_connection(
-        client: "LabellerrClient", client_id: str, gcp_config: dict
-    ) -> str:
+    def create_connection(client: "LabellerrClient", gcp_config: dict) -> str:
         """
         Sets up GCP connector for dataset creation (quick connection).
 
         :param client: The LabellerrClient instance
-        :param client_id: Client ID
         :param gcp_config: GCP configuration containing bucket_name, folder_path, service_account_key
         :return: Connection ID for GCP connector
         """
@@ -36,12 +33,12 @@ class GCSConnection(LabellerrConnection):
                 raise LabellerrError(f"Required field '{field}' missing in gcp_config")
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/connectors/connect/gcp?client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/connectors/connect/gcp?client_id={client.client_id}&uuid={unique_id}"
 
         headers = client_utils.build_headers(
             api_key=client.api_key,
             api_secret=client.api_secret,
-            client_id=client_id,
+            client_id=client.client_id,
             extra_headers={"content-type": "application/json"},
         )
 

@@ -4,72 +4,151 @@ import os
 from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
-from labellerr.core.schemas import DatasetConfig, KeyFrame
-from labellerr.core.datasets import create_dataset, LabellerrDataset
+from labellerr.core.datasets import LabellerrDataset, create_dataset
+from labellerr.core.files import LabellerrFile
 from labellerr.core.projects import (
-    create_project,
-    create_annotation_guideline,
     LabellerrProject,
     LabellerrVideoProject,
+    create_annotation_guideline,
+    create_project,
 )
-from labellerr.core.files import LabellerrFile
+from labellerr.core.schemas import DatasetConfig, KeyFrame
 
 # Set logging level to DEBUG
 logging.basicConfig(level=logging.DEBUG)
 
 load_dotenv()
 
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
+CLIENT_ID = os.getenv("CLIENT_ID")
+
+if not all([API_KEY, API_SECRET, CLIENT_ID]):
+    raise ValueError(
+        "API_KEY, API_SECRET, and CLIENT_ID must be set in environment variables"
+    )
+
+# Initialize client
 client = LabellerrClient(
-    api_key=os.getenv("API_KEY"),
-    api_secret=os.getenv("API_SECRET"),
-    client_id=os.getenv("CLIENT_ID"),
+    api_key=API_KEY,
+    api_secret=API_SECRET,
+    client_id=CLIENT_ID,
 )
-# response = create_annotation_guideline(client=client, questions=[], template_name="Test Template", data_type="image")
-# print(response)
-# file = LabellerrFile(
-#     client=client,
-#     file_id="6a17c668-1dd8-4d4f-b935-a629091859f7",
-#     dataset_id="ec541bdc-d190-4618-aedf-bb0cf45c1787",
-# )
-# print(file.metadata)
-# dataset = LabellerrDataset(
-#     client=client, dataset_id="e6280472-e7f9-4f5f-a4e1-b546b41bd616"
-# )
 
-# response = create_dataset(
-#     client=client,
-#     dataset_config=schemas.DatasetConfig(
-#         client_id=os.getenv("CLIENT_ID"),
-#         dataset_name="Dataset new Ximi",
-#         data_type="image",
-#     ),
-#     folder_to_upload="images",
-# )
-# print(response.dataset_data)
-# autolabel = LabellerrAutoLabel(client=client)
-# project = create_project(
-#     client=client,
-#     payload={
-#         "project_name": "Project new Ximi 3",
-#         "data_type": "image",
-#         "folder_to_upload": "images_single",
-#         "annotation_template_id": "c87ef749-cab7-457a-94d7-e733d6107c6f",
-#         "rotations": {
-#             "annotation_rotation_count": 1,
-#             "review_rotation_count": 1,
-#             "client_review_rotation_count": 1,
-#         },
-#         "use_ai": False,
-#         "created_by": "ximi.hoque@labellerr.com",
-#         "autolabel": False,
-#         # "datasets": [dataset.dataset_id],
-#     },
-# )
-# project = LabellerrProject(client=client, project_id="gina_inland_clam_15425")
-# print(project.attached_datasets)
+if os.getenv("CREATE_DATASET", "").lower() == "true":
+    from labellerr import schemas
+    from labellerr.core.datasets import create_dataset
 
-# print (autolabel.train(training_request=TrainingRequest(model_id="yolov11", job_name="Ximi SDK Test", slice_id='34m28HW1i6c4wwxLDfQh')))
-# print(autolabel.list_training_jobs())
+    folder_to_upload = os.getenv("FOLDER_TO_UPLOAD", "images")
+    dataset_name = os.getenv("DATASET_NAME", "Dataset new Ximi")
+
+    print(f"\n=== Creating Dataset: {dataset_name} ===")
+    response = create_dataset(
+        client=client,
+        dataset_config=schemas.DatasetConfig(
+            client_id=CLIENT_ID,
+            dataset_name=dataset_name,
+            data_type="image",
+        ),
+        folder_to_upload=folder_to_upload,
+    )
+    print(f"Dataset created: {response.dataset_data}")
+
+DATASET_ID = os.getenv("DATASET_ID")
+if DATASET_ID:
+    print(f"\n=== Working with Dataset: {DATASET_ID} ===")
+    dataset = LabellerrDataset(client=client, dataset_id=DATASET_ID)
+    print(f"Dataset loaded: {dataset.data_type}")
+
+if os.getenv("CREATE_PROJECT", "").lower() == "true":
+    project_name = os.getenv("PROJECT_NAME", "Project new Ximi")
+    folder_to_upload = os.getenv("PROJECT_FOLDER_TO_UPLOAD", "images_single")
+    annotation_template_id = os.getenv("ANNOTATION_TEMPLATE_ID")
+
+    if not annotation_template_id:
+        raise ValueError("ANNOTATION_TEMPLATE_ID must be set when CREATE_PROJECT=true")
+
+    print(f"\n=== Creating Project: {project_name} ===")
+    project = create_project(
+        client=client,
+        payload={
+            "project_name": project_name,
+            "data_type": "image",
+            "folder_to_upload": folder_to_upload,
+            "annotation_template_id": annotation_template_id,
+            "rotations": {
+                "annotation_rotation_count": 1,
+                "review_rotation_count": 1,
+                "client_review_rotation_count": 1,
+            },
+            "use_ai": False,
+            "created_by": os.getenv("CREATED_BY", "dev@labellerr.com"),
+            "autolabel": False,
+        },
+    )
+    print(f"Project created: {project.project_data}")
+
+if os.getenv("SYNC_AWS", "").lower() == "true":
+    aws_connection_id = os.getenv("AWS_CONNECTION_ID")
+    aws_project_id = os.getenv("AWS_PROJECT_ID")
+    aws_dataset_id = os.getenv("AWS_DATASET_ID", DATASET_ID)
+    aws_s3_path = os.getenv("AWS_S3_PATH")
+    aws_data_type = os.getenv("AWS_DATA_TYPE", "image")
+    aws_email = os.getenv("AWS_EMAIL", "dev@labellerr.com")
+
+    if not all([aws_connection_id, aws_project_id, aws_dataset_id, aws_s3_path]):
+        raise ValueError(
+            "AWS_CONNECTION_ID, AWS_PROJECT_ID, AWS_DATASET_ID, and AWS_S3_PATH "
+            "must be set when SYNC_AWS=true"
+        )
+
+    if not aws_dataset_id:
+        raise ValueError("DATASET_ID or AWS_DATASET_ID must be set when SYNC_AWS=true")
+
+    print(f"\n=== Syncing Dataset from AWS S3: {aws_s3_path} ===")
+    dataset = LabellerrDataset(client=client, dataset_id=aws_dataset_id)
+    response = dataset.sync_datasets(
+        client_id=CLIENT_ID,
+        project_id=aws_project_id,
+        dataset_id=aws_dataset_id,
+        path=aws_s3_path,
+        data_type=aws_data_type,
+        email_id=aws_email,
+        connection_id=aws_connection_id,
+    )
+    print(f"AWS S3 Sync Response: {response}")
+
+if os.getenv("SYNC_GCS", "").lower() == "true":
+    gcs_connection_id = os.getenv("GCS_CONNECTION_ID")
+    gcs_project_id = os.getenv("GCS_PROJECT_ID")
+    gcs_dataset_id = os.getenv("GCS_DATASET_ID", DATASET_ID)
+    gcs_path = os.getenv("GCS_PATH")
+    gcs_data_type = os.getenv("GCS_DATA_TYPE", "image")
+    gcs_email = os.getenv("GCS_EMAIL", "dev@labellerr.com")
+
+    if not all([gcs_connection_id, gcs_project_id, gcs_dataset_id, gcs_path]):
+        raise ValueError(
+            "GCS_CONNECTION_ID, GCS_PROJECT_ID, GCS_DATASET_ID, and GCS_PATH "
+            "must be set when SYNC_GCS=true"
+        )
+
+    if not gcs_dataset_id:
+        raise ValueError("DATASET_ID or GCS_DATASET_ID must be set when SYNC_GCS=true")
+
+    print(f"\n=== Syncing Dataset from GCS: {gcs_path} ===")
+    dataset = LabellerrDataset(client=client, dataset_id=gcs_dataset_id)
+    response = dataset.sync_datasets(
+        client_id=CLIENT_ID,
+        project_id=gcs_project_id,
+        dataset_id=gcs_dataset_id,
+        path=gcs_path,
+        data_type=gcs_data_type,
+        email_id=gcs_email,
+        connection_id=gcs_connection_id,
+    )
+    print(f"GCS Sync Response: {response}")
+
+print("\n=== Driver execution completed ===")
 
 # dataset = create_dataset(client=client, dataset_config=DatasetConfig(dataset_name="Dataset new Ximi", data_type="image"), folder_to_upload="images")
 # print(dataset.dataset_data)

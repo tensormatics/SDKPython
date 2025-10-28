@@ -41,9 +41,7 @@ class VideoDataset(LabellerrDataset):
 
                 # print(params)
 
-                response = self.client.make_request(
-                    self.client.client_id, url, params, unique_id
-                )
+                response = self.client.make_request(url, params, unique_id)
 
                 # pprint.pprint(response)
 

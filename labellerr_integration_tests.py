@@ -16,7 +16,13 @@ from labellerr.core.connectors import create_connection
 from labellerr.core.connectors.gcs_connection import GCSConnection
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import LabellerrProject, create_project
-from labellerr.core.schemas import DatasetDataType
+from labellerr.core.schemas import (
+    CreateUserParams,
+    DatasetDataType,
+    DeleteUserParams,
+    GCSConnectionParams,
+    UpdateUserRoleParams,
+)
 
 dotenv.load_dotenv()
 
@@ -957,13 +963,15 @@ class LabelerIntegrationTests(unittest.TestCase):
                     )
                     with self.assertRaises(error_type) as ctx:
                         self.client.create_gcs_connection(
-                            client_id=case.client_id,
-                            gcs_cred_file=case.cred_file_content,
-                            gcs_path=case.gcs_path,
-                            data_type=case.data_type,
-                            name=case.name,
-                            description=case.description,
-                            connection_type=case.connection_type,
+                            GCSConnectionParams(
+                                client_id=case.client_id,
+                                gcs_cred_file=case.cred_file_content,
+                                gcs_path=case.gcs_path,
+                                data_type=case.data_type,
+                                name=case.name,
+                                description=case.description,
+                                connection_type=case.connection_type,
+                            )
                         )
                     if expected_substrs:
                         exc_str = str(ctx.exception)
@@ -998,13 +1006,15 @@ class LabelerIntegrationTests(unittest.TestCase):
                             pass
                     temp_created_path = tf.name
                     result = self.client.create_gcs_connection(
-                        client_id=case.client_id,
-                        gcs_cred_file=temp_created_path,
-                        gcs_path=case.gcs_path,
-                        data_type=case.data_type,
-                        name=case.name,
-                        description=case.description,
-                        connection_type=case.connection_type,
+                        GCSConnectionParams(
+                            client_id=case.client_id,
+                            gcs_cred_file=temp_created_path,
+                            gcs_path=case.gcs_path,
+                            data_type=case.data_type,
+                            name=case.name,
+                            description=case.description,
+                            connection_type=case.connection_type,
+                        )
                     )
                     self.assertIsInstance(result, dict)
                     self.assertIn("response", result)
@@ -1537,12 +1547,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 1: Create a user
             print(f"\n=== Step 1: Creating user {test_email} ===")
             create_result = self.client.users.create_user(
-                client_id=self.client_id,
-                first_name=test_first_name,
-                last_name=test_last_name,
-                email_id=test_email,
-                projects=[test_project_id],
-                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                CreateUserParams(
+                    client_id=self.client_id,
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                    email_id=test_email,
+                    projects=[test_project_id],
+                    roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                )
             )
             print(f"User creation result: {create_result}")
             self.assertIsNotNone(create_result)
@@ -1550,12 +1562,16 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 2: Update user role
             print(f"\n=== Step 2: Updating user role for {test_email} ===")
             update_result = self.client.users.update_user_role(
-                client_id=self.client_id,
-                project_id=test_project_id,
-                email_id=test_email,
-                roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
-                first_name=test_first_name,
-                last_name=test_last_name,
+                UpdateUserRoleParams(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    roles=[
+                        {"project_id": test_project_id, "role_id": test_new_role_id}
+                    ],
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
             )
             print(f"User role update result: {update_result}")
             self.assertIsNotNone(update_result)
@@ -1590,7 +1606,6 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 5: Remove user from project
             print(f"\n=== Step 5: Removing user from project {test_project_id} ===")
             remove_result = self.client.users.remove_user_from_project(
-                client_id=self.client_id,
                 project_id=test_project_id,
                 email_id=test_email,
             )
@@ -1600,12 +1615,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Step 6: Delete user
             print(f"\n=== Step 6: Deleting user {test_email} ===")
             delete_result = self.client.users.delete_user(
-                client_id=self.client_id,
-                project_id=test_project_id,
-                email_id=test_email,
-                user_id=test_user_id,
-                first_name=test_first_name,
-                last_name=test_last_name,
+                DeleteUserParams(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    user_id=test_user_id,
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
             )
             print(f"Delete user result: {delete_result}")
             self.assertIsNotNone(delete_result)
@@ -1628,16 +1645,18 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing user creation for {test_email} ===")
 
             result = self.client.users.create_user(
-                client_id=self.client_id,
-                first_name=test_first_name,
-                last_name=test_last_name,
-                email_id=test_email,
-                projects=[test_project_id],
-                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
-                work_phone="123-456-7890",
-                job_title="Test Engineer",
-                language="en",
-                timezone="GMT",
+                CreateUserParams(
+                    client_id=self.client_id,
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                    email_id=test_email,
+                    projects=[test_project_id],
+                    roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                    work_phone="123-456-7890",
+                    job_title="Test Engineer",
+                    language="en",
+                    timezone="GMT",
+                )
             )
 
             print(f"User creation result: {result}")
@@ -1645,12 +1664,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             try:
                 self.client.users.delete_user(
-                    client_id=self.client_id,
-                    project_id=test_project_id,
-                    email_id=test_email,
-                    user_id=f"test-user-{int(time.time())}",
-                    first_name=test_first_name,
-                    last_name=test_last_name,
+                    DeleteUserParams(
+                        client_id=self.client_id,
+                        project_id=test_project_id,
+                        email_id=test_email,
+                        user_id=f"test-user-{int(time.time())}",
+                        first_name=test_first_name,
+                        last_name=test_last_name,
+                    )
                 )
                 print(f"Cleanup: User {test_email} deleted successfully")
             except Exception as cleanup_error:
@@ -1675,26 +1696,32 @@ class LabelerIntegrationTests(unittest.TestCase):
             print(f"\n=== Testing user role update for {test_email} ===")
 
             create_result = self.client.users.create_user(
-                client_id=self.client_id,
-                first_name=test_first_name,
-                last_name=test_last_name,
-                email_id=test_email,
-                projects=[test_project_id],
-                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                CreateUserParams(
+                    client_id=self.client_id,
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                    email_id=test_email,
+                    projects=[test_project_id],
+                    roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                )
             )
             print(f"User creation result: {create_result}")
 
             update_result = self.client.users.update_user_role(
-                client_id=self.client_id,
-                project_id=test_project_id,
-                email_id=test_email,
-                roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
-                first_name=test_first_name,
-                last_name=test_last_name,
-                work_phone="987-654-3210",
-                job_title="Senior Test Engineer",
-                language="en",
-                timezone="UTC",
+                UpdateUserRoleParams(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    roles=[
+                        {"project_id": test_project_id, "role_id": test_new_role_id}
+                    ],
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                    work_phone="987-654-3210",
+                    job_title="Senior Test Engineer",
+                    language="en",
+                    timezone="UTC",
+                )
             )
 
             print(f"User role update result: {update_result}")
@@ -1702,12 +1729,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             try:
                 self.client.users.delete_user(
-                    client_id=self.client_id,
-                    project_id=test_project_id,
-                    email_id=test_email,
-                    user_id=f"test-user-{int(time.time())}",
-                    first_name=test_first_name,
-                    last_name=test_last_name,
+                    DeleteUserParams(
+                        client_id=self.client_id,
+                        project_id=test_project_id,
+                        email_id=test_email,
+                        user_id=f"test-user-{int(time.time())}",
+                        first_name=test_first_name,
+                        last_name=test_last_name,
+                    )
                 )
                 print(f" Cleanup: User {test_email} deleted successfully")
             except Exception as cleanup_error:
@@ -1733,36 +1762,44 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             # Step 1: Create a user
             create_result = self.client.users.create_user(
-                client_id=self.client_id,
-                first_name=test_first_name,
-                last_name=test_last_name,
-                email_id=test_email,
-                projects=[test_project_id],
-                roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                CreateUserParams(
+                    client_id=self.client_id,
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                    email_id=test_email,
+                    projects=[test_project_id],
+                    roles=[{"project_id": test_project_id, "role_id": test_role_id}],
+                )
             )
             print(f"User creation result: {create_result}")
             self.assertIsNotNone(create_result)
 
             # Step 2: Update user role (use update_user_role instead of separate add/change operations)
             update_result = self.client.users.update_user_role(
-                client_id=self.client_id,
-                project_id=test_project_id,
-                email_id=test_email,
-                roles=[{"project_id": test_project_id, "role_id": test_new_role_id}],
-                first_name=test_first_name,
-                last_name=test_last_name,
+                UpdateUserRoleParams(
+                    client_id=self.client_id,
+                    project_id=test_project_id,
+                    email_id=test_email,
+                    roles=[
+                        {"project_id": test_project_id, "role_id": test_new_role_id}
+                    ],
+                    first_name=test_first_name,
+                    last_name=test_last_name,
+                )
             )
             print(f"Update user role result: {update_result}")
             self.assertIsNotNone(update_result)
 
             try:
                 self.client.users.delete_user(
-                    client_id=self.client_id,
-                    project_id=test_project_id,
-                    email_id=test_email,
-                    user_id=f"test-user-{int(time.time())}",
-                    first_name=test_first_name,
-                    last_name=test_last_name,
+                    DeleteUserParams(
+                        client_id=self.client_id,
+                        project_id=test_project_id,
+                        email_id=test_email,
+                        user_id=f"test-user-{int(time.time())}",
+                        first_name=test_first_name,
+                        last_name=test_last_name,
+                    )
                 )
                 print(f" Cleanup: User {test_email} deleted successfully")
             except Exception as cleanup_error:
@@ -1782,12 +1819,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Test with invalid client_id
             try:
                 self.client.users.create_user(
-                    client_id="invalid_client_id",
-                    first_name="Test",
-                    last_name="User",
-                    email_id="test@example.com",
-                    projects=["project_123"],
-                    roles=[{"project_id": "project_123", "role_id": "7"}],
+                    CreateUserParams(
+                        client_id="invalid_client_id",
+                        first_name="Test",
+                        last_name="User",
+                        email_id="test@example.com",
+                        projects=["project_123"],
+                        roles=[{"project_id": "project_123", "role_id": "7"}],
+                    )
                 )
                 self.fail("Expected error for invalid client_id")
             except Exception as e:
@@ -1795,12 +1834,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
             with self.assertRaises(ValidationError) as e:
                 self.client.users.create_user(
-                    client_id=self.client_id,
-                    first_name="Test",
-                    last_name="",  # Empty string - should fail validation
-                    email_id="",  # Empty string - should fail validation
-                    projects=[],  # Empty list - should fail validation
-                    roles=[],  # Empty list - should fail validation
+                    CreateUserParams(
+                        client_id=self.client_id,
+                        first_name="Test",
+                        last_name="",  # Empty string - should fail validation
+                        email_id="",  # Empty string - should fail validation
+                        projects=[],  # Empty list - should fail validation
+                        roles=[],  # Empty list - should fail validation
+                    )
                 )
             print(
                 f" Correctly caught ValidationError for empty parameters: {str(e.exception)}"
@@ -1809,12 +1850,14 @@ class LabelerIntegrationTests(unittest.TestCase):
             # Test with invalid email format
             try:
                 self.client.users.create_user(
-                    client_id=self.client_id,
-                    first_name="Test",
-                    last_name="User",
-                    email_id="invalid_email",  # Invalid email format
-                    projects=["project_123"],
-                    roles=[{"project_id": "project_123", "role_id": "7"}],
+                    CreateUserParams(
+                        client_id=self.client_id,
+                        first_name="Test",
+                        last_name="User",
+                        email_id="invalid_email",  # Invalid email format
+                        projects=["project_123"],
+                        roles=[{"project_id": "project_123", "role_id": "7"}],
+                    )
                 )
                 print(" Note: Email validation may not be enforced at SDK level")
             except Exception as e:

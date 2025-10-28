@@ -3,10 +3,9 @@ from typing import List
 
 from .. import constants
 from ..exceptions import LabellerrError
+from ..schemas import DatasetDataType, KeyFrame
 from ..utils import validate_params
 from .base import LabellerrProject, LabellerrProjectMeta
-from ..schemas import KeyFrame
-from ..schemas import DatasetDataType
 
 
 class VideoProject(LabellerrProject):
@@ -43,7 +42,6 @@ class VideoProject(LabellerrProject):
             return self.client.make_request(
                 "POST",
                 url,
-                client_id=self.client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
                 json=body,
@@ -70,7 +68,6 @@ class VideoProject(LabellerrProject):
             return self.client.make_request(
                 "POST",
                 url,
-                client_id=self.client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
                 json={

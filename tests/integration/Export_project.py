@@ -14,6 +14,7 @@ sys.path.append(root_dir)
 from labellerr.client import LabellerrClient
 
 
+# todo: ximi this don't use new struct
 def export_project(api_key, api_secret, client_id, project_id):
     """Exports a project using the Labellerr SDK."""
 

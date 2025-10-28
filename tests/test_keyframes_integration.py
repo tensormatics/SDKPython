@@ -3,8 +3,8 @@ import os
 import pytest
 
 from labellerr.client import LabellerrClient
-from labellerr.core.client import KeyFrame
 from labellerr.core.exceptions import LabellerrError
+from labellerr.core.schemas import KeyFrame
 
 
 @pytest.fixture
@@ -127,7 +127,7 @@ class TestKeyFrameBusinessScenarios:
             ),
         ]
 
-        try:
+        try:  # todo: ximi need to add this to video
             result = client.link_key_frame(
                 client_id, project_id, footage_file_id, incident_keyframes
             )

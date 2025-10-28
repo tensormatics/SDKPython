@@ -61,10 +61,9 @@ class LabellerrVideoFile(LabellerrFile):
                 "frame_end": frame_end,
                 "project_id": self.project_id,
                 "uuid": unique_id,
-                "client_id": self.client_id,
             }
 
-            response = self.client.make_request(self.client_id, url, params, unique_id)
+            response = self.client.make_request(url, params, unique_id)
 
             return response
 

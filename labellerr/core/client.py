@@ -6,6 +6,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from ..schemas import GCSConnectionParams
 from . import client_utils, constants
 
 # Initialize DataSets handler for dataset-related operations
@@ -163,7 +164,6 @@ class LabellerrClient:
         self,
         method,
         url,
-        client_id=None,
         extra_headers=None,
         request_id=None,
         handle_response=True,
@@ -183,11 +183,11 @@ class LabellerrClient:
         :return: Parsed response data if handle_response=True, otherwise Response object
         """
         # Build headers if client_id is provided
-        if client_id is not None:
+        if self.client_id is not None:
             headers = client_utils.build_headers(
                 api_key=self.api_key,
                 api_secret=self.api_secret,
-                client_id=client_id,
+                client_id=self.client_id,
                 extra_headers=extra_headers,
             )
             # Merge with any existing headers in kwargs

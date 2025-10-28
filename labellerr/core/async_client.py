@@ -330,6 +330,7 @@ class AsyncLabellerrClient:
         self,
         dataset_config: Dict[str, Any],
         files_to_upload: Optional[List[str]] = None,
+        path: Optional[str] = None,
         connection_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
@@ -337,6 +338,7 @@ class AsyncLabellerrClient:
 
         :param dataset_config: Configuration for the dataset
         :param files_to_upload: Optional list of files to upload
+        :param path: Path to the data source (required for GCS and AWS connectors)
         :param connection_id: Pre-existing connection ID to use for the dataset.
                              If both connection_id and files_to_upload are provided, connection_id takes precedence.
         """
@@ -346,6 +348,13 @@ class AsyncLabellerrClient:
                 raise LabellerrError(
                     f"Invalid data_type. Must be one of {constants.DATA_TYPES}"
                 )
+
+            # Get connector_type from dataset_config, default to "local"
+            connector_type = dataset_config.get("connector_type", "local")
+
+            # Validate path for GCS/AWS connectors
+            if connector_type in ["gcp", "aws"] and path is None:
+                raise LabellerrError(f"path is required for {connector_type} connector")
 
             # Use provided connection_id or create one from files_to_upload
             final_connection_id = connection_id
@@ -367,8 +376,9 @@ class AsyncLabellerrClient:
                 "dataset_description": dataset_config.get("dataset_description", ""),
                 "data_type": dataset_config["data_type"],
                 "connection_id": final_connection_id,
-                "path": "local",
+                "path": path,
                 "client_id": dataset_config["client_id"],
+                "connector_type": connector_type,
             }
 
             response_data = await self._request(

@@ -31,6 +31,7 @@ def create_dataset(
     dataset_config: schemas.DatasetConfig,
     files_to_upload=None,
     folder_to_upload=None,
+    path=None,
     connection_id=None,
     connector_config=None,
 ):
@@ -63,7 +64,6 @@ def create_dataset(
         connector_type = dataset_config.connector_type
         # Use provided connection_id or set to None (will be created later if needed)
         final_connection_id = connection_id
-        path = connector_type
 
         # Handle different connector types only if connection_id is not provided
         if final_connection_id is None:
@@ -103,6 +103,10 @@ def create_dataset(
                 if connector_config is None:
                     raise LabellerrError(
                         f"connector_config is required for {connector_type} connector when connection_id is not provided"
+                    )
+                if path is None:
+                    raise LabellerrError(
+                        f"path is required for {connector_type} connector"
                     )
 
                 # Validate connector_config using Pydantic models

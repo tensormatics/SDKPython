@@ -91,3 +91,9 @@ client = LabellerrClient(
 
 # file = LabellerrFile(client=client, dataset_id='137a7b2f-942f-478d-a135-94ad2e11fcca', file_id="8fb00e0d-456c-49c7-94e2-cca50b4acee7")
 # print(file.file_data)
+
+project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+res = project.upload_preannotations(
+    annotation_format="coco_json", annotation_file="horses_coco.json"
+)
+print(res)

@@ -4,7 +4,6 @@ import concurrent.futures
 import json
 import logging
 import os
-import time
 import uuid
 from abc import ABCMeta
 from typing import TYPE_CHECKING, Dict, List
@@ -13,7 +12,7 @@ import requests
 
 from .. import client_utils, constants, gcs, schemas
 from ..exceptions import InvalidProjectError, LabellerrError
-from ..utils import validate_params
+from ..utils import validate_params, poll
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -246,7 +245,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             raise
 
     def _upload_preannotation_sync(
-        self, project_id, client_id, annotation_format, annotation_file
+        self,
+        project_id,
+        client_id,
+        annotation_format,
+        annotation_file,
+        conf_bucket=None,
     ):
         """
         Synchronous implementation of preannotation upload.
@@ -255,6 +259,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         :param client_id: The ID of the client.
         :param annotation_format: The format of the preannotation data.
         :param annotation_file: The file path of the preannotation data.
+        :param conf_bucket: Confidence bucket [low, medium, high]
         :return: The response from the API.
         :raises LabellerrError: If the upload fails.
         """
@@ -272,19 +277,22 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             client_utils.validate_annotation_format(annotation_format, annotation_file)
 
             request_uuid = str(uuid.uuid4())
-            url = (
-                f"{constants.BASE_URL}/actions/upload_answers?project_id={project_id}"
-                f"&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
-            )
+            url = f"{constants.BASE_URL}/actions/upload_answers?project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+            if conf_bucket:
+                assert conf_bucket in [
+                    "low",
+                    "medium",
+                    "high",
+                ], "Invalid confidence bucket value. Must be one of [low, medium, high]"
+                url += f"&conf_bucket={conf_bucket}"
             file_name = client_utils.validate_file_exists(annotation_file)
             # get the direct upload url
             gcs_path = f"{project_id}/{annotation_format}-{file_name}"
             logging.info("Uploading your file to Labellerr. Please wait...")
-            direct_upload_url = self.client.get_direct_upload_url(gcs_path, client_id)
+            direct_upload_url = self.get_direct_upload_url(gcs_path, client_id)
             # Now let's wait for the file to be uploaded to the gcs
             gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
             payload = {}
-
             url += "&gcs_path=" + gcs_path
 
             response = self.client.make_request(
@@ -301,38 +309,34 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             # read job_id from the response
             job_id = response_data["response"]["job_id"]
             self.client_id = client_id
-            self.job_id = job_id
-            self.project_id = project_id
 
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
             # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
-            future = self.preannotation_job_status_async(retry_interval=5)
+            future = self.preannotation_job_status_async(project_id, job_id)
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise
 
     def upload_preannotation_by_project_id_async(
-        self, project_id, client_id, annotation_format, annotation_file
+        self, annotation_format, annotation_file, conf_bucket=None
     ):
         """
         Asynchronously uploads preannotation data to a project.
 
-        :param project_id: The ID of the project.
-        :param client_id: The ID of the client.
         :param annotation_format: The format of the preannotation data.
         :param annotation_file: The file path of the preannotation data.
+        :param conf_bucket: Confidence bucket [low, medium, high]
         :return: A Future object that will contain the response from the API.
         :raises LabellerrError: If the upload fails.
+
         """
 
         def upload_and_monitor():
             try:
                 # validate all the parameters
                 required_params = [
-                    "project_id",
-                    "client_id",
                     "annotation_format",
                     "annotation_file",
                 ]
@@ -348,9 +352,15 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 request_uuid = str(uuid.uuid4())
                 url = (
                     f"{constants.BASE_URL}/actions/upload_answers?"
-                    f"project_id={project_id}&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
+                    f"project_id={self.project_id}&answer_format={annotation_format}&client_id={self.client.client_id}&uuid={request_uuid}"
                 )
-
+                if conf_bucket:
+                    assert conf_bucket in [
+                        "low",
+                        "medium",
+                        "high",
+                    ], "Invalid confidence bucket value. Must be one of [low, medium, high]"
+                    url += f"&conf_bucket={conf_bucket}"
                 # validate if the file exist then extract file name from the path
                 if os.path.exists(annotation_file):
                     file_name = os.path.basename(annotation_file)
@@ -365,32 +375,20 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                             "For coco_json annotation format, the file must have a .json extension"
                         )
                 # get the direct upload url
-                gcs_path = f"{project_id}/{annotation_format}-{file_name}"
+                gcs_path = f"{self.project_id}/{annotation_format}-{file_name}"
                 logging.info("Uploading your file to Labellerr. Please wait...")
-                direct_upload_url = self.client.get_direct_upload_url(
-                    gcs_path, client_id
+                direct_upload_url = self.get_direct_upload_url(
+                    gcs_path, self.client.client_id
                 )
                 # Now let's wait for the file to be uploaded to the gcs
                 gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
                 payload = {}
-                # with open(annotation_file, 'rb') as f:
-                #     files = [
-                #         ('file', (file_name, f, 'application/octet-stream'))
-                #     ]
-                #     response = requests.request("POST", url, headers={
-                #         'client_id': client_id,
-                #         'api_key': self.api_key,
-                #         'api_secret': self.api_secret,
-                #         'origin': constants.ALLOWED_ORIGINS,
-                #         'source':'sdk',
-                #         'email_id': self.api_key
-                #     }, data=payload, files=files)
                 url += "&gcs_path=" + gcs_path
 
                 response = self.client.make_request(
                     "POST",
                     url,
-                    client_id=client_id,
+                    client_id=self.client.client_id,
                     extra_headers={"email_id": self.client.api_key},
                     request_id=request_uuid,
                     handle_response=False,
@@ -402,37 +400,43 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
                 # read job_id from the response
                 job_id = response_data["response"]["job_id"]
-                self.client_id = client_id
-                self.job_id = job_id
-                self.project_id = project_id
 
                 logging.info(f"Pre annotation upload successful. Job ID: {job_id}")
 
                 # Now monitor the status
-                status_url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
-                while True:
-                    try:
-                        status_data = self.client.make_request(
-                            "GET",
-                            status_url,
-                            client_id=self.client_id,
-                            extra_headers={"Origin": constants.ALLOWED_ORIGINS},
-                        )
+                status_url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={job_id}&client_id={self.client.client_id}"
 
-                        logging.debug(f"Status data: {status_data}")
+                def check_job_status():
+                    status_data = self.client.make_request(
+                        "GET",
+                        status_url,
+                        client_id=self.client.client_id,
+                        extra_headers={"Origin": constants.ALLOWED_ORIGINS},
+                    )
+                    logging.debug(f"Status data: {status_data}")
+                    return status_data
 
-                        # Check if job is completed
-                        if status_data.get("response", {}).get("status") == "completed":
-                            return status_data
+                def is_job_completed(status_data):
+                    return status_data.get("response", {}).get("status") == "completed"
 
-                        logging.info("Syncing status after 5 seconds . . .")
-                        time.sleep(5)
+                def on_success(status_data):
+                    logging.info("Pre-annotation job completed.")
 
-                    except Exception as e:
-                        logging.error(
-                            f"Failed to get preannotation job status: {str(e)}"
-                        )
-                        raise
+                def on_exception(e):
+                    logging.error(f"Failed to get preannotation job status: {str(e)}")
+                    raise LabellerrError(
+                        f"Failed to get preannotation job status: {str(e)}"
+                    )
+
+                result = poll(
+                    function=check_job_status,
+                    condition=is_job_completed,
+                    interval=5.0,
+                    on_success=on_success,
+                    on_exception=on_exception,
+                )
+
+                return result
 
             except Exception as e:
                 logging.exception(f"Failed to upload preannotation: {str(e)}")
@@ -441,11 +445,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(upload_and_monitor)
 
-    def preannotation_job_status_async(self, retry_interval=5):
+    def preannotation_job_status_async(self, project_id, job_id):
         """
         Get the status of a preannotation job asynchronously with timeout protection.
 
         Args:
+            project_id: The project ID
+            job_id: The job ID to check status for
             max_retries: Maximum number of retries before timing out (default: 60 retries = 5 minutes)
             retry_interval: Seconds to wait between retries (default: 5 seconds)
 
@@ -457,71 +463,65 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
 
         def check_status():
-            url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={self.job_id}&client_id={self.client_id}"
-            retry_count = 0
+            url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={project_id}&job_id={job_id}&client_id={self.client.client_id}"
 
-            while retry_count < max_retries:
-                try:
-                    response_data = self.client.make_request(
-                        "GET",
-                        url,
-                        client_id=self.client_id,
-                        extra_headers={"Origin": constants.ALLOWED_ORIGINS},
-                    )
+            def get_job_status():
+                response_data = self.client.make_request(
+                    "GET",
+                    url,
+                    client_id=self.client.client_id,
+                    extra_headers={"Origin": constants.ALLOWED_ORIGINS},
+                )
 
-                    # Check if job is completed
-                    if response_data.get("response", {}).get("status") == "completed":
-                        logging.info(
-                            f"Pre-annotation job completed after {retry_count} retries"
-                        )
-                        return response_data
+                # Log current status for visibility
+                current_status = response_data.get("response", {}).get(
+                    "status", "unknown"
+                )
+                logging.info(f"Pre-annotation job status: {current_status}")
 
-                    retry_count += 1
-                    if retry_count < max_retries:
-                        logging.info(
-                            f"Retry {retry_count}/{max_retries}: Job not complete, retrying after {retry_interval} seconds..."
-                        )
-                        time.sleep(retry_interval)
-                    else:
-                        # Max retries exceeded
-                        total_wait_time = max_retries * retry_interval
-                        raise LabellerrError(
-                            f"Pre-annotation job did not complete after {max_retries} retries "
-                            f"({total_wait_time} seconds). Job ID: {self.job_id}. "
-                            f"Last status: {response_data.get('response', {}).get('status', 'unknown')}"
-                        )
+                # Check if job failed and raise error immediately
+                if current_status == "failed":
+                    raise LabellerrError("Internal server error: ", response_data)
 
-                except LabellerrError:
-                    # Re-raise LabellerrError without wrapping
-                    raise
-                except Exception as e:
-                    logging.error(f"Failed to get preannotation job status: {str(e)}")
-                    raise LabellerrError(
-                        f"Failed to get preannotation job status: {str(e)}"
-                    )
-            return None
+                return response_data
+
+            def is_job_completed(response_data):
+                return response_data.get("response", {}).get("status") == "completed"
+
+            def on_success(response_data):
+                logging.info("Pre-annotation job completed successfully!")
+
+            def on_exception(e):
+                logging.exception(f"Failed to get preannotation job status: {str(e)}")
+                raise LabellerrError(
+                    f"Failed to get preannotation job status: {str(e)}"
+                )
+
+            return poll(
+                function=get_job_status,
+                condition=is_job_completed,
+                on_success=on_success,
+                on_exception=on_exception,
+            )
 
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(check_status)
 
-    def upload_preannotation_by_project_id(
-        self, project_id, client_id, annotation_format, annotation_file
+    def upload_preannotations(
+        self, annotation_format, annotation_file, conf_bucket=None
     ):
         """
         Uploads preannotation data to a project.
 
-        :param project_id: The ID of the project.
-        :param client_id: The ID of the client.
         :param annotation_format: The format of the preannotation data.
         :param annotation_file: The file path of the preannotation data.
+        :param conf_bucket: Confidence bucket [low, medium, high]
         :return: The response from the API.
         :raises LabellerrError: If the upload fails.
         """
         try:
             # validate all the parameters
             required_params = [
-                "project_id",
-                "client_id",
                 "annotation_format",
                 "annotation_file",
             ]
@@ -535,11 +535,14 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 )
 
             request_uuid = str(uuid.uuid4())
-            url = (
-                f"{constants.BASE_URL}/actions/upload_answers?project_id={project_id}"
-                f"&answer_format={annotation_format}&client_id={client_id}&uuid={request_uuid}"
-            )
-
+            url = f"{constants.BASE_URL}/actions/upload_answers?project_id={self.project_id}&answer_format={annotation_format}&client_id={self.client.client_id}&uuid={request_uuid}"
+            if conf_bucket:
+                assert conf_bucket in [
+                    "low",
+                    "medium",
+                    "high",
+                ], "Invalid confidence bucket value. Must be one of [low, medium, high]"
+                url += f"&conf_bucket={conf_bucket}"
             # validate if the file exist then extract file name from the path
             if os.path.exists(annotation_file):
                 file_name = os.path.basename(annotation_file)
@@ -552,7 +555,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 response = self.client.make_request(
                     "POST",
                     url,
-                    client_id=client_id,
+                    client_id=self.client.client_id,
                     extra_headers={"email_id": self.client.api_key},
                     request_id=request_uuid,
                     handle_response=False,
@@ -560,19 +563,14 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                     files=files,
                 )
             response_data = self.client.handle_upload_response(response, request_uuid)
-            logging.debug(f"response_data: {response_data}")
 
+            # read job_id from the response
             job_id = response_data["response"]["job_id"]
-            # self.client_id = client_id
-            # self.job_id = job_id
-            self.project_id = project_id
 
-            logging.info(f"Preannotation upload successful. Job ID: {job_id}")
+            logging.info(f"Preannotation job started successfully. Job ID: {job_id}")
 
             # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
-            future = self.preannotation_job_status_async(
-                max_retries=10, retry_interval=5
-            )
+            future = self.preannotation_job_status_async(self.project_id, job_id)
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")

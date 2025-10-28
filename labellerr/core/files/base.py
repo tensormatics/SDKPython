@@ -53,17 +53,11 @@ class LabellerrFileMeta(ABCMeta):
 
             # TODO: Add dataset_id to params based on precedence logic
             # Priority: project_id > dataset_id
-            print(params)
             url = f"{constants.BASE_URL}/data/file_data"
             response = client.make_request(
                 "GET", url, client_id=client_id, request_id=unique_id, params=params
             )
-
-            # Extract data_type from response
-            file_metadata = response.get("file_metadata", {})
             data_type = response.get("data_type", "").lower()
-
-            # print(f"Detected file type: {data_type}")
 
             file_class = cls._registry.get(data_type)
             if file_class is None:
@@ -74,7 +68,7 @@ class LabellerrFileMeta(ABCMeta):
                 file_id,
                 project_id,
                 dataset_id=dataset_id,
-                file_metadata=file_metadata,
+                file_data=response,
             )
 
         except Exception as e:
@@ -103,9 +97,6 @@ class LabellerrFile(metaclass=LabellerrFileMeta):
         """
         self.client = client
         self.file_data = kwargs.get("file_data", {})
-
-        # Store metadata from factory creation
-        self.metadata = kwargs.get("file_metadata", {})
 
     @property
     def file_id(self):

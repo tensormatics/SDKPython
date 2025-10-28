@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from labellerr import LabellerrError
 from labellerr.client import LabellerrClient
+from labellerr.core.projects import LabellerrProject
 
 dotenv.load_dotenv()
 
@@ -1019,13 +1020,14 @@ class LabelerIntegrationTests(unittest.TestCase):
         # ========== SINGLE DATASET OPERATIONS ==========
         print("\n=== Testing Single Dataset Operations ===")
 
+        # Create project instance for testing
+        project = LabellerrProject(self.client, self.test_project_id)
+
         # Step 1: Detach single dataset first to get to a known state
         print(f"Step 1: Detaching single dataset {self.test_dataset_id}...")
         try:
-            single_detach_result = self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id=self.test_dataset_id,
+            single_detach_result = project.detach_dataset_from_project(
+                dataset_id=self.test_dataset_id
             )
             self.assertIsInstance(single_detach_result, dict)
             self.assertIn("response", single_detach_result)
@@ -1039,10 +1041,8 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 2: Attach single dataset
         print("Step 2: Attaching single dataset...")
         try:
-            single_attach_result = self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id=self.test_dataset_id,
+            single_attach_result = project.attach_dataset_to_project(
+                dataset_id=self.test_dataset_id
             )
             self.assertIsInstance(single_attach_result, dict)
             self.assertIn("response", single_attach_result)
@@ -1064,10 +1064,8 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 3: Detach batch datasets first to get to a known state
         print(f"Step 3: Detaching batch datasets {test_dataset_ids}...")
         try:
-            batch_detach_result = self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_ids=test_dataset_ids,
+            batch_detach_result = project.detach_dataset_from_project(
+                dataset_ids=test_dataset_ids
             )
             self.assertIsInstance(batch_detach_result, dict)
             self.assertIn("response", batch_detach_result)
@@ -1078,10 +1076,8 @@ class LabelerIntegrationTests(unittest.TestCase):
         # Step 4: Attach batch datasets
         print("Step 4: Attaching batch datasets...")
         try:
-            batch_attach_result = self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_ids=test_dataset_ids,
+            batch_attach_result = project.attach_dataset_to_project(
+                dataset_ids=test_dataset_ids
             )
             self.assertIsInstance(batch_attach_result, dict)
             self.assertIn("response", batch_attach_result)
@@ -1103,21 +1099,16 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_invalid_project_id(self):
         """Test dataset attachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id="invalid-project-id",
-                dataset_id=self.test_dataset_id,
-            )
+            # This should fail when trying to create the project instance
+            invalid_project = LabellerrProject(self.client, "invalid-project-id")
+            invalid_project.attach_dataset_to_project(dataset_id=self.test_dataset_id)
         # Just verify that an error is raised - the exact error message is API-dependent
 
     def test_attach_dataset_invalid_dataset_id(self):
         """Test dataset attachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id="invalid-dataset-id",
-            )
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.attach_dataset_to_project(dataset_id="invalid-dataset-id")
 
         # The error message should contain UUID validation error
         error_msg = str(context.exception)
@@ -1129,12 +1120,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_attach_dataset_missing_client_id(self):
         """Test dataset attachment with missing client_id"""
+        # Create client with empty client_id to test validation
+        from labellerr.client import LabellerrClient
+
+        empty_client = LabellerrClient(self.api_key, self.api_secret, "")
+
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.attach_dataset_to_project(
-                client_id="",
-                project_id=self.test_project_id,
-                dataset_id=self.test_dataset_id,
-            )
+            project = LabellerrProject(empty_client, self.test_project_id)
+            project.attach_dataset_to_project(dataset_id=self.test_dataset_id)
 
         error_msg = str(context.exception)
         self.assertTrue(
@@ -1144,41 +1137,37 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_attach_dataset_nonexistent_project(self):
         """Test dataset attachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id="00000000-0000-0000-0000-000000000000",
-                dataset_id=self.test_dataset_id,
+            # This should fail when trying to create the project instance
+            nonexistent_project = LabellerrProject(
+                self.client, "00000000-0000-0000-0000-000000000000"
+            )
+            nonexistent_project.attach_dataset_to_project(
+                dataset_id=self.test_dataset_id
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
     def test_attach_dataset_nonexistent_dataset(self):
         """Test dataset attachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id="00000000-0000-0000-0000-000000000000",
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.attach_dataset_to_project(
+                dataset_id="00000000-0000-0000-0000-000000000000"
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
     def test_detach_dataset_invalid_project_id(self):
         """Test dataset detachment with invalid project_id format"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id="invalid-project-id",
-                dataset_id=self.test_dataset_id,
-            )
+            # This should fail when trying to create the project instance
+            invalid_project = LabellerrProject(self.client, "invalid-project-id")
+            invalid_project.detach_dataset_from_project(dataset_id=self.test_dataset_id)
         # Just verify that an error is raised - the exact error message is API-dependent
 
     def test_detach_dataset_invalid_dataset_id(self):
         """Test dataset detachment with invalid dataset_id format"""
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id="invalid-dataset-id",
-            )
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.detach_dataset_from_project(dataset_id="invalid-dataset-id")
 
         # The error message should contain UUID validation error
         error_msg = str(context.exception)
@@ -1190,12 +1179,14 @@ class LabelerIntegrationTests(unittest.TestCase):
 
     def test_detach_dataset_missing_client_id(self):
         """Test dataset detachment with missing client_id"""
+        # Create client with empty client_id to test validation
+        from labellerr.client import LabellerrClient
+
+        empty_client = LabellerrClient(self.api_key, self.api_secret, "")
+
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.detach_dataset_from_project(
-                client_id="",
-                project_id=self.test_project_id,
-                dataset_id=self.test_dataset_id,
-            )
+            project = LabellerrProject(empty_client, self.test_project_id)
+            project.detach_dataset_from_project(dataset_id=self.test_dataset_id)
 
         error_msg = str(context.exception)
         self.assertTrue(
@@ -1205,20 +1196,21 @@ class LabelerIntegrationTests(unittest.TestCase):
     def test_detach_dataset_nonexistent_project(self):
         """Test dataset detachment with non-existent project_id"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id="00000000-0000-0000-0000-000000000000",
-                dataset_id=self.test_dataset_id,
+            # This should fail when trying to create the project instance
+            nonexistent_project = LabellerrProject(
+                self.client, "00000000-0000-0000-0000-000000000000"
+            )
+            nonexistent_project.detach_dataset_from_project(
+                dataset_id=self.test_dataset_id
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
     def test_detach_dataset_nonexistent_dataset(self):
         """Test dataset detachment with non-existent dataset_id"""
         with self.assertRaises(LabellerrError):
-            self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_id="00000000-0000-0000-0000-000000000000",
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.detach_dataset_from_project(
+                dataset_id="00000000-0000-0000-0000-000000000000"
             )
         # Just verify that an error is raised - the exact error message is API-dependent
 
@@ -1228,11 +1220,8 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.attach_dataset_to_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_ids=test_dataset_ids,
-            )
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.attach_dataset_to_project(dataset_ids=test_dataset_ids)
 
         error_msg = str(context.exception)
         self.assertTrue(
@@ -1247,11 +1236,8 @@ class LabelerIntegrationTests(unittest.TestCase):
         test_dataset_ids = [self.test_dataset_id, "invalid-id"]
 
         with self.assertRaises(ValidationError) as context:
-            self.client.datasets.detach_dataset_from_project(
-                client_id=self.client_id,
-                project_id=self.test_project_id,
-                dataset_ids=test_dataset_ids,
-            )
+            project = LabellerrProject(self.client, self.test_project_id)
+            project.detach_dataset_from_project(dataset_ids=test_dataset_ids)
 
         error_msg = str(context.exception)
         self.assertTrue(

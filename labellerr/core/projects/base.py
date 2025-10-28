@@ -86,14 +86,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
     def attached_datasets(self):
         return self.project_data.get("attached_datasets")
 
-    def detach_dataset_from_project(
-        self, client_id, project_id, dataset_id=None, dataset_ids=None
-    ):
+    def detach_dataset_from_project(self, dataset_id=None, dataset_ids=None):
         """
         Detaches one or more datasets from an existing project.
 
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
         :param dataset_id: The ID of a single dataset to detach (for backward compatibility)
         :param dataset_ids: List of dataset IDs to detach (for batch operations)
         :return: Dictionary containing detachment status
@@ -116,24 +112,28 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         validated_dataset_ids = []
         for ds_id in dataset_ids:
             params = schemas.DetachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=ds_id
+                client_id=self.client.client_id,
+                project_id=self.project_id,
+                dataset_id=ds_id,
             )
             validated_dataset_ids.append(str(params.dataset_id))
 
         # Use the first params validation for client_id and project_id
         params = schemas.DetachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
+            client_id=self.client.client_id,
+            project_id=self.project_id,
+            dataset_id=dataset_ids[0],
         )
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/actions/jobs/delete_datasets_from_project?project_id={params.project_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/actions/jobs/delete_datasets_from_project?project_id={self.project_id}&uuid={unique_id}"
 
         payload = json.dumps({"attached_datasets": validated_dataset_ids})
 
         return self.client.make_request(
             "POST",
             url,
-            client_id=params.client_id,
+            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -221,22 +221,23 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.error(f"Project rotation update config failed: {e}")
             raise
 
-    def get_all_project_per_client_id(self, client_id):
+    @staticmethod
+    def list_all_projects(client: "LabellerrClient"):
         """
         Retrieves a list of projects associated with a client ID.
 
-        :param client_id: The ID of the client.
+        :param client: The client instance.
         :return: A dictionary containing the list of projects.
         :raises LabellerrError: If the retrieval fails.
         """
         try:
             unique_id = str(uuid.uuid4())
-            url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client_id}&uuid={unique_id}"
+            url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client.client_id}&uuid={unique_id}"
 
-            return self.client.make_request(
+            return client.make_request(
                 "GET",
                 url,
-                client_id=client_id,
+                client_id=client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
             )
@@ -283,18 +284,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             # Now let's wait for the file to be uploaded to the gcs
             gcs.upload_to_gcs_direct(direct_upload_url, annotation_file)
             payload = {}
-            # with open(annotation_file, 'rb') as f:
-            #     files = [
-            #         ('file', (file_name, f, 'application/octet-stream'))
-            #     ]
-            #     response = requests.request("POST", url, headers={
-            #         'client_id': client_id,
-            #         'api_key': self.api_key,
-            #         'api_secret': self.api_secret,
-            #         'origin': constants.ALLOWED_ORIGINS,
-            #         'source':'sdk',
-            #         'email_id': self.api_key
-            #     }, data=payload, files=files)
+
             url += "&gcs_path=" + gcs_path
 
             response = self.client.make_request(
@@ -317,9 +307,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.info(f"Preannotation upload successful. Job ID: {job_id}")
 
             # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
-            future = self.preannotation_job_status_async(
-                max_retries=10, retry_interval=5
-            )
+            future = self.preannotation_job_status_async(retry_interval=5)
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
@@ -453,7 +441,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(upload_and_monitor)
 
-    def preannotation_job_status_async(self, max_retries=60, retry_interval=5):
+    def preannotation_job_status_async(self, retry_interval=5):
         """
         Get the status of a preannotation job asynchronously with timeout protection.
 

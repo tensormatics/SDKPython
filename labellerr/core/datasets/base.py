@@ -204,3 +204,41 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             request_id=unique_id,
             data=payload,
         )
+
+    def enable_multimodal_indexing(self, is_multimodal=True):
+        """
+        Enables or disables multimodal indexing for an existing dataset.
+
+        :param is_multimodal: Boolean flag to enable (True) or disable (False) multimodal indexing
+        :return: Dictionary containing indexing status
+        :raises LabellerrError: If the operation fails
+        """
+        assert is_multimodal is True, "Disabling multimodal indexing is not supported"
+        # Validate parameters using Pydantic
+        params = schemas.EnableMultimodalIndexingParams(
+            client_id=self.client.client_id,
+            dataset_id=self.dataset_id,
+            is_multimodal=is_multimodal,
+        )
+
+        unique_id = str(uuid.uuid4())
+        url = (
+            f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
+        )
+
+        payload = json.dumps(
+            {
+                "dataset_id": str(params.dataset_id),
+                "client_id": params.client_id,
+                "is_multimodal": params.is_multimodal,
+            }
+        )
+
+        return self.client.make_request(
+            "POST",
+            url,
+            client_id=params.client_id,
+            extra_headers={"content-type": "application/json"},
+            request_id=unique_id,
+            data=payload,
+        )

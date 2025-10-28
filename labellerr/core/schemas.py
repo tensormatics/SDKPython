@@ -196,7 +196,7 @@ class AttachDatasetParams(BaseModel):
 
     client_id: str = Field(min_length=1)
     project_id: str = Field(min_length=1)  # Accept both UUID and string formats
-    dataset_id: UUID
+    dataset_id: str
 
 
 class DetachDatasetParams(BaseModel):
@@ -204,7 +204,7 @@ class DetachDatasetParams(BaseModel):
 
     client_id: str = Field(min_length=1)
     project_id: str = Field(min_length=1)  # Accept both UUID and string formats
-    dataset_id: UUID
+    dataset_id: str
 
 
 class GetAllDatasetParams(BaseModel):

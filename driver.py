@@ -84,4 +84,10 @@ client = LabellerrClient(
 
 # project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
 # print(project.attached_datasets)
-# print(project.attach_dataset_to_project(dataset_id="137a7b2f-942f-478d-a135-94ad2e11fcca"))
+# print(project.attach_dataset_to_project(dataset_id="137a7b2f-942f-478d"))
+
+# dataset = LabellerrDataset(client=client, dataset_id="1db5342a-8d43-4f16-9765-3f09dd3f245c")
+# print(dataset.enable_multimodal_indexing(is_multimodal=False))
+
+# file = LabellerrFile(client=client, dataset_id='137a7b2f-942f-478d-a135-94ad2e11fcca', file_id="8fb00e0d-456c-49c7-94e2-cca50b4acee7")
+# print(file.file_data)

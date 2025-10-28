@@ -455,65 +455,6 @@ class LabellerrClient:
             "POST", delete_url, headers=headers, data=payload, request_id=request_uuid
         )
 
-    def get_dataset(self, workspace_id, dataset_id):
-        """
-        Retrieves a dataset from the Labellerr API.
-
-        :param workspace_id: The ID of the workspace.
-        :param dataset_id: The ID of the dataset.
-        :return: The dataset as JSON.
-        """
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{dataset_id}?client_id={workspace_id}&uuid={unique_id}"
-
-        return self.make_request(
-            "GET",
-            url,
-            client_id=workspace_id,
-            extra_headers={"Origin": constants.ALLOWED_ORIGINS},
-            request_id=unique_id,
-        )
-
-    def enable_multimodal_indexing(self, client_id, dataset_id, is_multimodal=True):
-        """
-        Enables or disables multimodal indexing for an existing dataset.
-
-        :param client_id: The ID of the client
-        :param dataset_id: The ID of the dataset
-        :param is_multimodal: Boolean flag to enable (True) or disable (False) multimodal indexing
-        :return: Dictionary containing indexing status
-        :raises LabellerrError: If the operation fails
-        """
-        # Validate parameters using Pydantic
-        params = schemas.EnableMultimodalIndexingParams(
-            client_id=client_id,
-            dataset_id=dataset_id,
-            is_multimodal=is_multimodal,
-        )
-
-        unique_id = str(uuid.uuid4())
-        url = (
-            f"{constants.BASE_URL}/search/multimodal_index?client_id={params.client_id}"
-        )
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        payload = json.dumps(
-            {
-                "dataset_id": str(params.dataset_id),
-                "client_id": params.client_id,
-                "is_multimodal": params.is_multimodal,
-            }
-        )
-
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
-        )
-
     def get_multimodal_indexing_status(self, client_id, dataset_id):
         """
         Retrieves the current multimodal indexing status for a dataset.

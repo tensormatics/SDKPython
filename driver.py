@@ -35,24 +35,24 @@ client = LabellerrClient(
     client_id=CLIENT_ID,
 )
 
-if os.getenv("CREATE_DATASET", "").lower() == "true":
-    from labellerr import schemas
-    from labellerr.core.datasets import create_dataset
+# if os.getenv("CREATE_DATASET", "").lower() == "true":
+#     from labellerr import schemas
+#     from labellerr.core.datasets import create_dataset
 
-    folder_to_upload = os.getenv("FOLDER_TO_UPLOAD", "images")
-    dataset_name = os.getenv("DATASET_NAME", "Dataset new Ximi")
+#     folder_to_upload = os.getenv("FOLDER_TO_UPLOAD", "images")
+#     dataset_name = os.getenv("DATASET_NAME", "Dataset new Ximi")
 
-    print(f"\n=== Creating Dataset: {dataset_name} ===")
-    response = create_dataset(
-        client=client,
-        dataset_config=schemas.DatasetConfig(
-            client_id=CLIENT_ID,
-            dataset_name=dataset_name,
-            data_type="image",
-        ),
-        folder_to_upload=folder_to_upload,
-    )
-    print(f"Dataset created: {response.dataset_data}")
+#     print(f"\n=== Creating Dataset: {dataset_name} ===")
+#     response = create_dataset(
+#         client=client,
+#         dataset_config=schemas.DatasetConfig(
+#             client_id=CLIENT_ID,
+#             dataset_name=dataset_name,
+#             data_type="image",
+#         ),
+#         folder_to_upload=folder_to_upload,
+#     )
+#     print(f"Dataset created: {response.dataset_data}")
 
 DATASET_ID = os.getenv("DATASET_ID")
 if DATASET_ID:
@@ -60,33 +60,25 @@ if DATASET_ID:
     dataset = LabellerrDataset(client=client, dataset_id=DATASET_ID)
     print(f"Dataset loaded: {dataset.data_type}")
 
-if os.getenv("CREATE_PROJECT", "").lower() == "true":
-    project_name = os.getenv("PROJECT_NAME", "Project new Ximi")
-    folder_to_upload = os.getenv("PROJECT_FOLDER_TO_UPLOAD", "images_single")
-    annotation_template_id = os.getenv("ANNOTATION_TEMPLATE_ID")
-
-    if not annotation_template_id:
-        raise ValueError("ANNOTATION_TEMPLATE_ID must be set when CREATE_PROJECT=true")
-
-    print(f"\n=== Creating Project: {project_name} ===")
-    project = create_project(
-        client=client,
-        payload={
-            "project_name": project_name,
-            "data_type": "image",
-            "folder_to_upload": folder_to_upload,
-            "annotation_template_id": annotation_template_id,
-            "rotations": {
-                "annotation_rotation_count": 1,
-                "review_rotation_count": 1,
-                "client_review_rotation_count": 1,
-            },
-            "use_ai": False,
-            "created_by": os.getenv("CREATED_BY", "dev@labellerr.com"),
-            "autolabel": False,
-        },
-    )
-    print(f"Project created: {project.project_data}")
+# if os.getenv("CREATE_PROJECT", "").lower() == "true":
+#     project = create_project(
+#         client=client,
+#         payload={
+#             "project_name": project_name,
+#             "data_type": "image",
+#             "folder_to_upload": folder_to_upload,
+#             "annotation_template_id": annotation_template_id,
+#             "rotations": {
+#                 "annotation_rotation_count": 1,
+#                 "review_rotation_count": 1,
+#                 "client_review_rotation_count": 1,
+#             },
+#             "use_ai": False,
+#             "created_by": os.getenv("CREATED_BY", "dev@labellerr.com"),
+#             "autolabel": False,
+#         },
+#     )
+#     print(f"Project created: {project.project_data}")
 
 if os.getenv("SYNC_AWS", "").lower() == "true":
     aws_connection_id = os.getenv("AWS_CONNECTION_ID")
@@ -108,9 +100,7 @@ if os.getenv("SYNC_AWS", "").lower() == "true":
     print(f"\n=== Syncing Dataset from AWS S3: {aws_s3_path} ===")
     dataset = LabellerrDataset(client=client, dataset_id=aws_dataset_id)
     response = dataset.sync_datasets(
-        client_id=CLIENT_ID,
         project_id=aws_project_id,
-        dataset_id=aws_dataset_id,
         path=aws_s3_path,
         data_type=aws_data_type,
         email_id=aws_email,
@@ -138,9 +128,7 @@ if os.getenv("SYNC_GCS", "").lower() == "true":
     print(f"\n=== Syncing Dataset from GCS: {gcs_path} ===")
     dataset = LabellerrDataset(client=client, dataset_id=gcs_dataset_id)
     response = dataset.sync_datasets(
-        client_id=CLIENT_ID,
         project_id=gcs_project_id,
-        dataset_id=gcs_dataset_id,
         path=gcs_path,
         data_type=gcs_data_type,
         email_id=gcs_email,

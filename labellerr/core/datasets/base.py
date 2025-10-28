@@ -134,7 +134,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     def sync_datasets(
         self,
         project_id,
-        dataset_id,
         path,
         data_type,
         email_id,
@@ -144,7 +143,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         Syncs datasets with the backend.
 
         :param project_id: The ID of the project
-        :param dataset_id: The ID of the dataset to sync
         :param path: The path to sync
         :param data_type: Type of data (image, video, audio, document, text)
         :param email_id: Email ID of the user
@@ -160,7 +158,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             {
                 "client_id": self.client.client_id,
                 "project_id": project_id,
-                "dataset_id": dataset_id,
+                "dataset_id": self.dataset_id,
                 "path": path,
                 "data_type": data_type,
                 "email_id": email_id,

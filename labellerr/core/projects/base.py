@@ -319,7 +319,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise
 
-    def upload_preannotation_by_project_id_async(
+    def upload_preannotation_async(
         self, annotation_format, annotation_file, conf_bucket=None
     ):
         """
@@ -445,12 +445,11 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         with concurrent.futures.ThreadPoolExecutor() as executor:
             return executor.submit(upload_and_monitor)
 
-    def preannotation_job_status_async(self, project_id, job_id):
+    def preannotation_job_status_async(self, job_id):
         """
         Get the status of a preannotation job asynchronously with timeout protection.
 
         Args:
-            project_id: The project ID
             job_id: The job ID to check status for
             max_retries: Maximum number of retries before timing out (default: 60 retries = 5 minutes)
             retry_interval: Seconds to wait between retries (default: 5 seconds)
@@ -463,7 +462,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
 
         def check_status():
-            url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={project_id}&job_id={job_id}&client_id={self.client.client_id}"
+            url = f"{constants.BASE_URL}/actions/upload_answers_status?project_id={self.project_id}&job_id={job_id}&client_id={self.client.client_id}"
 
             def get_job_status():
                 response_data = self.client.make_request(
@@ -570,13 +569,13 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.info(f"Preannotation job started successfully. Job ID: {job_id}")
 
             # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
-            future = self.preannotation_job_status_async(self.project_id, job_id)
+            future = self.preannotation_job_status_async(job_id)
             return future.result()
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise
 
-    def create_local_export(self, project_id, client_id, export_config):
+    def create_local_export(self, export_config):
         """
         Creates a local export with the given configuration.
 
@@ -588,8 +587,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         """
         # Validate parameters using Pydantic
         schemas.CreateLocalExportParams(
-            project_id=project_id,
-            client_id=client_id,
+            project_id=self.project_id,
+            client_id=self.client.client_id,
             export_config=export_config,
         )
         # Validate export config using client_utils
@@ -602,8 +601,8 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         return self.client.make_request(
             "POST",
-            f"{constants.BASE_URL}/sdk/export/files?project_id={project_id}&client_id={client_id}",
-            client_id=client_id,
+            f"{constants.BASE_URL}/sdk/export/files?project_id={self.project_id}&client_id={self.client.client_id}",
+            client_id=self.client.client_id,
             extra_headers={
                 "Origin": constants.ALLOWED_ORIGINS,
                 "Content-Type": "application/json",
@@ -612,26 +611,22 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             data=payload,
         )
 
-    @validate_params(project_id=str, report_ids=list, client_id=str)
-    def check_export_status(
-        self, project_id: str, report_ids: List[str], client_id: str
-    ):
+    @validate_params(report_ids=list)
+    def check_export_status(self, report_ids: List[str]):
         request_uuid = client_utils.generate_request_id()
         try:
-            if not project_id:
-                raise LabellerrError("project_id cannot be null")
             if not report_ids:
                 raise LabellerrError("report_ids cannot be empty")
 
             # Construct URL
-            url = f"{constants.BASE_URL}/exports/status?project_id={project_id}&uuid={request_uuid}&client_id={client_id}"
+            url = f"{constants.BASE_URL}/exports/status?project_id={self.project_id}&uuid={request_uuid}&client_id={self.client.client_id}"
 
             payload = json.dumps({"report_ids": report_ids})
 
             result = self.client.make_request(
                 "POST",
                 url,
-                client_id=client_id,
+                client_id=self.client.client_id,
                 extra_headers={"Content-Type": "application/json"},
                 request_id=request_uuid,
                 data=payload,
@@ -646,10 +641,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                     # Download URL if job completed
                     download_url = (  # noqa E999 todo check use of that
                         self.client.fetch_download_url(
-                            project_id=project_id,
+                            project_id=self.project_id,
                             uuid=request_uuid,
                             export_id=status_item["report_id"],
-                            client_id=client_id,
+                            client_id=self.client.client_id,
                         )
                     )
 
@@ -662,13 +657,11 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.error(f"Unexpected error checking export status: {str(e)}")
             raise
 
-    def list_file(
-        self, client_id, project_id, search_queries, size=10, next_search_after=None
-    ):
+    def list_files(self, search_queries, size=10, next_search_after=None):
         # Validate parameters using Pydantic
         params = schemas.ListFileParams(
-            client_id=client_id,
-            project_id=project_id,
+            client_id=self.client.client_id,
+            project_id=self.project_id,
             search_queries=search_queries,
             size=size,
             next_search_after=next_search_after,
@@ -694,24 +687,25 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             data=payload,
         )
 
-    def bulk_assign_files(self, client_id, project_id, file_ids, new_status):
+    def bulk_assign_files(self, file_ids, new_status, assign_to=None):
         # Validate parameters using Pydantic
         params = schemas.BulkAssignFilesParams(
-            client_id=client_id,
-            project_id=project_id,
+            client_id=self.client.client_id,
+            project_id=self.project_id,
             file_ids=file_ids,
             new_status=new_status,
+            assign_to=assign_to,
         )
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/actions/files/bulk_assign?project_id={params.project_id}&uuid={unique_id}&client_id={params.client_id}"
 
-        payload = json.dumps(
-            {
-                "file_ids": params.file_ids,
-                "new_status": params.new_status,
-            }
-        )
+        payload = {
+            "file_ids": params.file_ids,
+            "new_status": params.new_status,
+        }
+        if assign_to:
+            payload["assign_to"] = assign_to
 
         return self.client.make_request(
             "POST",
@@ -719,5 +713,5 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             client_id=params.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
-            data=payload,
+            data=json.dumps(payload),
         )

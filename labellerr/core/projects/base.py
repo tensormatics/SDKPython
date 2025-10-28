@@ -640,7 +640,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 ):
                     # Download URL if job completed
                     download_url = (  # noqa E999 todo check use of that
-                        self.client.fetch_download_url(
+                        self.__fetch_exports_download_url(
                             project_id=self.project_id,
                             uuid=request_uuid,
                             export_id=status_item["report_id"],
@@ -715,3 +715,17 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             request_id=unique_id,
             data=json.dumps(payload),
         )
+
+    def __fetch_exports_download_url(self, project_id, uuid, export_id, client_id):
+        try:
+            url = f"{constants.BASE_URL}/exports/download?project_id={project_id}&uuid={uuid}&report_id={export_id}&client_id={client_id}"
+            response = self.client.make_request(
+                "GET",
+                url,
+                client_id=client_id,
+                extra_headers={"Content-Type": "application/json"},
+                request_id=uuid,
+            )
+            return response.get("response")
+        except Exception as e:
+            raise LabellerrError(f"Failed to download export: {str(e)}")

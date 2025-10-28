@@ -15,7 +15,7 @@ class VideoProject(LabellerrProject):
     """
 
     @validate_params(file_id=str, keyframes=list)
-    def add_keyframes(
+    def add_or_update_keyframes(
         self,
         file_id: str,
         keyframes: List[KeyFrame],

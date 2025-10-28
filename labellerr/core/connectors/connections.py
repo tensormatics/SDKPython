@@ -91,13 +91,11 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
 
     def list_connections(
         self,
-        client_id: str,
         connection_type: str,
         connector: str = None,
     ) -> list:
         """
         List connections for a client
-        :param client_id: The ID of the client
         :param connection_type: Type of connection (import/export)
         :param connector: Optional connector type filter (s3, gcs, etc.)
         :return: List of connections
@@ -105,7 +103,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
         request_uuid = str(uuid.uuid4())
         list_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/list"
-            f"?client_id={client_id}&uuid={request_uuid}&connection_type={connection_type}"
+            f"?client_id={self.client.client_id}&uuid={request_uuid}&connection_type={connection_type}"
         )
 
         if connector:
@@ -122,10 +120,9 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
             "GET", list_connection_url, headers=headers, request_id=request_uuid
         )
 
-    def delete_connection(self, client_id: str, connection_id: str):
+    def delete_connection(self, connection_id: str):
         """
         Deletes a connector connection by ID.
-        :param client_id: The ID of the client
         :param connection_id: The ID of the connection to delete
         :return: Parsed JSON response
         """
@@ -135,7 +132,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
 
         # Validate parameters using Pydantic
         params = schemas.DeleteConnectionParams(
-            client_id=client_id, connection_id=connection_id
+            client_id=self.client.client_id, connection_id=connection_id
         )
         request_uuid = str(uuid.uuid4())
         delete_url = (
@@ -146,7 +143,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
         headers = client_utils.build_headers(
             api_key=self.client.api_key,
             api_secret=self.client.api_secret,
-            client_id=params.client_id,
+            client_id=self.client.client_id,
             extra_headers={
                 "content-type": "application/json",
                 "email_id": self.client.api_key,

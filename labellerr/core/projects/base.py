@@ -139,14 +139,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             data=payload,
         )
 
-    def attach_dataset_to_project(
-        self, client_id, project_id, dataset_id=None, dataset_ids=None
-    ):
+    def attach_dataset_to_project(self, dataset_id=None, dataset_ids=None):
         """
         Attaches one or more datasets to an existing project.
 
-        :param client_id: The ID of the client
-        :param project_id: The ID of the project
         :param dataset_id: The ID of a single dataset to attach (for backward compatibility)
         :param dataset_ids: List of dataset IDs to attach (for batch operations)
         :return: Dictionary containing attachment status
@@ -169,13 +165,17 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         validated_dataset_ids = []
         for ds_id in dataset_ids:
             params = schemas.AttachDatasetParams(
-                client_id=client_id, project_id=project_id, dataset_id=ds_id
+                client_id=self.client.client_id,
+                project_id=self.project_id,
+                dataset_id=ds_id,
             )
             validated_dataset_ids.append(str(params.dataset_id))
 
         # Use the first params validation for client_id and project_id
         params = schemas.AttachDatasetParams(
-            client_id=client_id, project_id=project_id, dataset_id=dataset_ids[0]
+            client_id=self.client.client_id,
+            project_id=self.project_id,
+            dataset_id=dataset_ids[0],
         )
 
         unique_id = str(uuid.uuid4())

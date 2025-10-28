@@ -588,45 +588,6 @@ class LabellerrClient:
             logging.error(f"Unexpected error in download_function: {str(e)}")
             raise
 
-    def create_template(self, client_id, data_type, template_name, questions):
-        """
-        Creates an annotation template with the given configuration.
-
-        :param client_id: The ID of the client.
-        :param data_type: The type of data for the template (image, video, etc.).
-        :param template_name: The name of the template.
-        :param questions: List of questions/annotations for the template.
-        :return: The response from the API containing template details.
-        :raises LabellerrError: If the creation fails.
-        """
-        # Validate parameters using Pydantic
-        params = schemas.CreateTemplateParams(
-            client_id=client_id,
-            data_type=data_type,
-            template_name=template_name,
-            questions=questions,
-        )
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/annotations/create_template?client_id={params.client_id}&data_type={params.data_type}&uuid={unique_id}"
-
-        headers = client_utils.build_headers(
-            api_key=self.api_key,
-            api_secret=self.api_secret,
-            client_id=params.client_id,
-            extra_headers={"content-type": "application/json"},
-        )
-
-        payload = json.dumps(
-            {
-                "templateName": params.template_name,
-                "questions": [q.model_dump() for q in params.questions],
-            }
-        )
-
-        return client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
-        )
-
     @validate_params(client_id=str, project_id=str, file_id=str, key_frames=list)
     def link_key_frame(
         self, client_id: str, project_id: str, file_id: str, key_frames: List[KeyFrame]

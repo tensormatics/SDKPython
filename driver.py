@@ -81,3 +81,7 @@ client = LabellerrClient(
 # Bulk assign files to a new status
 # project = LabellerrProject()
 # project.bulk_assign_files(client_id=client.client_id, project_id=project.project_id, file_ids=file_ids, new_status="completed")
+
+# project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+# print(project.attached_datasets)
+# print(project.attach_dataset_to_project(dataset_id="137a7b2f-942f-478d-a135-94ad2e11fcca"))

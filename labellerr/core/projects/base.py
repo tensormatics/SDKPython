@@ -84,6 +84,35 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
     def attached_datasets(self):
         return self.project_data.get("attached_datasets")
 
+    def get_direct_upload_url(
+        self, file_name: str, client_id: str, purpose: str = "pre-annotations"
+    ) -> str:
+        """
+        Get a direct upload URL for uploading files to GCS.
+
+        :param file_name: Name of the file to upload
+        :param client_id: Client ID
+        :param purpose: Purpose of the upload (default: "pre-annotations")
+        :return: Direct upload URL
+        """
+        url = f"{constants.BASE_URL}/connectors/direct-upload-url"
+        params = {  # noqa: F841
+            "client_id": client_id,
+            "purpose": purpose,
+            "file_name": file_name,
+        }
+
+        try:
+            response_data = self.client.make_request(
+                "GET",
+                url,
+                extra_headers={"Origin": constants.ALLOWED_ORIGINS},
+            )
+            return response_data["response"]
+        except Exception as e:
+            logging.error(f"Error getting direct upload url: {e}")
+            raise LabellerrError(f"Failed to get direct upload URL: {str(e)}")
+
     def detach_dataset_from_project(self, dataset_id=None, dataset_ids=None):
         """
         Detaches one or more datasets from an existing project.
@@ -454,7 +483,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
                 response_data = self.client.make_request(
                     "GET",
                     url,
-                    client_id=self.client.client_id,
                     extra_headers={"Origin": constants.ALLOWED_ORIGINS},
                 )
 

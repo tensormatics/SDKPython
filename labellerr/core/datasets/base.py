@@ -194,7 +194,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "DELETE",
             url,
-            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
         )
@@ -237,7 +236,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,
@@ -267,7 +265,6 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.client.make_request(
             "POST",
             url,
-            client_id=self.client.client_id,
             extra_headers={"content-type": "application/json"},
             request_id=unique_id,
             data=payload,

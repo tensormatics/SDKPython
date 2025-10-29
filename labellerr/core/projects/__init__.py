@@ -109,11 +109,17 @@ def create_project(client: "LabellerrClient", payload: dict):
             logging.info("All datasets validated successfully")
         else:
             # Create new dataset (existing logic)
-            # Validate absence of dataset_name
+            # Set dataset_name and dataset_description
             if "dataset_name" not in payload:
                 dataset_name = payload.get("project_name")
                 dataset_description = (
                     f"Dataset for Project - {payload.get('project_name')}"
+                )
+            else:
+                dataset_name = payload.get("dataset_name")
+                dataset_description = payload.get(
+                    "dataset_description",
+                    f"Dataset for Project - {payload.get('project_name')}",
                 )
 
             if "folder_to_upload" in payload and "files_to_upload" in payload:

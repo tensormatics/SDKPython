@@ -4,3 +4,4 @@ requests
 pytest
 pydantic>=2.0.0
 aiofiles
+aiohttp

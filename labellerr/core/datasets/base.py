@@ -145,18 +145,19 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
                 response = client.make_request(
                     "GET",
                     url,
-                    client_id=client.client_id,
                     extra_headers={"content-type": "application/json"},
                     request_id=unique_id,
                 )
 
-                datasets = response.get("datasets", [])
+                datasets = response.get("response", {}).get("datasets", [])
                 for dataset in datasets:
                     yield dataset
 
                 # Check if there are more pages
-                has_more = response.get("has_more", False)
-                current_last_dataset_id = response.get("last_dataset_id")
+                has_more = response.get("response", {}).get("has_more", False)
+                current_last_dataset_id = response.get("response", {}).get(
+                    "last_dataset_id"
+                )
 
         else:
             unique_id = str(uuid.uuid4())
@@ -172,12 +173,10 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             response = client.make_request(
                 "GET",
                 url,
-                client_id=client.client_id,
                 extra_headers={"content-type": "application/json"},
                 request_id=unique_id,
             )
-
-            datasets = response.get("datasets", [])
+            datasets = response.get("response", {}).get("datasets", [])
             for dataset in datasets:
                 yield dataset
 

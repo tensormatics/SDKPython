@@ -1,8 +1,8 @@
 .PHONY: help install clean test lint format version info
-
+-include .env
 SOURCE_DIR := labellerr
-PYTHON := python3
-PIP := pip3
+PYTHON := python
+PIP := pip
 
 help:
 	@echo "Labellerr SDK - Simple Development Commands"
@@ -57,7 +57,7 @@ check-release: ## Check if everything is ready for release
 	@echo "4. Push and create PR to main (patch) or develop (minor)"
 
 integration-test:
-	$(PYTHON) -m pytest  -v labellerr_integration_case_tests.py
+	$(PYTHON) -m pytest  -v labellerr_integration_tests.py
 
 pre-commit-install:
 	pip install pre-commit

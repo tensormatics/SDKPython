@@ -1,24 +1,20 @@
 """
-Test cases for create_dataset path parameter validation.
-Focus on testing path parameter handling for AWS and GCS connectors.
+Unit tests for create_dataset path parameter validation.
+
+This module focuses on testing path parameter handling for AWS and GCS connectors
+in the create_dataset functionality.
 """
 
 from unittest.mock import patch
 
 import pytest
 
-from labellerr.client import LabellerrClient
 from labellerr.core.datasets import create_dataset
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.schemas import DatasetConfig
 
 
-@pytest.fixture
-def client():
-    """Create a test client with mock credentials"""
-    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
-
-
+@pytest.mark.unit
 class TestCreateDatasetPathValidation:
     """Test path parameter validation for AWS and GCS connectors"""
 

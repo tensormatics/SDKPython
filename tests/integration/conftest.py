@@ -1,5 +1,8 @@
 """
-Pytest configuration and fixtures for integration tests.
+Integration-specific pytest configuration and fixtures.
+
+This module extends the main conftest.py with integration-specific fixtures
+for AWS, GCS, and other external service configurations.
 """
 
 import os

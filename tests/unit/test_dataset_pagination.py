@@ -1,10 +1,14 @@
-"""Tests for dataset pagination functionality in get_all_datasets method"""
+"""
+Unit tests for dataset pagination functionality.
+
+This module tests the pagination functionality in the get_all_datasets method
+with proper mocking and parameterized test cases.
+"""
 
 from unittest.mock import patch
 
 import pytest
 
-from labellerr.client import LabellerrClient
 from labellerr.core.datasets.base import LabellerrDataset
 from labellerr.schemas import DataSetScope
 
@@ -15,22 +19,18 @@ SCOPE_PUBLIC = DataSetScope.public
 
 
 @pytest.fixture
-def client():
-    """Create a test client with mock credentials"""
-    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
-
-
-@pytest.fixture
 def mock_single_page_response():
     """Mock response for a single page with no more pages"""
     return {
-        "datasets": [
-            {"id": "dataset1", "name": "Dataset 1", "data_type": "image"},
-            {"id": "dataset2", "name": "Dataset 2", "data_type": "image"},
-            {"id": "dataset3", "name": "Dataset 3", "data_type": "image"},
-        ],
-        "has_more": False,
-        "last_dataset_id": "dataset3",
+        "response": {
+            "datasets": [
+                {"id": "dataset1", "name": "Dataset 1", "data_type": "image"},
+                {"id": "dataset2", "name": "Dataset 2", "data_type": "image"},
+                {"id": "dataset3", "name": "Dataset 3", "data_type": "image"},
+            ],
+            "has_more": False,
+            "last_dataset_id": "dataset3",
+        }
     }
 
 
@@ -38,12 +38,14 @@ def mock_single_page_response():
 def mock_first_page_response():
     """Mock response for first page with more pages available"""
     return {
-        "datasets": [
-            {"id": "dataset1", "name": "Dataset 1", "data_type": "image"},
-            {"id": "dataset2", "name": "Dataset 2", "data_type": "image"},
-        ],
-        "has_more": True,
-        "last_dataset_id": "dataset2",
+        "response": {
+            "datasets": [
+                {"id": "dataset1", "name": "Dataset 1", "data_type": "image"},
+                {"id": "dataset2", "name": "Dataset 2", "data_type": "image"},
+            ],
+            "has_more": True,
+            "last_dataset_id": "dataset2",
+        }
     }
 
 
@@ -51,12 +53,14 @@ def mock_first_page_response():
 def mock_second_page_response():
     """Mock response for second page with more pages available"""
     return {
-        "datasets": [
-            {"id": "dataset3", "name": "Dataset 3", "data_type": "image"},
-            {"id": "dataset4", "name": "Dataset 4", "data_type": "image"},
-        ],
-        "has_more": True,
-        "last_dataset_id": "dataset4",
+        "response": {
+            "datasets": [
+                {"id": "dataset3", "name": "Dataset 3", "data_type": "image"},
+                {"id": "dataset4", "name": "Dataset 4", "data_type": "image"},
+            ],
+            "has_more": True,
+            "last_dataset_id": "dataset4",
+        }
     }
 
 
@@ -64,14 +68,17 @@ def mock_second_page_response():
 def mock_last_page_response():
     """Mock response for last page with no more pages"""
     return {
-        "datasets": [
-            {"id": "dataset5", "name": "Dataset 5", "data_type": "image"},
-        ],
-        "has_more": False,
-        "last_dataset_id": "dataset5",
+        "response": {
+            "datasets": [
+                {"id": "dataset5", "name": "Dataset 5", "data_type": "image"},
+            ],
+            "has_more": False,
+            "last_dataset_id": "dataset5",
+        }
     }
 
 
+@pytest.mark.unit
 class TestGetAllDatasetsDefaultBehavior:
     """Test default pagination behavior (page_size not specified)"""
 
@@ -95,7 +102,7 @@ class TestGetAllDatasetsDefaultBehavior:
             url = call_args[0][1]
             assert "page_size=10" in url
             assert "data_type=image" in url
-            assert "permission_level=client" in url
+            assert f"permission_level={SCOPE_CLIENT.value}" in url
 
     def test_default_returns_generator(self, client, mock_single_page_response):
         """Test that default behavior returns a generator"""
@@ -117,6 +124,7 @@ class TestGetAllDatasetsDefaultBehavior:
             assert datasets[0]["id"] == "dataset1"
 
 
+@pytest.mark.unit
 class TestGetAllDatasetsManualPagination:
     """Test manual pagination with explicit page_size"""
 
@@ -192,6 +200,7 @@ class TestGetAllDatasetsManualPagination:
             assert second_page_datasets[0]["id"] == "dataset5"
 
 
+@pytest.mark.unit
 class TestGetAllDatasetsAutoPagination:
     """Test auto-pagination with page_size=-1"""
 
@@ -363,12 +372,15 @@ class TestGetAllDatasetsAutoPagination:
             assert mock_request.call_count == 2
 
 
+@pytest.mark.unit
 class TestGetAllDatasetsEdgeCases:
     """Test edge cases and error scenarios"""
 
     def test_empty_results(self, client):
         """Test behavior when no datasets are returned"""
-        empty_response = {"datasets": [], "has_more": False, "last_dataset_id": None}
+        empty_response = {
+            "response": {"datasets": [], "has_more": False, "last_dataset_id": None}
+        }
 
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = empty_response
@@ -382,7 +394,9 @@ class TestGetAllDatasetsEdgeCases:
 
     def test_empty_results_auto_pagination(self, client):
         """Test auto-pagination with no results"""
-        empty_response = {"datasets": [], "has_more": False, "last_dataset_id": None}
+        empty_response = {
+            "response": {"datasets": [], "has_more": False, "last_dataset_id": None}
+        }
 
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = empty_response
@@ -471,6 +485,7 @@ class TestGetAllDatasetsEdgeCases:
             assert mock_request.call_count == 1
 
 
+@pytest.mark.unit
 class TestGetAllDatasetsIntegration:
     """Integration-style tests that simulate real usage patterns"""
 

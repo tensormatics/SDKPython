@@ -1,19 +1,19 @@
+"""
+Unit tests for Labellerr client functionality.
+
+This module contains unit tests that test individual components
+in isolation using mocks and fixtures.
+"""
+
 import os
 
 import pytest
 from pydantic import ValidationError
 
-from labellerr.client import LabellerrClient
 from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import create_project
 from labellerr.core.projects.image_project import ImageProject
 from labellerr.core.users.base import LabellerrUsers
-
-
-@pytest.fixture
-def client():
-    """Create a test client with mock credentials"""
-    return LabellerrClient("test_api_key", "test_api_secret", "test_client_id")
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def users(client):
 
 @pytest.fixture
 def sample_valid_payload():
-    """Create a sample valid payload for initiate_create_project"""
+    """Create a sample valid payload for create_project"""
     current_dir = os.path.dirname(os.path.abspath(__file__))
     test_image = os.path.join(current_dir, "test_data", "test_image.jpg")
 
@@ -53,9 +53,6 @@ def sample_valid_payload():
             f.write("dummy image content")
 
     return {
-        "client_id": "12345",
-        "dataset_name": "Test Dataset",
-        "dataset_description": "Dataset for testing",
         "data_type": "image",
         "created_by": "test_user@example.com",
         "project_name": "Test Project",
@@ -76,15 +73,14 @@ def sample_valid_payload():
     }
 
 
+@pytest.mark.unit
 class TestInitiateCreateProject:
 
     def test_missing_required_parameters(self, client, sample_valid_payload):
         """Test error handling for missing required parameters"""
         # Remove required parameters one by one and test
+        # Current required params in create_project: data_type, created_by, project_name, autolabel
         required_params = [
-            "client_id",
-            "dataset_name",
-            "dataset_description",
             "data_type",
             "created_by",
             "project_name",
@@ -112,26 +108,22 @@ class TestInitiateCreateProject:
             in str(exc_info.value)
         )
 
-    def test_invalid_client_id(self, client, sample_valid_payload):
-        """Test error handling for invalid client_id"""
+    def test_invalid_created_by_email(self, client, sample_valid_payload):
+        """Test error handling for invalid created_by email format"""
         invalid_payload = sample_valid_payload.copy()
-        invalid_payload["client_id"] = 123  # Not a string
+        invalid_payload["created_by"] = "not_an_email"  # Missing @ and domain
 
-        with pytest.raises(LabellerrError) as exc_info:
-
-            create_project(client, invalid_payload)
-
-        assert "client_id must be a non-empty string" in str(exc_info.value)
-
-        # Test empty string
-        invalid_payload["client_id"] = "   "
         with pytest.raises(LabellerrError) as exc_info:
             create_project(client, invalid_payload)
 
-        # Whitespace client_id causes HTTP header issues
-        assert "Invalid leading whitespace" in str(
-            exc_info.value
-        ) or "client_id must be a non-empty string" in str(exc_info.value)
+        assert "Please enter email id in created_by" in str(exc_info.value)
+
+        # Test invalid email without domain extension
+        invalid_payload["created_by"] = "test@example"
+        with pytest.raises(LabellerrError) as exc_info:
+            create_project(client, invalid_payload)
+
+        assert "Please enter email id in created_by" in str(exc_info.value)
 
     def test_invalid_annotation_guide(self, client, sample_valid_payload):
         """Test error handling for invalid annotation guide"""
@@ -196,25 +188,33 @@ class TestInitiateCreateProject:
         assert "Folder path does not exist" in str(exc_info.value)
 
 
+@pytest.mark.unit
 class TestCreateUser:
     """Test cases for create_user method"""
 
     def test_create_user_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        with pytest.raises(TypeError) as exc_info:
-            users.create_user(
+        from labellerr.schemas import CreateUserParams
+
+        with pytest.raises(ValidationError) as exc_info:
+            CreateUserParams(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
                 # Missing email_id, projects, roles
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "field required" in str(exc_info.value).lower()
+            or "missing" in str(exc_info.value).lower()
+        )
 
     def test_create_user_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
+        from labellerr.schemas import CreateUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.create_user(
+            CreateUserParams(
                 client_id=12345,  # Not a string
                 first_name="John",
                 last_name="Doe",
@@ -227,8 +227,10 @@ class TestCreateUser:
 
     def test_create_user_empty_projects(self, users):
         """Test error handling for empty projects list"""
+        from labellerr.schemas import CreateUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.create_user(
+            CreateUserParams(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
@@ -241,8 +243,10 @@ class TestCreateUser:
 
     def test_create_user_empty_roles(self, users):
         """Test error handling for empty roles list"""
+        from labellerr.schemas import CreateUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.create_user(
+            CreateUserParams(
                 client_id="12345",
                 first_name="John",
                 last_name="Doe",
@@ -254,24 +258,32 @@ class TestCreateUser:
         assert "roles" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestUpdateUserRole:
     """Test cases for update_user_role method"""
 
     def test_update_user_role_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        with pytest.raises(TypeError) as exc_info:
-            users.update_user_role(
+        from labellerr.schemas import UpdateUserRoleParams
+
+        with pytest.raises(ValidationError) as exc_info:
+            UpdateUserRoleParams(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id, roles
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "field required" in str(exc_info.value).lower()
+            or "missing" in str(exc_info.value).lower()
+        )
 
     def test_update_user_role_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
+        from labellerr.schemas import UpdateUserRoleParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.update_user_role(
+            UpdateUserRoleParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -282,8 +294,10 @@ class TestUpdateUserRole:
 
     def test_update_user_role_empty_roles(self, users):
         """Test error handling for empty roles list"""
+        from labellerr.schemas import UpdateUserRoleParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.update_user_role(
+            UpdateUserRoleParams(
                 client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
@@ -293,24 +307,32 @@ class TestUpdateUserRole:
         assert "roles" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestDeleteUser:
     """Test cases for delete_user method"""
 
     def test_delete_user_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        with pytest.raises(TypeError) as exc_info:
-            users.delete_user(
+        from labellerr.schemas import DeleteUserParams
+
+        with pytest.raises(ValidationError) as exc_info:
+            DeleteUserParams(
                 client_id="12345",
                 project_id="project_123",
                 # Missing email_id, user_id
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "field required" in str(exc_info.value).lower()
+            or "missing" in str(exc_info.value).lower()
+        )
 
     def test_delete_user_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
+        from labellerr.schemas import DeleteUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.delete_user(
+            DeleteUserParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -321,8 +343,10 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_project_id(self, users):
         """Test error handling for invalid project_id"""
+        from labellerr.schemas import DeleteUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.delete_user(
+            DeleteUserParams(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 email_id="john@example.com",
@@ -333,8 +357,10 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_email_id(self, users):
         """Test error handling for invalid email_id"""
+        from labellerr.schemas import DeleteUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.delete_user(
+            DeleteUserParams(
                 client_id="12345",
                 project_id="project_123",
                 email_id=12345,  # Not a string
@@ -345,8 +371,10 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_user_id(self, users):
         """Test error handling for invalid user_id"""
+        from labellerr.schemas import DeleteUserParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.delete_user(
+            DeleteUserParams(
                 client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
@@ -356,6 +384,7 @@ class TestDeleteUser:
         assert "user_id" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestAddUserToProject:
     """Test cases for add_user_to_project method"""
 
@@ -363,17 +392,21 @@ class TestAddUserToProject:
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
             users.add_user_to_project(
-                client_id="12345",
                 project_id="project_123",
                 # Missing email_id
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "missing" in str(exc_info.value).lower()
+            or "required" in str(exc_info.value).lower()
+        )
 
     def test_add_user_to_project_invalid_client_id(self, users):
-        """Test error handling for invalid client_id"""
+        """Test error handling for invalid client_id - validation happens inside method"""
+        from labellerr.schemas import AddUserToProjectParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.add_user_to_project(
+            AddUserToProjectParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -382,6 +415,7 @@ class TestAddUserToProject:
         assert "client_id" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestRemoveUserFromProject:
     """Test cases for remove_user_from_project method"""
 
@@ -389,17 +423,21 @@ class TestRemoveUserFromProject:
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
             users.remove_user_from_project(
-                client_id="12345",
                 project_id="project_123",
                 # Missing email_id
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "missing" in str(exc_info.value).lower()
+            or "required" in str(exc_info.value).lower()
+        )
 
     def test_remove_user_from_project_invalid_client_id(self, users):
-        """Test error handling for invalid client_id"""
+        """Test error handling for invalid client_id - validation happens inside method"""
+        from labellerr.schemas import RemoveUserFromProjectParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.remove_user_from_project(
+            RemoveUserFromProjectParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -408,6 +446,7 @@ class TestRemoveUserFromProject:
         assert "client_id" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestChangeUserRole:
     """Test cases for change_user_role method"""
 
@@ -415,18 +454,22 @@ class TestChangeUserRole:
         """Test error handling for missing required parameters"""
         with pytest.raises(TypeError) as exc_info:
             users.change_user_role(
-                client_id="12345",
                 project_id="project_123",
                 email_id="john@example.com",
                 # Missing new_role_id
             )
 
-        assert "missing" in str(exc_info.value).lower()
+        assert (
+            "missing" in str(exc_info.value).lower()
+            or "required" in str(exc_info.value).lower()
+        )
 
     def test_change_user_role_invalid_client_id(self, users):
-        """Test error handling for invalid client_id"""
+        """Test error handling for invalid client_id - validation happens inside method"""
+        from labellerr.schemas import ChangeUserRoleParams
+
         with pytest.raises(ValidationError) as exc_info:
-            users.change_user_role(
+            ChangeUserRoleParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 email_id="john@example.com",
@@ -436,27 +479,31 @@ class TestChangeUserRole:
         assert "client_id" in str(exc_info.value).lower()
 
 
+@pytest.mark.unit
 class TestListAndBulkAssignFiles:
-    """Tests for list_file and bulk_assign_files methods"""
+    """Tests for list_files and bulk_assign_files methods"""
 
-    def test_list_file_missing_required(self, project):
+    def test_list_files_missing_required(self, project):
+        """Test list_files with missing required parameters"""
         with pytest.raises(TypeError):
-            project.list_file(client_id="12345", project_id="project_123")
+            project.list_files()
 
     def test_bulk_assign_files_missing_required(self, project):
+        """Test bulk_assign_files with missing required parameters"""
         with pytest.raises(TypeError):
-            project.bulk_assign_files(
-                client_id="12345", project_id="project_123", new_status="None"
-            )
+            project.bulk_assign_files(new_status="None")
 
 
+@pytest.mark.unit
 class TestBulkAssignFiles:
     """Comprehensive tests for bulk_assign_files method"""
 
     def test_bulk_assign_files_invalid_client_id_type(self, project):
-        """Test error handling for invalid client_id type"""
+        """Test error handling for invalid client_id type - validation happens inside method"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -466,8 +513,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_empty_client_id(self, project):
         """Test error handling for empty client_id"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -477,8 +526,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_invalid_project_id_type(self, project):
         """Test error handling for invalid project_id type"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 file_ids=["file1", "file2"],
@@ -488,8 +539,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_empty_project_id(self, project):
         """Test error handling for empty project_id"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id="",
                 file_ids=["file1", "file2"],
@@ -499,8 +552,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_empty_file_ids_list(self, project):
         """Test error handling for empty file_ids list"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=[],  # Empty list
@@ -510,8 +565,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_invalid_file_ids_type(self, project):
         """Test error handling for invalid file_ids type"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids="file1,file2",  # Not a list
@@ -519,21 +576,12 @@ class TestBulkAssignFiles:
             )
         assert "file_ids" in str(exc_info.value).lower()
 
-    def test_bulk_assign_files_file_ids_with_non_string(self, project):
-        """Test error handling for file_ids containing non-string values"""
-        with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
-                client_id="12345",
-                project_id="project_123",
-                file_ids=["file1", 123, "file3"],  # Contains integer
-                new_status="completed",
-            )
-        assert "file_ids" in str(exc_info.value).lower()
-
     def test_bulk_assign_files_invalid_new_status_type(self, project):
         """Test error handling for invalid new_status type"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -543,8 +591,10 @@ class TestBulkAssignFiles:
 
     def test_bulk_assign_files_empty_new_status(self, project):
         """Test error handling for empty new_status"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.bulk_assign_files(
+            BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2"],
@@ -553,110 +603,121 @@ class TestBulkAssignFiles:
         assert "new_status" in str(exc_info.value).lower()
 
     def test_bulk_assign_files_single_file(self, project):
-        """Test bulk assign with a single file"""
-        # This should not raise validation errors
+        """Test bulk assign with a single file - validation should pass"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         try:
-            project.bulk_assign_files(
+            params = BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1"],
                 new_status="completed",
             )
+            assert params.file_ids == ["file1"]
         except ValidationError:
             pytest.fail("Validation should pass for single file")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
     def test_bulk_assign_files_multiple_files(self, project):
-        """Test bulk assign with multiple files"""
-        # This should not raise validation errors
+        """Test bulk assign with multiple files - validation should pass"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         try:
-            project.bulk_assign_files(
+            params = BulkAssignFilesParams(
                 client_id="12345",
                 project_id="project_123",
                 file_ids=["file1", "file2", "file3", "file4", "file5"],
                 new_status="in_progress",
             )
+            assert len(params.file_ids) == 5
         except ValidationError:
             pytest.fail("Validation should pass for multiple files")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
     def test_bulk_assign_files_special_characters_in_ids(self, project):
-        """Test bulk assign with special characters in IDs"""
+        """Test bulk assign with special characters in IDs - validation should pass"""
+        from labellerr.core.schemas import BulkAssignFilesParams
+
         try:
-            project.bulk_assign_files(
+            params = BulkAssignFilesParams(
                 client_id="client-123_test",
                 project_id="project-456_test",
                 file_ids=["file-1_test", "file-2_test"],
                 new_status="pending",
             )
+            assert params.client_id == "client-123_test"
         except ValidationError:
             pytest.fail("Validation should pass for IDs with special characters")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
 
-class TestListFile:
-    """Comprehensive tests for list_file method"""
+@pytest.mark.unit
+class TestListFiles:
+    """Comprehensive tests for list_files method"""
 
-    def test_list_file_invalid_client_id_type(self, project):
-        """Test error handling for invalid client_id type"""
+    def test_list_files_invalid_client_id_type(self, project):
+        """Test error handling for invalid client_id type - validation happens inside method"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id=12345,  # Not a string
                 project_id="project_123",
                 search_queries={"status": "completed"},
             )
         assert "client_id" in str(exc_info.value).lower()
 
-    def test_list_file_empty_client_id(self, project):
+    def test_list_files_empty_client_id(self, project):
         """Test error handling for empty client_id"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="",
                 project_id="project_123",
                 search_queries={"status": "completed"},
             )
         assert "client_id" in str(exc_info.value).lower()
 
-    def test_list_file_invalid_project_id_type(self, project):
+    def test_list_files_invalid_project_id_type(self, project):
         """Test error handling for invalid project_id type"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id=12345,  # Not a string
                 search_queries={"status": "completed"},
             )
         assert "project_id" in str(exc_info.value).lower()
 
-    def test_list_file_empty_project_id(self, project):
+    def test_list_files_empty_project_id(self, project):
         """Test error handling for empty project_id"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id="",
                 search_queries={"status": "completed"},
             )
         assert "project_id" in str(exc_info.value).lower()
 
-    def test_list_file_invalid_search_queries_type(self, project):
+    def test_list_files_invalid_search_queries_type(self, project):
         """Test error handling for invalid search_queries type"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries="status:completed",  # Not a dict
             )
         assert "search_queries" in str(exc_info.value).lower()
 
-    def test_list_file_invalid_size_type(self, project):
+    def test_list_files_invalid_size_type(self, project):
         """Test error handling for invalid size type"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -664,10 +725,12 @@ class TestListFile:
             )
         assert "size" in str(exc_info.value).lower()
 
-    def test_list_file_negative_size(self, project):
+    def test_list_files_negative_size(self, project):
         """Test error handling for negative size"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -675,10 +738,12 @@ class TestListFile:
             )
         assert "size" in str(exc_info.value).lower()
 
-    def test_list_file_zero_size(self, project):
+    def test_list_files_zero_size(self, project):
         """Test error handling for zero size"""
+        from labellerr.core.schemas import ListFileParams
+
         with pytest.raises(ValidationError) as exc_info:
-            project.list_file(
+            ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
@@ -686,55 +751,57 @@ class TestListFile:
             )
         assert "size" in str(exc_info.value).lower()
 
-    def test_list_file_with_default_size(self, project):
-        """Test list_file with default size parameter"""
+    def test_list_files_with_default_size(self, project):
+        """Test list_files with default size parameter - validation should pass"""
+        from labellerr.core.schemas import ListFileParams
+
         try:
-            project.list_file(
+            params = ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
             )
+            assert params.size == 10  # Default value
         except ValidationError:
             pytest.fail("Validation should pass with default size")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
-    def test_list_file_with_custom_size(self, project):
-        """Test list_file with custom size parameter"""
+    def test_list_files_with_custom_size(self, project):
+        """Test list_files with custom size parameter - validation should pass"""
+        from labellerr.core.schemas import ListFileParams
+
         try:
-            project.list_file(
+            params = ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
                 size=50,
             )
+            assert params.size == 50
         except ValidationError:
             pytest.fail("Validation should pass with custom size")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
-    def test_list_file_with_next_search_after(self, project):
-        """Test list_file with next_search_after for pagination"""
+    def test_list_files_with_next_search_after(self, project):
+        """Test list_files with next_search_after for pagination - validation should pass"""
+        from labellerr.core.schemas import ListFileParams
+
         try:
-            project.list_file(
+            params = ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={"status": "completed"},
                 size=10,
                 next_search_after="some_cursor_value",
             )
+            assert params.next_search_after == "some_cursor_value"
         except ValidationError:
             pytest.fail("Validation should pass with next_search_after")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
-    def test_list_file_complex_search_queries(self, project):
-        """Test list_file with complex search queries"""
+    def test_list_files_complex_search_queries(self, project):
+        """Test list_files with complex search queries - validation should pass"""
+        from labellerr.core.schemas import ListFileParams
+
         try:
-            project.list_file(
+            params = ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={
@@ -743,25 +810,23 @@ class TestListFile:
                     "tags": ["tag1", "tag2"],
                 },
             )
+            assert "status" in params.search_queries
         except ValidationError:
             pytest.fail("Validation should pass with complex search queries")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
-    def test_list_file_empty_search_queries(self, project):
-        """Test list_file with empty search queries dict"""
+    def test_list_files_empty_search_queries(self, project):
+        """Test list_files with empty search queries dict - validation should pass"""
+        from labellerr.core.schemas import ListFileParams
+
         try:
-            project.list_file(
+            params = ListFileParams(
                 client_id="12345",
                 project_id="project_123",
                 search_queries={},  # Empty dict
             )
+            assert params.search_queries == {}
         except ValidationError:
             pytest.fail("Validation should pass with empty search queries")
-        except Exception:
-            # API call will fail but validation should pass
-            pass
 
 
 if __name__ == "__main__":

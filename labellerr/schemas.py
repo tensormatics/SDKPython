@@ -5,7 +5,7 @@ This module re-exports everything for backward compatibility.
 """
 
 # Re-export everything from core.schemas for backward compatibility
-from labellerr.core.schemas import *
+from labellerr.core.schemas import *  # noqa: F403
 
 __all__ = [
     # Base types
@@ -51,4 +51,3 @@ __all__ = [
     "Hyperparameters",
     "TrainingRequest",
 ]
-

@@ -57,4 +57,3 @@ class DirPathStr(str):
         if not os.access(v, os.R_OK):
             raise ValueError(f"no read permission for folder: {v}")
         return v
-

@@ -35,4 +35,3 @@ class TrainingRequest(BaseModel):
     slice_id: Optional[str] = None
     min_samples_per_class: Optional[int] = 100
     job_name: str
-

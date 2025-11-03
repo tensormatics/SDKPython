@@ -25,4 +25,3 @@ class BulkAssignFilesParams(BaseModel):
     file_ids: List[str] = Field(min_length=1)
     new_status: str = Field(min_length=1)
     assign_to: Optional[str] = None
-

@@ -12,7 +12,12 @@ from labellerr.core.projects import (
     create_annotation_guideline,
     create_project,
 )
-from labellerr.core.schemas import DatasetConfig, KeyFrame, TrainingRequest, Hyperparameters
+from labellerr.core.schemas import (
+    DatasetConfig,
+    KeyFrame,
+    TrainingRequest,
+    Hyperparameters,
+)
 from labellerr.core.autolabel import LabellerrAutoLabel
 
 # Set logging level to DEBUG

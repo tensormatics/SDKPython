@@ -82,4 +82,3 @@ class ChangeUserRoleParams(BaseModel):
     project_id: str = Field(min_length=1)
     email_id: str = Field(min_length=1)
     new_role_id: str = Field(min_length=1)
-

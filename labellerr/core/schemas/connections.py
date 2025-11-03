@@ -88,4 +88,3 @@ class GCPConnectorConfig(BaseModel):
         if not os.path.exists(v):
             raise ValueError(f"GCS credential file not found: {v}")
         return v
-

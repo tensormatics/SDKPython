@@ -110,4 +110,3 @@ class DatasetConfig(BaseModel):
     data_type: Literal["image", "video", "audio", "document", "text"]
     dataset_description: str = ""
     connector_type: Literal["local", "aws", "gcp"] = "local"
-

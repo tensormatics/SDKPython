@@ -25,6 +25,7 @@ from labellerr.core.schemas.connections import (
     DeleteConnectionParams,
     GCPConnectorConfig,
     GCSConnectionParams,
+    AWSConnectionTestParams,
 )
 
 # Dataset schemas
@@ -80,6 +81,7 @@ __all__ = [
     "DirPathStr",
     # Connection schemas
     "AWSConnectionParams",
+    "AWSConnectionTestParams",
     "GCSConnectionParams",
     "DeleteConnectionParams",
     "AWSConnectorConfig",

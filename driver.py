@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
 from labellerr.core.datasets import LabellerrDataset, create_dataset
+from labellerr.core.connectors import LabellerrS3Connection
 from labellerr.core.files import LabellerrFile
 from labellerr.core.projects import (
     LabellerrProject,
@@ -17,6 +18,10 @@ from labellerr.core.schemas import (
     KeyFrame,
     TrainingRequest,
     Hyperparameters,
+    AWSConnectionParams,
+    AWSConnectionTestParams,
+    DatasetDataType,
+    CreateExportParams,
 )
 from labellerr.core.autolabel import LabellerrAutoLabel
 
@@ -144,7 +149,33 @@ if os.getenv("SYNC_GCS", "").lower() == "true":
 
 
 autolabel = LabellerrAutoLabel(client=client)
-print(autolabel.list_training_jobs())
+# print(LabellerrS3Connection.create_connection(client=client,
+# params=AWSConnectionParams(
+#     aws_access_key=os.getenv("AWS_KEY"),
+#     aws_secrets_key=os.getenv("AWS_SECRET"),
+#     s3_path="s3://amazon-s3-sync-test/exports",
+#     connection_type="export",
+#     name="Amazon S3 Export Test",
+#     description="Amazon S3 Export Test",
+# )))
+project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+
+export = project.create_export(
+    export_config=CreateExportParams(
+        export_name="Amazon S3 Export Test",
+        export_description="Amazon S3 Export Test",
+        export_format="json",
+        statuses=["review"],
+        connection_id=os.getenv("AWS_EXPORT_CONNECTION_ID"),
+        export_destination="s3",
+    )
+)
+
+print(f"Export created: {export.report_id}")
+print(f"Current status: {export._status}")
+# Uncomment to poll until completion:
+final_status = export.status()
+print(f"Final status: {final_status}")
 # print(autolabel.train(training_request=TrainingRequest(model_id="yolov11", hyperparameters=Hyperparameters(epochs=10), slice_id='f4an5DvU8KaMlYukHFSc', min_samples_per_class=100, job_name="Yolo V11 Training")))
 
 # dataset = LabellerrDataset(client=client, dataset_id="137a7b2f-942f-478d-a135-94ad2e11fcca")

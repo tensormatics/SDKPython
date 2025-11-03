@@ -19,17 +19,27 @@ class DatasetDataType(str, Enum):
     text = "text"
 
 
-class AWSConnectionParams(BaseModel):
-    """Parameters for creating an AWS S3 connection."""
+class ConnectionType(str, Enum):
+    """Enum for connection types."""
 
-    client_id: str = Field(min_length=1)
+    _IMPORT = "import"
+    _EXPORT = "export"
+
+
+class AWSConnectionTestParams(BaseModel):
+    """Parameters for testing an AWS S3 connection."""
+
     aws_access_key: str = Field(min_length=1)
     aws_secrets_key: str = Field(min_length=1)
     s3_path: str = Field(min_length=1)
-    data_type: Literal["image", "video", "audio", "document", "text"]
+    connection_type: ConnectionType = ConnectionType._IMPORT
+
+
+class AWSConnectionParams(AWSConnectionTestParams):
+    """Parameters for creating an AWS S3 connection."""
+
     name: str = Field(min_length=1)
     description: str
-    connection_type: str = "import"
 
 
 class GCSConnectionParams(BaseModel):

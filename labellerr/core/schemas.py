@@ -9,7 +9,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
-
+from .autolabel.typings import *
 class NonEmptyStr(str):
     """Custom string type that cannot be empty or whitespace-only."""
 

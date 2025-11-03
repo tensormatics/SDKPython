@@ -12,7 +12,8 @@ from labellerr.core.projects import (
     create_annotation_guideline,
     create_project,
 )
-from labellerr.core.schemas import DatasetConfig, KeyFrame
+from labellerr.core.schemas import DatasetConfig, KeyFrame, TrainingRequest, Hyperparameters
+from labellerr.core.autolabel import LabellerrAutoLabel
 
 # Set logging level to DEBUG
 logging.basicConfig(level=logging.DEBUG)
@@ -136,10 +137,10 @@ if os.getenv("SYNC_GCS", "").lower() == "true":
     )
     print(f"GCS Sync Response: {response}")
 
-print("\n=== Driver execution completed ===")
 
-# dataset = create_dataset(client=client, dataset_config=DatasetConfig(dataset_name="Dataset new Ximi", data_type="image"), folder_to_upload="images")
-# print(dataset.dataset_data)
+autolabel = LabellerrAutoLabel(client=client)
+print(autolabel.list_training_jobs())
+# print(autolabel.train(training_request=TrainingRequest(model_id="yolov11", hyperparameters=Hyperparameters(epochs=10), slice_id='f4an5DvU8KaMlYukHFSc', min_samples_per_class=100, job_name="Yolo V11 Training")))
 
 # dataset = LabellerrDataset(client=client, dataset_id="137a7b2f-942f-478d-a135-94ad2e11fcca")
 # print (dataset.fetch_files())

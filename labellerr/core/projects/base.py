@@ -587,6 +587,31 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         except Exception as e:
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise
+    
+    def create_export(self, export_config: schemas.CreateExportParams):
+        """
+        Creates an export with the given configuration.
+
+        :param export_config: Export configuration dictionary
+        :return: The response from the API
+        :raises LabellerrError: If the export creation fails
+        """
+        if export_config.destination == schemas.ExportDestination.LOCAL:
+            return self.create_local_export(export_config)
+       
+        else:
+            payload = export_config.model_dump()
+            if not export_config.connection_id or export_config.connection_id == "":
+                raise LabellerrError("connection_id is required")
+            payload.update({"export_destination": export_config.destination, "question_ids": ["all"], "connection_id": export_config.connection_id})
+
+            return self.client.make_request(
+                "POST",
+                f"{constants.BASE_URL}/sdk/export/files?project_id={self.project_id}&client_id={self.client.client_id}",
+                extra_headers={"Content-Type": "application/json"},
+                data=payload,
+            )
+
 
     def create_local_export(self, export_config):
         """
@@ -596,12 +621,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
         :return: The response from the API
         :raises LabellerrError: If the export creation fails
         """
-        # Validate parameters using Pydantic
-        schemas.CreateLocalExportParams(
-            project_id=self.project_id,
-            client_id=self.client.client_id,
-            export_config=export_config,
-        )
         # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 

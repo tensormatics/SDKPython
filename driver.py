@@ -65,11 +65,11 @@ client = LabellerrClient(
 #     )
 #     print(f"Dataset created: {response.dataset_data}")
 
-DATASET_ID = os.getenv("DATASET_ID")
-if DATASET_ID:
-    print(f"\n=== Working with Dataset: {DATASET_ID} ===")
-    dataset = LabellerrDataset(client=client, dataset_id=DATASET_ID)
-    print(f"Dataset loaded: {dataset.data_type}")
+# DATASET_ID = os.getenv("DATASET_ID")
+# if DATASET_ID:
+#     print(f"\n=== Working with Dataset: {DATASET_ID} ===")
+#     dataset = LabellerrDataset(client=client, dataset_id=DATASET_ID)
+#     print(f"Dataset loaded: {dataset.data_type}")
 
 # if os.getenv("CREATE_PROJECT", "").lower() == "true":
 #     project = create_project(
@@ -91,61 +91,61 @@ if DATASET_ID:
 #     )
 #     print(f"Project created: {project.project_data}")
 
-if os.getenv("SYNC_AWS", "").lower() == "true":
-    aws_connection_id = os.getenv("AWS_CONNECTION_ID")
-    aws_project_id = os.getenv("AWS_PROJECT_ID")
-    aws_dataset_id = os.getenv("AWS_DATASET_ID", DATASET_ID)
-    aws_s3_path = os.getenv("AWS_S3_PATH")
-    aws_data_type = os.getenv("AWS_DATA_TYPE", "image")
-    aws_email = os.getenv("AWS_EMAIL", "dev@labellerr.com")
+# if os.getenv("SYNC_AWS", "").lower() == "true":
+#     aws_connection_id = os.getenv("AWS_CONNECTION_ID")
+#     aws_project_id = os.getenv("AWS_PROJECT_ID")
+#     aws_dataset_id = os.getenv("AWS_DATASET_ID", DATASET_ID)
+#     aws_s3_path = os.getenv("AWS_S3_PATH")
+#     aws_data_type = os.getenv("AWS_DATA_TYPE", "image")
+#     aws_email = os.getenv("AWS_EMAIL", "dev@labellerr.com")
 
-    if not all([aws_connection_id, aws_project_id, aws_dataset_id, aws_s3_path]):
-        raise ValueError(
-            "AWS_CONNECTION_ID, AWS_PROJECT_ID, AWS_DATASET_ID, and AWS_S3_PATH "
-            "must be set when SYNC_AWS=true"
-        )
+#     if not all([aws_connection_id, aws_project_id, aws_dataset_id, aws_s3_path]):
+#         raise ValueError(
+#             "AWS_CONNECTION_ID, AWS_PROJECT_ID, AWS_DATASET_ID, and AWS_S3_PATH "
+#             "must be set when SYNC_AWS=true"
+#         )
 
-    if not aws_dataset_id:
-        raise ValueError("DATASET_ID or AWS_DATASET_ID must be set when SYNC_AWS=true")
+#     if not aws_dataset_id:
+#         raise ValueError("DATASET_ID or AWS_DATASET_ID must be set when SYNC_AWS=true")
 
-    print(f"\n=== Syncing Dataset from AWS S3: {aws_s3_path} ===")
-    dataset = LabellerrDataset(client=client, dataset_id=aws_dataset_id)
-    response = dataset.sync_datasets(
-        project_id=aws_project_id,
-        path=aws_s3_path,
-        data_type=aws_data_type,
-        email_id=aws_email,
-        connection_id=aws_connection_id,
-    )
-    print(f"AWS S3 Sync Response: {response}")
+#     print(f"\n=== Syncing Dataset from AWS S3: {aws_s3_path} ===")
+#     dataset = LabellerrDataset(client=client, dataset_id=aws_dataset_id)
+#     response = dataset.sync_datasets(
+#         project_id=aws_project_id,
+#         path=aws_s3_path,
+#         data_type=aws_data_type,
+#         email_id=aws_email,
+#         connection_id=aws_connection_id,
+#     )
+#     print(f"AWS S3 Sync Response: {response}")
 
-if os.getenv("SYNC_GCS", "").lower() == "true":
-    gcs_connection_id = os.getenv("GCS_CONNECTION_ID")
-    gcs_project_id = os.getenv("GCS_PROJECT_ID")
-    gcs_dataset_id = os.getenv("GCS_DATASET_ID", DATASET_ID)
-    gcs_path = os.getenv("GCS_PATH")
-    gcs_data_type = os.getenv("GCS_DATA_TYPE", "image")
-    gcs_email = os.getenv("GCS_EMAIL", "dev@labellerr.com")
+# if os.getenv("SYNC_GCS", "").lower() == "true":
+#     gcs_connection_id = os.getenv("GCS_CONNECTION_ID")
+#     gcs_project_id = os.getenv("GCS_PROJECT_ID")
+#     gcs_dataset_id = os.getenv("GCS_DATASET_ID", DATASET_ID)
+#     gcs_path = os.getenv("GCS_PATH")
+#     gcs_data_type = os.getenv("GCS_DATA_TYPE", "image")
+#     gcs_email = os.getenv("GCS_EMAIL", "dev@labellerr.com")
 
-    if not all([gcs_connection_id, gcs_project_id, gcs_dataset_id, gcs_path]):
-        raise ValueError(
-            "GCS_CONNECTION_ID, GCS_PROJECT_ID, GCS_DATASET_ID, and GCS_PATH "
-            "must be set when SYNC_GCS=true"
-        )
+#     if not all([gcs_connection_id, gcs_project_id, gcs_dataset_id, gcs_path]):
+#         raise ValueError(
+#             "GCS_CONNECTION_ID, GCS_PROJECT_ID, GCS_DATASET_ID, and GCS_PATH "
+#             "must be set when SYNC_GCS=true"
+#         )
 
-    if not gcs_dataset_id:
-        raise ValueError("DATASET_ID or GCS_DATASET_ID must be set when SYNC_GCS=true")
+#     if not gcs_dataset_id:
+#         raise ValueError("DATASET_ID or GCS_DATASET_ID must be set when SYNC_GCS=true")
 
-    print(f"\n=== Syncing Dataset from GCS: {gcs_path} ===")
-    dataset = LabellerrDataset(client=client, dataset_id=gcs_dataset_id)
-    response = dataset.sync_datasets(
-        project_id=gcs_project_id,
-        path=gcs_path,
-        data_type=gcs_data_type,
-        email_id=gcs_email,
-        connection_id=gcs_connection_id,
-    )
-    print(f"GCS Sync Response: {response}")
+#     print(f"\n=== Syncing Dataset from GCS: {gcs_path} ===")
+#     dataset = LabellerrDataset(client=client, dataset_id=gcs_dataset_id)
+#     response = dataset.sync_datasets(
+#         project_id=gcs_project_id,
+#         path=gcs_path,
+#         data_type=gcs_data_type,
+#         email_id=gcs_email,
+#         connection_id=gcs_connection_id,
+#     )
+#     print(f"GCS Sync Response: {response}")
 
 
 autolabel = LabellerrAutoLabel(client=client)
@@ -153,12 +153,12 @@ autolabel = LabellerrAutoLabel(client=client)
 # params=AWSConnectionParams(
 #     aws_access_key=os.getenv("AWS_KEY"),
 #     aws_secrets_key=os.getenv("AWS_SECRET"),
-#     s3_path="s3://amazon-s3-sync-test/exports",
+#     s3_path="",
 #     connection_type="export",
 #     name="Amazon S3 Export Test",
 #     description="Amazon S3 Export Test",
 # )))
-project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+project = LabellerrProject(client=client, project_id="")
 
 export = project.create_export(
     export_config=CreateExportParams(
@@ -168,6 +168,7 @@ export = project.create_export(
         statuses=["review"],
         connection_id=os.getenv("AWS_EXPORT_CONNECTION_ID"),
         export_destination="s3",
+        export_folder_path="amazon-s3-sync-test/exports/",  # pattern - bucket_name/path/to/folder/ - the last slash is important
     )
 )
 

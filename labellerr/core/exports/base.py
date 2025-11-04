@@ -88,7 +88,6 @@ class Export:
             timeout=timeout,
             max_retries=max_retries,
             on_success=on_success,
-            on_failure=on_failure,
         )
 
     def __repr__(self) -> str:

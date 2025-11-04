@@ -773,7 +773,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             response = self.client.make_request(
                 "GET",
                 url,
-                client_id=client_id,
                 extra_headers={"Content-Type": "application/json"},
                 request_id=uuid,
             )

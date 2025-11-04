@@ -17,3 +17,4 @@ class CreateExportParams(BaseModel):
     statuses: List[str] = Field(min_length=1)
     export_destination: ExportDestination = Field(default=ExportDestination.LOCAL)
     connection_id: Optional[str] = None
+    export_folder_path: Optional[str] = None

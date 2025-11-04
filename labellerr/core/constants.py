@@ -1,4 +1,4 @@
-BASE_URL = "http://localhost:8000"
+BASE_URL = "https://api.labellerr.com"
 ALLOWED_ORIGINS = "https://pro.labellerr.com"
 
 

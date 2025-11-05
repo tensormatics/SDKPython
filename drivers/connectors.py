@@ -2,8 +2,22 @@ import logging
 import os
 from dotenv import load_dotenv
 from labellerr.client import LabellerrClient
-from labellerr.core.connectors import LabellerrConnection, list_connections, delete_connection, create_connection, AWSConnectionParams
-from labellerr.core.schemas import ConnectionType, ConnectorType
+
+# from labellerr.core.connectors import (
+#     LabellerrConnection,
+#     list_connections,
+#     delete_connection,
+#     create_connection,
+#     AWSConnectionParams,
+#     LabellerrGCSConnection,
+# )
+# from labellerr.core.schemas import (
+#     ConnectionType,
+#     ConnectorType,
+#     DatasetDataType,
+#     GCSConnectionTestParams,
+#     GCSConnectionParams,
+# )
 
 # Set logging level to DEBUG
 logging.basicConfig(level=logging.DEBUG)
@@ -26,10 +40,27 @@ client = LabellerrClient(
     client_id=CLIENT_ID,
 )
 
+# response = LabellerrGCSConnection.test_connection(client=client, params=GCSConnectionTestParams(
+#     svc_account_json='labellerr-dev.json',
+#     path="gs://aws-labellerr-public-datasets/coco2017",
+#     connection_type=ConnectionType._IMPORT,
+#     data_type=DatasetDataType.video,
+# ))
+# print(response)
+
+# response = create_connection(client=client, connector_type=ConnectorType._GCS, params=GCSConnectionParams(
+#     svc_account_json='labellerr-dev.json',
+#     path="gs://aws-labellerr-public-datasets/coco2017",
+#     connection_type=ConnectionType._IMPORT,
+#     data_type=DatasetDataType.image, name="GCS Import Test", description="GCS Import Test"))
+# print(response)
+# connection = LabellerrConnection(client=client, connection_id='8c3dc4b4-e701-4d22-add3-28abc33e13ef')
+# response = connection.test(path="gs://aws-labellerr-public-datasets/coco2017", connection_type=ConnectionType._IMPORT, data_type=DatasetDataType.image)
+# print(response)
 # connection = create_connection(client=client, connector_type=ConnectorType._S3, params=AWSConnectionParams(
 #     aws_access_key=os.getenv("AWS_KEY"),
 #     aws_secrets_key=os.getenv("AWS_SECRET"),
-#     s3_path="s3://amazon-s3-sync-test/labellerr-processed/videos/", # this path is not part of the connection but needed to test the connection on the desired path. 
+#     s3_path="s3://amazon-s3-sync-test/labellerr-processed/videos/", # this path is not part of the connection but needed to test the connection on the desired path.
 #     # This can be dynamically changed while using the connection for creating datasets.
 #     connection_type=ConnectionType._IMPORT,
 #     name="Amazon S3 Import Test",

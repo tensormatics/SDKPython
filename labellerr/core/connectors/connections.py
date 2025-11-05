@@ -1,11 +1,10 @@
 """This module will contain all CRUD for connections. Example, create, list connections, get connection, delete connection, update connection, etc."""
 
 import uuid
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from typing import TYPE_CHECKING, Dict
-import logging
 from .. import client_utils, constants
-from ..schemas import ConnectionType, ConnectorType
+from ..schemas import ConnectionType, DatasetDataType
 from ..exceptions import InvalidConnectionError, InvalidDatasetIDError
 
 if TYPE_CHECKING:
@@ -28,20 +27,13 @@ class LabellerrConnectionMeta(ABCMeta):
         assert connection_id, "Connection ID is can't be empty"
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/connectors/connections/{connection_id}/details"
-        
-        params = {
-            "client_id": client.client_id,
-            "uuid": unique_id
-        }
-        
+
+        params = {"client_id": client.client_id, "uuid": unique_id}
+
         extra_headers = {"content-type": "application/json"}
-        
+
         response = client.make_request(
-            "GET", 
-            url, 
-            extra_headers=extra_headers,
-            request_id=unique_id,
-            params=params
+            "GET", url, extra_headers=extra_headers, request_id=unique_id, params=params
         )
         return response.get("response", None)
 
@@ -89,11 +81,11 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     @property
     def connection_type(self):
         return self.__connection_data.get("connection_type")
-    
+
     @property
     def connector(self):
         return self.__connection_data.get("connector")
-    
+
     @property
     def created_at(self):
         return self.__connection_data.get("created_at")
@@ -102,7 +94,35 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
     def created_by(self):
         return self.__connection_data.get("created_by")
 
-    @abstractmethod
-    def test(self):
-        """Each connection type must implement its own connection testing logic"""
-        pass
+    def test(
+        self, path: str, connection_type: ConnectionType, data_type: DatasetDataType
+    ):
+        request_id = str(uuid.uuid4())
+        test_connection_url = (
+            f"{constants.BASE_URL}/connectors/connections/test"
+            f"?client_id={self.client.client_id}&uuid={request_id}"
+        )
+
+        headers = client_utils.build_headers(
+            api_key=self.client.api_key,
+            api_secret=self.client.api_secret,
+            client_id=self.client.client_id,
+            extra_headers={"email_id": self.client.api_key},
+        )
+
+        # Test endpoint also expects multipart/form-data format
+        test_request = {
+            "connector": (None, self.connector),
+            "path": (None, path),
+            "connection_type": (None, connection_type.value),
+            "connection_id": (None, self.connection_id),
+            "data_type": (None, data_type.value),
+        }
+        response = client_utils.request(
+            "POST",
+            test_connection_url,
+            headers=headers,
+            files=test_request,
+            request_id=request_id,
+        )
+        return response.get("response", {})

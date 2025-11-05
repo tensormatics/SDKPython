@@ -400,7 +400,7 @@ class TestConnectionManagement:
                 client_id=test_credentials["client_id"],
                 aws_access_key=aws_secret.get("access_key"),
                 aws_secrets_key=aws_secret.get("secret_key"),
-                s3_path=aws_secret.get("s3_path"),
+                path=aws_secret.get("s3_path"),
                 data_type=DatasetDataType.image,
                 name=connection_name,
                 description="Test AWS connection",

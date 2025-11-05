@@ -20,14 +20,13 @@ from labellerr.core.schemas.base import DirPathStr, FilePathStr, NonEmptyStr
 # Connection schemas
 from labellerr.core.schemas.connectors import (
     AWSConnectionParams,
-    AWSConnectorConfig,
     DatasetDataType,
     DeleteConnectionParams,
-    GCPConnectorConfig,
     GCSConnectionParams,
     AWSConnectionTestParams,
     ConnectionType,
     ConnectorType,
+    GCSConnectionTestParams,
 )
 
 # Dataset schemas
@@ -85,11 +84,10 @@ __all__ = [
     "AWSConnectionParams",
     "AWSConnectionTestParams",
     "GCSConnectionParams",
+    "GCSConnectionTestParams",
     "DeleteConnectionParams",
-    "AWSConnectorConfig",
-    "GCPConnectorConfig",
     "ConnectorType",
-    "ConnectionType",   
+    "ConnectionType",
     "DatasetDataType",
     # Dataset schemas
     "UploadFilesParams",

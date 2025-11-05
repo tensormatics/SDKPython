@@ -1,10 +1,12 @@
 import json
 import uuid
 from ..client import LabellerrClient
-from ..schemas import AWSConnectionParams, AWSConnectionTestParams, ConnectionType
+from ..schemas import AWSConnectionParams, AWSConnectionTestParams
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
 import logging
+
+
 class S3Connection(LabellerrConnection):
 
     @staticmethod
@@ -41,8 +43,9 @@ class S3Connection(LabellerrConnection):
         test_request = {
             "credentials": (None, aws_credentials_json),
             "connector": (None, "s3"),
-            "path": (None, params.s3_path),
+            "path": (None, params.path),
             "connection_type": (None, params.connection_type.value),
+            "data_type": (None, params.data_type.value),
         }
 
         # Remove content-type from headers to let requests set it with boundary
@@ -54,36 +57,6 @@ class S3Connection(LabellerrConnection):
             "POST",
             test_connection_url,
             headers=headers_without_content_type,
-            files=test_request,
-            request_id=request_id,
-        )
-        return response.get("response", {})
-
-    def test(self, s3_path: str, connection_type: ConnectionType):
-        request_id = str(uuid.uuid4())
-        test_connection_url = (
-            f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={self.client.client_id}&uuid={request_id}"
-        )
-
-        headers = client_utils.build_headers(
-            api_key=self.client.api_key,
-            api_secret=self.client.api_secret,
-            client_id=self.client.client_id,
-            extra_headers={"email_id": self.client.api_key},
-        )
-
-        # Test endpoint also expects multipart/form-data format
-        test_request = {
-            "connector": (None, "s3"),
-            "path": (None, s3_path),
-            "connection_type": (None, connection_type.value),
-            "connection_id": (None, self.connection_id),
-        }
-        response = client_utils.request(
-            "POST",
-            test_connection_url,
-            headers=headers,
             files=test_request,
             request_id=request_id,
         )
@@ -133,8 +106,10 @@ class S3Connection(LabellerrConnection):
         response_data = client_utils.request(
             "POST", url, headers=headers, files=request_payload, request_id=unique_id
         )
-        logging.info(f"Connection creation response: {response_data}")
-        return LabellerrConnection(client=client, connection_id=response_data.get("response", {}).get("connection_id"))
+        return LabellerrConnection(
+            client=client,
+            connection_id=response_data.get("response", {}).get("connection_id"),
+        )
 
 
 LabellerrConnectionMeta._register("s3", S3Connection)

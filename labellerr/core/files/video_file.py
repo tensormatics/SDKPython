@@ -61,9 +61,12 @@ class LabellerrVideoFile(LabellerrFile):
                 "frame_end": frame_end,
                 "project_id": self.project_id,
                 "uuid": unique_id,
+                "client_id": self.client.client_id,
             }
 
-            response = self.client.make_request(url, params, unique_id)
+            response = self.client.make_request(
+                "GET", url, request_id=unique_id, params=params
+            )
 
             return response
 
@@ -233,7 +236,7 @@ class LabellerrVideoFile(LabellerrFile):
             raise LabellerrError(f"Error while joining frames: {str(e)}")
 
     def download_create_video_auto_cleanup(
-        self, output_folder: str = "./Labellerr_datastets"
+        self, output_folder: str = "./Labellerr_datasets"
     ):
         """
         Download frames, create video, and automatically clean up temporary frames.

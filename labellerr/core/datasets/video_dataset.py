@@ -42,16 +42,12 @@ class VideoDataset(LabellerrDataset):
                 # print(params)
 
                 # Fixed: Pass method as first arg, url as second, params as kwarg
-                print(f"url: f{url}")
-                
-                response = self.client.make_request(
-                    method="GET",
-                    url=url,
-                    request_id=unique_id,
-                    params=params
-                )
 
-                # pprint.pprint(response)
+                response = self.client.make_request(
+                    method="GET", url=url, request_id=unique_id, params=params
+                )
+                # from pprint import pprint
+                # pprint(response)
 
                 # Extract files from the response
                 files = response.get("response", {}).get("files", [])
@@ -71,12 +67,15 @@ class VideoDataset(LabellerrDataset):
                 if not next_search_after or not files:
                     break
 
-                print(f"Fetched total: {len(all_file_ids)}")
-
             print(f"Total file IDs extracted: {len(all_file_ids)}")
-            # return all_file_ids
+            return all_file_ids
 
-            # Create LabellerrVideoFile instances for each file_id
+        except Exception as e:
+            raise LabellerrError(f"Failed to fetch dataset files: {str(e)}")
+
+    def _create_labellerrfile_instances(self, all_file_ids: list, project_id: str):
+        # Create LabellerrVideoFile instances for each file_id
+        try:
             video_files = []
             print(
                 f"\nCreating LabellerrFile instances for {len(all_file_ids)} files..."
@@ -87,7 +86,7 @@ class VideoDataset(LabellerrDataset):
                     video_file = LabellerrFile(
                         client=self.client,
                         file_id=file_id,
-                        project_id="self.project_id",  # noqa: # todo: ximi we don't have project id here
+                        project_id=project_id,  # noqa: # todo: ximi we don't have project id here
                         dataset_id=self.dataset_id,
                     )
                     video_files.append(video_file)
@@ -102,7 +101,7 @@ class VideoDataset(LabellerrDataset):
         except Exception as e:
             raise LabellerrError(f"Failed to fetch dataset files: {str(e)}")
 
-    def download(self):
+    def download(self, project_id: str):
         """
         Process all video files in the dataset: download frames, create videos,
         and automatically clean up temporary files.
@@ -115,8 +114,13 @@ class VideoDataset(LabellerrDataset):
             print(f"# Starting batch video processing for dataset: {self.dataset_id}")
             print(f"{'#'*70}\n")
 
+            # Fetch all files ids
+            all_files_ids = self.fetch_files()
+
             # Fetch all video files
-            video_files = self.fetch_files()
+            video_files = self._create_labellerrfile_instances(
+                all_files_ids, project_id
+            )
 
             if not video_files:
                 print("No video files found in dataset")

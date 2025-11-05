@@ -25,6 +25,12 @@ class ConnectionType(str, Enum):
     _IMPORT = "import"
     _EXPORT = "export"
 
+class ConnectorType(str, Enum):
+    """Enum for connector types."""
+
+    _S3 = "s3"
+    _GCS = "gcs"
+    _LOCAL = "local"
 
 class AWSConnectionTestParams(BaseModel):
     """Parameters for testing an AWS S3 connection."""

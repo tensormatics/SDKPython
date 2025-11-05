@@ -1,6 +1,8 @@
+import uuid
 from typing import TYPE_CHECKING
 
-from ...schemas import AWSConnectionParams
+from .. import constants
+from ...schemas import AWSConnectionParams, ConnectionType, ConnectorType
 from .connections import LabellerrConnection
 from .gcs_connection import GCSConnection as LabellerrGCSConnection
 from .s3_connection import S3Connection as LabellerrS3Connection
@@ -13,60 +15,66 @@ __all__ = ["LabellerrGCSConnection", "LabellerrConnection", "LabellerrS3Connecti
 
 def create_connection(
     client: "LabellerrClient",
-    connector_type: str,
-    client_id: str,
-    connector_config: dict,
-):
-    """
-    Sets up cloud connector (GCP/AWS) for dataset creation using factory pattern.
+    connector_type: ConnectorType,
+    params: AWSConnectionParams,
+) -> LabellerrS3Connection | LabellerrGCSConnection:
+    if connector_type == ConnectorType._S3:
+        return LabellerrS3Connection.create_connection(client, params)
+    elif connector_type == ConnectorType._GCS:
+        return LabellerrGCSConnection.create_connection(client, params)
+    else:
+        raise ValueError(f"Unsupported connector type: {connector_type}")
 
+
+def list_connections(
+        client: "LabellerrClient",
+        connector: ConnectorType,
+        connection_type: ConnectionType = None,
+    ) -> list[LabellerrGCSConnection | LabellerrS3Connection]:
+    """
+    Lists connections for a client
     :param client: LabellerrClient instance
-    :param connector_type: Type of connector ('gcp' or 'aws')
-    :param client_id: Client ID
-    :param connector_config: Configuration dictionary for the connector
-    :return: Connection ID (str) for quick connection or full response (dict) for full connection
+    :param connection_type: Type of connection (import/export)
+    :param connector: Optional connector type filter (s3, gcs, etc.)
+    :return: List of connections
     """
-    import logging
 
-    from ..exceptions import InvalidConnectionError
+    unique_id = str(uuid.uuid4())
+    url = f"{constants.BASE_URL}/connectors/connections/list"
 
-    try:
-        if connector_type == "gcs":
-            from .gcs_connection import GCSConnection
+    params = {
+        "client_id": client.client_id,
+        "uuid": unique_id,
+        "connector": connector,
+    }
+    if connection_type:
+        params["connection_type"] = connection_type
+    extra_headers = {"email_id": client.api_key}
 
-            return GCSConnection.create_connection(client, connector_config)
-        elif connector_type == "s3":
-            from .s3_connection import S3Connection
+    response = client.make_request(
+        "GET", 
+        url, 
+        extra_headers=extra_headers,
+        request_id=unique_id,
+        params=params
+    )
+    return [LabellerrConnection(client, connection["connection_id"]) for connection in response.get("response", [])]
 
-            # Determine which method to call based on config parameters
-            # Full connection has: aws_access_key, aws_secrets_key, s3_path, name, description
-            # Quick connection has: bucket_name, folder_path, access_key_id, secret_access_key
-            if "aws_access_key" in connector_config and "name" in connector_config:
-                # Full connection flow - creates a saved connection
-                return S3Connection.setup_full_connection(
-                    client,
-                    AWSConnectionParams(
-                        client_id=connector_config["client_id"],
-                        aws_access_key=connector_config["aws_access_key"],
-                        aws_secrets_key=connector_config["aws_secrets_key"],
-                        s3_path=connector_config["s3_path"],
-                        data_type=connector_config["data_type"],
-                        name=connector_config["name"],
-                        description=connector_config["description"],
-                        connection_type=connector_config.get(
-                            "connection_type", "import"
-                        ),
-                    ),
-                )
-            else:
-                # Quick connection flow - for dataset creation
-                return S3Connection.create_connection(
-                    client, client_id, connector_config
-                )
-        else:
-            raise InvalidConnectionError(
-                f"Unsupported connector type: {connector_type}"
-            )
-    except Exception as e:
-        logging.error(f"Failed to setup {connector_type} connector: {e}")
-        raise
+def delete_connection(client: "LabellerrClient", connection_id: str):
+    """
+    Deletes a connector connection by ID.
+    :param connection_id: The ID of the connection to delete
+    :return: Parsed JSON response
+    """
+    request_id = str(uuid.uuid4())
+    url = (
+        f"{constants.BASE_URL}/connectors/connections/delete"
+        f"?client_id={client.client_id}&uuid={request_id}"
+    )
+
+    extra_headers = {"email_id": client.api_key}
+
+    response = client.make_request(
+        "POST", url, extra_headers=extra_headers, request_id=request_id, json={"connection_id": connection_id}
+    )
+    return response.get("response", None)

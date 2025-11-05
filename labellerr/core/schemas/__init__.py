@@ -18,7 +18,7 @@ from labellerr.core.autolabel.typings import *  # noqa: F403, F401
 from labellerr.core.schemas.base import DirPathStr, FilePathStr, NonEmptyStr
 
 # Connection schemas
-from labellerr.core.schemas.connections import (
+from labellerr.core.schemas.connectors import (
     AWSConnectionParams,
     AWSConnectorConfig,
     DatasetDataType,
@@ -26,6 +26,8 @@ from labellerr.core.schemas.connections import (
     GCPConnectorConfig,
     GCSConnectionParams,
     AWSConnectionTestParams,
+    ConnectionType,
+    ConnectorType,
 )
 
 # Dataset schemas
@@ -86,6 +88,8 @@ __all__ = [
     "DeleteConnectionParams",
     "AWSConnectorConfig",
     "GCPConnectorConfig",
+    "ConnectorType",
+    "ConnectionType",   
     "DatasetDataType",
     # Dataset schemas
     "UploadFilesParams",

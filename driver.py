@@ -148,12 +148,14 @@ client = LabellerrClient(
 #     print(f"GCS Sync Response: {response}")
 
 
-autolabel = LabellerrAutoLabel(client=client)
+# autolabel = LabellerrAutoLabel(client=client)
 # print(LabellerrS3Connection.create_connection(client=client,
 # params=AWSConnectionParams(
 #     aws_access_key=os.getenv("AWS_KEY"),
 #     aws_secrets_key=os.getenv("AWS_SECRET"),
-#     s3_path="",
+#     s3_path="", # format - s3://bucket_name/path/to/folder/
+#     # (this is required to test the connection on the desired path) this path wont be associated with the connection.
+#     # you can dynamically change the export path while using this connection
 #     connection_type="export",
 #     name="Amazon S3 Export Test",
 #     description="Amazon S3 Export Test",
@@ -168,7 +170,7 @@ export = project.create_export(
         statuses=["review"],
         connection_id=os.getenv("AWS_EXPORT_CONNECTION_ID"),
         export_destination="s3",
-        export_folder_path="amazon-s3-sync-test/exports/",  # pattern - bucket_name/path/to/folder/ - the last slash is important
+        export_folder_path="",  # pattern - bucket_name/path/to/folder/ - the last slash is important
     )
 )
 
@@ -177,9 +179,9 @@ print(f"Current status: {export._status}")
 # Uncomment to poll until completion:
 final_status = export.status()
 print(f"Final status: {final_status}")
-# print(autolabel.train(training_request=TrainingRequest(model_id="yolov11", hyperparameters=Hyperparameters(epochs=10), slice_id='f4an5DvU8KaMlYukHFSc', min_samples_per_class=100, job_name="Yolo V11 Training")))
+# print(autolabel.train(training_request=TrainingRequest(model_id="yolov11", hyperparameters=Hyperparameters(epochs=10), slice_id='', min_samples_per_class=100, job_name="Yolo V11 Training")))
 
-# dataset = LabellerrDataset(client=client, dataset_id="137a7b2f-942f-478d-a135-94ad2e11fcca")
+# dataset = LabellerrDataset(client=client, dataset_id="")
 # print (dataset.fetch_files())
 
 # Create dataset using aws and gcs
@@ -188,17 +190,17 @@ print(f"Final status: {final_status}")
 # project = LabellerrProject()
 # project.bulk_assign_files(client_id=client.client_id, project_id=project.project_id, file_ids=file_ids, new_status="completed")
 
-# project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+# project = LabellerrProject(client=client, project_id="")
 # print(project.attached_datasets)
 # print(project.attach_dataset_to_project(dataset_id="137a7b2f-942f-478d"))
 
-# dataset = LabellerrDataset(client=client, dataset_id="1db5342a-8d43-4f16-9765-3f09dd3f245c")
+# dataset = LabellerrDataset(client=client, dataset_id="")
 # print(dataset.enable_multimodal_indexing(is_multimodal=False))
 
-# file = LabellerrFile(client=client, dataset_id='137a7b2f-942f-478d-a135-94ad2e11fcca', file_id="8fb00e0d-456c-49c7-94e2-cca50b4acee7")
+# file = LabellerrFile(client=client, dataset_id='', file_id="")
 # print(file.file_data)
 
-# project = LabellerrProject(client=client, project_id="aimil_reasonable_locust_75218")
+# project = LabellerrProject(client=client, project_id="")
 # res = project.upload_preannotations(
 #     annotation_format="coco_json", annotation_file="horses_coco.json"
 # )
@@ -207,7 +209,7 @@ print(f"Final status: {final_status}")
 # print(LabellerrProject.list_all_projects(client=client))
 
 # project: LabellerrVideoProject = LabellerrProject(client=client, project_id="pam_rear_worm_89383")
-# print(project.add_keyframes(file_id="fd42f5da-7a0c-4d5d-be16-3a9c4fa078bf", keyframes=[KeyFrame(frame_number=1, is_manual=True, method="manual", source="manual")]))
+# print(project.add_keyframes(file_id="", keyframes=[KeyFrame(frame_number=1, is_manual=True, method="manual", source="manual")]))
 
 # datasets = LabellerrDataset.get_all_datasets(
 #     client=client, datatype="image", scope="project", page_size=-1

@@ -28,5 +28,5 @@ wheels/
 tests/test_data
 download
 labellerr/__pycache__/
-env.dev
+env.*
 claude.md

@@ -194,7 +194,7 @@ class TestCreateUser:
 
     def test_create_user_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        from labellerr.schemas import CreateUserParams
+        from labellerr.core.schemas import CreateUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             CreateUserParams(
@@ -211,7 +211,7 @@ class TestCreateUser:
 
     def test_create_user_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
-        from labellerr.schemas import CreateUserParams
+        from labellerr.core.schemas import CreateUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             CreateUserParams(
@@ -227,7 +227,7 @@ class TestCreateUser:
 
     def test_create_user_empty_projects(self, users):
         """Test error handling for empty projects list"""
-        from labellerr.schemas import CreateUserParams
+        from labellerr.core.schemas import CreateUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             CreateUserParams(
@@ -243,7 +243,7 @@ class TestCreateUser:
 
     def test_create_user_empty_roles(self, users):
         """Test error handling for empty roles list"""
-        from labellerr.schemas import CreateUserParams
+        from labellerr.core.schemas import CreateUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             CreateUserParams(
@@ -264,7 +264,7 @@ class TestUpdateUserRole:
 
     def test_update_user_role_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        from labellerr.schemas import UpdateUserRoleParams
+        from labellerr.core.schemas import UpdateUserRoleParams
 
         with pytest.raises(ValidationError) as exc_info:
             UpdateUserRoleParams(
@@ -280,7 +280,7 @@ class TestUpdateUserRole:
 
     def test_update_user_role_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
-        from labellerr.schemas import UpdateUserRoleParams
+        from labellerr.core.schemas import UpdateUserRoleParams
 
         with pytest.raises(ValidationError) as exc_info:
             UpdateUserRoleParams(
@@ -294,7 +294,7 @@ class TestUpdateUserRole:
 
     def test_update_user_role_empty_roles(self, users):
         """Test error handling for empty roles list"""
-        from labellerr.schemas import UpdateUserRoleParams
+        from labellerr.core.schemas import UpdateUserRoleParams
 
         with pytest.raises(ValidationError) as exc_info:
             UpdateUserRoleParams(
@@ -313,7 +313,7 @@ class TestDeleteUser:
 
     def test_delete_user_missing_required_params(self, users):
         """Test error handling for missing required parameters"""
-        from labellerr.schemas import DeleteUserParams
+        from labellerr.core.schemas import DeleteUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             DeleteUserParams(
@@ -329,7 +329,7 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_client_id(self, users):
         """Test error handling for invalid client_id"""
-        from labellerr.schemas import DeleteUserParams
+        from labellerr.core.schemas import DeleteUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             DeleteUserParams(
@@ -343,7 +343,7 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_project_id(self, users):
         """Test error handling for invalid project_id"""
-        from labellerr.schemas import DeleteUserParams
+        from labellerr.core.schemas import DeleteUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             DeleteUserParams(
@@ -357,7 +357,7 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_email_id(self, users):
         """Test error handling for invalid email_id"""
-        from labellerr.schemas import DeleteUserParams
+        from labellerr.core.schemas import DeleteUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             DeleteUserParams(
@@ -371,7 +371,7 @@ class TestDeleteUser:
 
     def test_delete_user_invalid_user_id(self, users):
         """Test error handling for invalid user_id"""
-        from labellerr.schemas import DeleteUserParams
+        from labellerr.core.schemas import DeleteUserParams
 
         with pytest.raises(ValidationError) as exc_info:
             DeleteUserParams(
@@ -403,7 +403,7 @@ class TestAddUserToProject:
 
     def test_add_user_to_project_invalid_client_id(self, users):
         """Test error handling for invalid client_id - validation happens inside method"""
-        from labellerr.schemas import AddUserToProjectParams
+        from labellerr.core.schemas import AddUserToProjectParams
 
         with pytest.raises(ValidationError) as exc_info:
             AddUserToProjectParams(
@@ -434,7 +434,7 @@ class TestRemoveUserFromProject:
 
     def test_remove_user_from_project_invalid_client_id(self, users):
         """Test error handling for invalid client_id - validation happens inside method"""
-        from labellerr.schemas import RemoveUserFromProjectParams
+        from labellerr.core.schemas import RemoveUserFromProjectParams
 
         with pytest.raises(ValidationError) as exc_info:
             RemoveUserFromProjectParams(
@@ -466,7 +466,7 @@ class TestChangeUserRole:
 
     def test_change_user_role_invalid_client_id(self, users):
         """Test error handling for invalid client_id - validation happens inside method"""
-        from labellerr.schemas import ChangeUserRoleParams
+        from labellerr.core.schemas import ChangeUserRoleParams
 
         with pytest.raises(ValidationError) as exc_info:
             ChangeUserRoleParams(

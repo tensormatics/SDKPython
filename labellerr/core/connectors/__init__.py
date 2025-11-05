@@ -31,11 +31,11 @@ def create_connection(
     from ..exceptions import InvalidConnectionError
 
     try:
-        if connector_type == "gcp":
+        if connector_type == "gcs":
             from .gcs_connection import GCSConnection
 
             return GCSConnection.create_connection(client, connector_config)
-        elif connector_type == "aws":
+        elif connector_type == "s3":
             from .s3_connection import S3Connection
 
             # Determine which method to call based on config parameters

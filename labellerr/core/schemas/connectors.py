@@ -5,18 +5,8 @@ Schema models for connection operations (AWS, GCS, etc.).
 import os
 from enum import Enum
 from typing import Optional
-
+from .base import DatasetDataType
 from pydantic import BaseModel, Field, field_validator
-
-
-class DatasetDataType(str, Enum):
-    """Enum for dataset data types."""
-
-    image = "image"
-    video = "video"
-    audio = "audio"
-    document = "document"
-    text = "text"
 
 
 class ConnectionType(str, Enum):

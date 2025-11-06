@@ -110,7 +110,6 @@ def connect_local_files(
     return client_utils.request("POST", url, headers=headers, json=body)
 
 
-@validate_params(client_id=str, files_list=(str, list))
 def upload_files(
     client: "LabellerrClient", client_id: str, files_list: Union[str, List[str]]
 ):
@@ -122,23 +121,12 @@ def upload_files(
     :return: The connection ID from the API.
     :raises LabellerrError: If the upload fails.
     """
-    # Validate parameters using Pydantic
-    params = schemas.UploadFilesParams(client_id=client_id, files_list=files_list)
-    try:
-        # Use validated files_list from Pydantic
-        files_list = params.files_list
+    if len(files_list) == 0:
+        raise LabellerrError("No files to upload")
 
-        if len(files_list) == 0:
-            raise LabellerrError("No files to upload")
-
-        response = __process_batch(client, client_id, files_list)
-        connection_id = response["response"]["temporary_connection_id"]
-        return connection_id
-    except LabellerrError:
-        raise
-    except Exception as e:
-        logging.error(f"Failed to upload files: {str(e)}")
-        raise
+    response = __process_batch(client, client_id, files_list)
+    connection_id = response["response"]["temporary_connection_id"]
+    return connection_id
 
 
 def __process_batch(

@@ -89,7 +89,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
             print(f"Data Type: {self.data_type}")
             print(f"Email ID: {self.email_id}")
 
-            response = datasets.sync_datasets(
+            response = datasets.sync_with_connection(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -134,7 +134,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 print(f"Data Type: {self.data_type}")
                 print(f"Email ID: {self.email_id}")
 
-                response = datasets.sync_datasets(
+                response = datasets.sync_with_connection(
                     client_id=self.client_id,
                     project_id=self.project_id,
                     dataset_id=self.gcs_dataset_id,
@@ -169,7 +169,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
                 print(f"\n  Testing with data_type: {data_type}")
 
                 try:
-                    response = datasets.sync_datasets(
+                    response = datasets.sync_with_connection(
                         client_id=self.client_id,
                         project_id=self.project_id,
                         dataset_id=self.aws_dataset_id,
@@ -194,7 +194,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            datasets.sync_datasets(
+            datasets.sync_with_connection(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id=self.aws_dataset_id,
@@ -214,7 +214,7 @@ class SyncDatasetsIntegrationTests(unittest.TestCase):
         print("=" * 60)
 
         with self.assertRaises((LabellerrError, Exception)) as context:
-            datasets.sync_datasets(
+            datasets.sync_with_connection(
                 client_id=self.client_id,
                 project_id=self.project_id,
                 dataset_id="00000000-0000-0000-0000-000000000000",

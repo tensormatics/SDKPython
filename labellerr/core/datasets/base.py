@@ -1,16 +1,15 @@
 """This module will contain all CRUD for datasets. Example, create, list datasets, get dataset, delete dataset, update dataset, etc."""
 
 import json
+import logging
 import uuid
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, Dict
+from typing import Dict, Optional, Any
 
 from ...schemas import DataSetScope
 from .. import constants
 from ..exceptions import InvalidDatasetError
-
-if TYPE_CHECKING:
-    from ..client import LabellerrClient
+from ..client import LabellerrClient
 
 
 class LabellerrDatasetMeta(ABCMeta):
@@ -69,136 +68,117 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     def __init__(self, client: "LabellerrClient", dataset_id: str, **kwargs):
         self.client = client
         self.dataset_id = dataset_id
-        self.dataset_data = kwargs["dataset_data"]
+        self.__dataset_data = kwargs["dataset_data"]
+
+    @property
+    def name(self):
+        return self.__dataset_data.get("name")
+
+    @property
+    def description(self):
+        return self.__dataset_data.get("description")
+
+    @property
+    def created_at(self):
+        return self.__dataset_data.get("created_at")
+
+    @property
+    def created_by(self):
+        return self.__dataset_data.get("created_by")
 
     @property
     def files_count(self):
-        return self.dataset_data.get("files_count", 0)
+        return self.__dataset_data.get("files_count", 0)
 
     @property
     def status_code(self):
-        return self.dataset_data.get("status_code", 501)  # if not found, return 501
+        return self.__dataset_data.get("status_code", 501)  # if not found, return 501
 
     @property
     def data_type(self):
-        return self.dataset_data.get("data_type")
+        return self.__dataset_data.get("data_type")
+
+    def status(
+        self,
+        interval: float = 2.0,
+        timeout: Optional[float] = None,
+        max_retries: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Poll dataset status until completion or timeout.
+
+        Args:
+            interval: Time in seconds between status checks (default: 2.0)
+            timeout: Maximum time in seconds to poll before giving up
+            max_retries: Maximum number of retries before giving up
+
+        Returns:
+            Final dataset data with status information
+
+        Examples:
+            # Poll until dataset processing is complete
+            final_status = dataset.status()
+
+            # Poll with custom timeout
+            final_status = dataset.status(timeout=300)
+
+            # Poll with custom interval and max retries
+            final_status = dataset.status(interval=5.0, max_retries=20)
+        """
+        from ..utils import poll
+
+        def get_dataset_status():
+            unique_id = str(uuid.uuid4())
+            url = (
+                f"{constants.BASE_URL}/datasets/{self.dataset_id}?client_id={self.client.client_id}"
+                f"&uuid={unique_id}"
+            )
+
+            response = self.client.make_request(
+                "GET",
+                url,
+                extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
+            )
+            dataset_data = response.get("response", {})
+            if dataset_data:
+                self.__dataset_data = dataset_data
+            return dataset_data
+
+        def is_completed(dataset_data):
+            status_code = dataset_data.get("status_code", 500)
+            # Consider dataset complete when status_code is 200 (success) or >= 400 (error/failed)
+            return status_code == 200 or status_code >= 400
+
+        def on_success(dataset_data):
+            status_code = dataset_data.get("status_code", 500)
+            if status_code == 300:
+                logging.info(
+                    "Dataset %s processing completed successfully!", self.dataset_id
+                )
+            else:
+                logging.warning(
+                    "Dataset %s processing finished with status code: %s",
+                    self.dataset_id,
+                    status_code,
+                )
+            return dataset_data
+
+        return poll(
+            function=get_dataset_status,
+            condition=is_completed,
+            interval=interval,
+            timeout=timeout,
+            max_retries=max_retries,
+            on_success=on_success,
+        )
 
     @abstractmethod
     def fetch_files(self):
         """Each file type must implement its own download logic"""
         pass
 
-    @staticmethod
-    def get_all_datasets(
-        client: "LabellerrClient",
-        datatype: str,
-        scope: DataSetScope,
-        page_size: int = None,
-        last_dataset_id: str = None,
-    ):
-        """
-        Retrieves datasets by parameters with pagination support.
-        Always returns a generator that yields individual datasets.
-
-        :param client: The client object.
-        :param datatype: The type of data for the dataset.
-        :param scope: The permission scope for the dataset.
-        :param page_size: Number of datasets to return per page (default: 10)
-                         Use -1 to auto-paginate through all pages
-                         Use specific number to fetch only that many datasets from first page
-        :param last_dataset_id: ID of the last dataset from previous page for pagination
-                               (only used when page_size is a specific number, ignored for -1)
-        :return: Generator yielding individual datasets
-
-        Examples:
-            # Auto-paginate through all datasets
-            for dataset in get_all_datasets(client, "image", DataSetScope.client, page_size=-1):
-                print(dataset)
-
-            # Get first 20 datasets
-            datasets = list(get_all_datasets(client, "image", DataSetScope.client, page_size=20))
-
-            # Manual pagination - first page of 10
-            gen = get_all_datasets(client, "image", DataSetScope.client, page_size=10)
-            first_10 = list(gen)
-        """
-        # Set default page size if not specified
-        if page_size is None:
-            page_size = constants.DEFAULT_PAGE_SIZE
-
-        # Auto-pagination mode: yield datasets across all pages
-        if page_size == -1:
-            actual_page_size = constants.DEFAULT_PAGE_SIZE
-            current_last_dataset_id = None
-            has_more = True
-
-            while has_more:
-                unique_id = str(uuid.uuid4())
-                url = (
-                    f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
-                    f"&page_size={actual_page_size}&uuid={unique_id}"
-                )
-
-                if current_last_dataset_id:
-                    url += f"&last_dataset_id={current_last_dataset_id}"
-
-                response = client.make_request(
-                    "GET",
-                    url,
-                    extra_headers={"content-type": "application/json"},
-                    request_id=unique_id,
-                )
-
-                datasets = response.get("response", {}).get("datasets", [])
-                for dataset in datasets:
-                    yield dataset
-
-                # Check if there are more pages
-                has_more = response.get("response", {}).get("has_more", False)
-                current_last_dataset_id = response.get("response", {}).get(
-                    "last_dataset_id"
-                )
-
-        else:
-            unique_id = str(uuid.uuid4())
-            url = (
-                f"{constants.BASE_URL}/datasets/list?client_id={client.client_id}&data_type={datatype}&permission_level={scope}"
-                f"&page_size={page_size}&uuid={unique_id}"
-            )
-
-            # Add last_dataset_id for pagination if provided
-            if last_dataset_id:
-                url += f"&last_dataset_id={last_dataset_id}"
-
-            response = client.make_request(
-                "GET",
-                url,
-                extra_headers={"content-type": "application/json"},
-                request_id=unique_id,
-            )
-            datasets = response.get("response", {}).get("datasets", [])
-            for dataset in datasets:
-                yield dataset
-
-    def delete_dataset(self, dataset_id):
-        """
-        Deletes a dataset from the system.
-
-        :param dataset_id: The ID of the dataset to delete
-        :return: Dictionary containing deletion status
-        :raises LabellerrError: If the deletion fails
-        """
-        unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/datasets/{dataset_id}/delete?client_id={self.client.client_id}&uuid={unique_id}"
-
-        return self.client.make_request(
-            "DELETE",
-            url,
-            extra_headers={"content-type": "application/json"},
-            request_id=unique_id,
-        )
-
-    def sync_datasets(
+    def sync_with_connection(
         self,
         project_id,
         path,

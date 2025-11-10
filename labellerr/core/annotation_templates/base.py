@@ -40,11 +40,11 @@ class LabellerrAnnotationTemplate:
         # Create the instance only if validation passes
         instance = super().__new__(cls)
         # Store the data on the instance to avoid calling API again in __init__
-        instance._annotation_template_data = annotation_template_data
+        instance.__annotation_template_data = annotation_template_data
         return instance
 
     def __init__(self, client: "LabellerrClient", annotation_template_id: str):
         self.client = client
         self.annotation_template_id = annotation_template_id
         # Use the data already fetched in __new__
-        self.annotation_template_data = self._annotation_template_data
+        self.annotation_template_data = self.__annotation_template_data

@@ -10,6 +10,7 @@ from .document_dataset import DocumentDataSet as LabellerrDocumentDataset
 from .image_dataset import ImageDataset as LabellerrImageDataset
 from .utils import upload_files, upload_folder_files_to_dataset
 from .video_dataset import VideoDataset as LabellerrVideoDataset
+from ..connectors import LabellerrConnection
 
 from ..client import LabellerrClient
 
@@ -25,7 +26,7 @@ __all__ = [
 def create_dataset_from_connection(
     client: "LabellerrClient",
     dataset_config: schemas.DatasetConfig,
-    connection_id: str,
+    connection: LabellerrConnection,
     path: str,
 ) -> LabellerrDataset:
     """
@@ -45,7 +46,7 @@ def create_dataset_from_connection(
             "dataset_name": dataset_config.dataset_name,
             "dataset_description": dataset_config.dataset_description,
             "data_type": dataset_config.data_type,
-            "connection_id": connection_id,
+            "connection_id": connection.connection_id,
             "path": path,
             "client_id": client.client_id,
             "es_multimodal_index": dataset_config.multimodal_indexing,

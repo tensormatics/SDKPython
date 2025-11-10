@@ -181,9 +181,9 @@ from labellerr.core.autolabel import LabellerrAutoLabel
 # print(file.file_data)
 
 # project = LabellerrProject(client=client, project_id="")
-# res = project.upload_preannotations(
+# res = project.upload_preannotation(
 #     annotation_format="coco_json", annotation_file="horses_coco.json"
-# )
+# ).result()
 # print(res)
 
 # print(LabellerrProject.list_all_projects(client=client))

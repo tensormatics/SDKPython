@@ -1,7 +1,14 @@
 from typing import Any, Dict
 
 from ..exceptions import LabellerrError
-from ..utils import poll  # noqa: F401
+from ..utils import poll
+
+from .. import constants
+from ..client import LabellerrClient
+
+__all__ = [
+    "poll",
+]
 
 
 def validate_rotation_config(rotation_config: Dict[str, Any]) -> None:
@@ -40,3 +47,32 @@ def validate_rotation_config(rotation_config: Dict[str, Any]) -> None:
         raise LabellerrError(
             "client_review_rotation_count must be 0 when annotation_rotation_count is greater than 1"
         )
+
+
+def get_direct_upload_url(
+    client: LabellerrClient, file_name: str, purpose: str = "pre-annotations"
+) -> str:
+    """
+    Get a direct upload URL for uploading files to GCS.
+
+    :param file_name: Name of the file to upload
+    :param client: LabellerrClient instance
+    :param purpose: Purpose of the upload (default: "pre-annotations")
+    :return: Direct upload URL
+    """
+    url = f"{constants.BASE_URL}/connectors/direct-upload-url"
+    params = {  # noqa: F841
+        "client_id": client.client_id,
+        "purpose": purpose,
+        "file_name": file_name,
+    }
+
+    try:
+        response_data = client.make_request(
+            "GET",
+            url,
+            extra_headers={"Origin": constants.ALLOWED_ORIGINS},
+        )
+        return response_data["response"]
+    except Exception as e:
+        raise LabellerrError(f"Failed to get direct upload URL: {str(e)}")

@@ -31,7 +31,7 @@ def project(client):
     proj = ImageProject.__new__(ImageProject)
     proj.client = client
     proj.project_id = "test_project_id"
-    proj.project_data = project_data
+    proj.__project_data = project_data
     return proj
 
 

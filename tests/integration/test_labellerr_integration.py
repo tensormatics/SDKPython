@@ -137,12 +137,11 @@ class TestPreAnnotationWorkflow:
         annotation_file = temp_json_file(sample_annotation_data["coco_json"])
 
         try:
-            result = project._upload_preannotation_sync(
-                project_id=test_project_ids["project_id"],
-                client_id=test_credentials["client_id"],
+            future = project.upload_preannotation(
                 annotation_format="coco_json",
                 annotation_file=annotation_file,
             )
+            result = future.result()
 
             assert isinstance(result, dict)
             assert "response" in result
@@ -183,12 +182,11 @@ class TestPreAnnotationWorkflow:
         signal.alarm(60)
 
         try:
-            result = project._upload_preannotation_sync(
-                project_id=test_project_ids["project_id"],
-                client_id=test_credentials["client_id"],
+            future = project.upload_preannotation(
                 annotation_format="json",
                 annotation_file=annotation_file,
             )
+            result = future.result()
 
             assert isinstance(result, dict)
 
@@ -230,12 +228,11 @@ class TestPreAnnotationWorkflow:
         project = LabellerrProject(integration_client, test_project_ids["project_id"])
 
         with pytest.raises(LabellerrError) as exc_info:
-            project._upload_preannotation_sync(
-                project_id=test_project_ids["project_id"],
-                client_id=test_credentials["client_id"],
+            future = project.upload_preannotation(
                 annotation_format=invalid_format,
                 annotation_file="test.json",
             )
+            future.result()
 
         assert expected_error in str(exc_info.value)
 

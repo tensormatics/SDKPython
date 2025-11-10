@@ -20,15 +20,20 @@ def create_template(
     client: LabellerrClient, params: CreateTemplateParams
 ) -> LabellerrAnnotationTemplate:
     """Create an annotation template"""
+
     unique_id = str(uuid.uuid4())
     for question in params.questions:
-        if question.question_type in object_types and not question.color:
-            raise ValueError(
-                "Color is required for bounding box, polygon, polyline, and dot questions"
-            )
-
         if question.question_type in object_types:
+            if not question.color:
+                raise ValueError(
+                    "Color is required for bounding box, polygon, polyline, and dot questions"
+                )
             question.options = [Option(option_name=question.color)]
+        else:
+            if question.question_type != QuestionType.input and not question.options:
+                raise ValueError(
+                    "Options are required for radio, boolean, select, dropdown, stt, imc questions"
+                )
 
     # Convert questions to the expected format
     questions_data = []

@@ -34,7 +34,7 @@ client = LabellerrClient(
 )
 
 # project = LabellerrProject(client=client, project_id="rafaela_youngest_pike_23125")
-# res = project.upload_preannotations(annotation_format="coco_json", annotation_file="/Users/Ximi-Hoque/Downloads/export_to_annotate_05_15.json")
+# res = project.upload_preannotation(annotation_format="coco_json", annotation_file="/Users/Ximi-Hoque/Downloads/export_to_annotate_05_15.json").result()
 # print(res)
 
 # annotation_template = LabellerrAnnotationTemplate(client=client, annotation_template_id="00016829-9051-46b1-96c6-3ec6763c342a")

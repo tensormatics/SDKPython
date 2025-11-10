@@ -201,7 +201,7 @@ def mock_video_project(mock_client):
     project = VideoProject.__new__(VideoProject)
     project.client = mock_client
     project.project_id = "test_project_id"
-    project.project_data = {
+    project.__project_data = {
         "project_id": "test_project_id",
         "data_type": "video",
         "attached_datasets": [],

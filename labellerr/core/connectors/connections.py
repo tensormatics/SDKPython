@@ -2,13 +2,12 @@
 
 import uuid
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Dict
+from typing import Dict
 from .. import client_utils, constants
 from ..schemas import ConnectionType, DatasetDataType
-from ..exceptions import InvalidConnectionError, InvalidDatasetIDError
+from ..exceptions import InvalidConnectionError
 
-if TYPE_CHECKING:
-    from ..client import LabellerrClient
+from ..client import LabellerrClient
 
 
 class LabellerrConnectionMeta(ABCMeta):
@@ -49,7 +48,7 @@ class LabellerrConnectionMeta(ABCMeta):
             return instance
         connection_data = cls.get_connection(client, connection_id)
         if connection_data is None:
-            raise InvalidDatasetIDError(f"Connection not found: {connection_id}")
+            raise InvalidConnectionError(f"Connection not found: {connection_id}")
         connector = connection_data.get("connector")
         connection_class = cls._registry.get(connector)
         if connection_class is None:

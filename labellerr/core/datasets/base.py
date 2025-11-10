@@ -6,7 +6,6 @@ import uuid
 from abc import ABCMeta, abstractmethod
 from typing import Dict, Optional, Any
 
-from ...schemas import DataSetScope
 from .. import constants
 from ..exceptions import InvalidDatasetError
 from ..client import LabellerrClient
@@ -52,8 +51,6 @@ class LabellerrDatasetMeta(ABCMeta):
         if dataset_data is None:
             raise InvalidDatasetError(f"Dataset not found: {dataset_id}")
         data_type = dataset_data.get("data_type")
-        if data_type not in constants.DATA_TYPES:
-            raise InvalidDatasetError(f"Data type not supported: {data_type}")
 
         dataset_class = cls._registry.get(data_type)
         if dataset_class is None:

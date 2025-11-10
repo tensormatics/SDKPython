@@ -1,7 +1,6 @@
 import json
 import logging
 import uuid
-from typing import TYPE_CHECKING
 
 from .. import constants, schemas
 from ..exceptions import LabellerrError
@@ -12,8 +11,7 @@ from .image_dataset import ImageDataset as LabellerrImageDataset
 from .utils import upload_files, upload_folder_files_to_dataset
 from .video_dataset import VideoDataset as LabellerrVideoDataset
 
-if TYPE_CHECKING:
-    from ..client import LabellerrClient
+from ..client import LabellerrClient
 
 __all__ = [
     "LabellerrImageDataset",

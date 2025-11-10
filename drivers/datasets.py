@@ -1,7 +1,7 @@
-from labellerr.core.datasets import (
-    create_dataset_from_local,
-    create_dataset_from_connection,
-)
+# from labellerr.core.datasets import (
+#     create_dataset_from_local,
+#     create_dataset_from_connection,
+# )
 import logging
 import os
 from dotenv import load_dotenv
@@ -58,5 +58,4 @@ dataset_config = DatasetConfig(
 dataset = LabellerrDataset(
     client=client, dataset_id="455e3d45-55f9-436d-98c2-07a514b7894e"
 )
-print(dataset.dataset_data)
 print(dataset.files_count)

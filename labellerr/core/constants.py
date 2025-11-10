@@ -17,8 +17,6 @@ LOCAL_EXPORT_STATUS = [
     "accepted",
 ]
 
-# DATA TYPES: image, video, audio, document, text
-DATA_TYPES = ("image", "video", "audio", "document", "text")
 DATA_TYPE_FILE_EXT = {
     "image": [".jpg", ".jpeg", ".png", ".tiff"],
     "video": [".mp4"],

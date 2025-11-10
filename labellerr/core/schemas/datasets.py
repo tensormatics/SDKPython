@@ -7,7 +7,6 @@ from enum import StrEnum
 from typing import List, Literal
 from uuid import UUID
 
-from .connectors import ConnectorType
 from .base import DatasetDataType
 from pydantic import BaseModel, Field, field_validator
 

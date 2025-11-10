@@ -6,7 +6,7 @@ import logging
 import os
 import uuid
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Dict
+from typing import Dict
 
 import requests
 
@@ -15,8 +15,7 @@ from ..exceptions import InvalidProjectError, LabellerrError
 from ..utils import poll
 from ..exports import Export
 
-if TYPE_CHECKING:
-    from ..client import LabellerrClient
+from ..client import LabellerrClient
 
 
 class LabellerrProjectMeta(ABCMeta):
@@ -59,8 +58,6 @@ class LabellerrProjectMeta(ABCMeta):
         if project_data is None:
             raise InvalidProjectError(f"Project not found: {project_id}")
         data_type = project_data.get("data_type")
-        if data_type not in constants.DATA_TYPES:
-            raise InvalidProjectError(f"Data type not supported: {data_type}")
 
         project_class = cls._registry.get(data_type)
         if project_class is None:
@@ -582,7 +579,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
             logging.info(f"Preannotation job started successfully. Job ID: {job_id}")
 
-            # Use max_retries=10 with 5-second intervals = 50 seconds max (fits within typical test timeouts)
             future = self.preannotation_job_status_async(job_id)
             return future.result()
         except Exception as e:

@@ -244,29 +244,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.error(f"Project rotation update config failed: {e}")
             raise
 
-    @staticmethod
-    def list_all_projects(client: "LabellerrClient"):
-        """
-        Retrieves a list of projects associated with a client ID.
-
-        :param client: The client instance.
-        :return: A dictionary containing the list of projects.
-        :raises LabellerrError: If the retrieval fails.
-        """
-        try:
-            unique_id = str(uuid.uuid4())
-            url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client.client_id}&uuid={unique_id}"
-
-            return client.make_request(
-                "GET",
-                url,
-                extra_headers={"content-type": "application/json"},
-                request_id=unique_id,
-            )
-        except Exception as e:
-            logging.error(f"Failed to retrieve projects: {str(e)}")
-            raise
-
     def _upload_preannotation_sync(
         self,
         project_id,

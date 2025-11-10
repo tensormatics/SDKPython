@@ -71,3 +71,25 @@ def create_project(
     )
 
     return LabellerrProject(client, project_id=response["response"]["project_id"])
+
+
+def list_projects(client: "LabellerrClient"):
+    """
+    Retrieves a list of projects associated with a client ID.
+
+    :param client: The client instance.
+    :return: A list of LabellerrProject objects.
+    """
+    unique_id = str(uuid.uuid4())
+    url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client.client_id}&uuid={unique_id}"
+
+    response = client.make_request(
+        "GET",
+        url,
+        extra_headers={"content-type": "application/json"},
+        request_id=unique_id,
+    )
+    return [
+        LabellerrProject(client, project_id=project["project_id"])
+        for project in response["response"]["projects"]
+    ]

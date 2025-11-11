@@ -1,8 +1,8 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional
 from enum import Enum
 from ..schemas import DatasetDataType
-
+import uuid
 
 class QuestionType(str, Enum):
     bounding_box = "BoundingBox"
@@ -27,7 +27,7 @@ class AnnotationQuestion(BaseModel):
 
     question_number: int
     question: str
-    question_id: str
+    question_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     question_type: QuestionType
     required: bool
     options: Optional[List[Option]] = []

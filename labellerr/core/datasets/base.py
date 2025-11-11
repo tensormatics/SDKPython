@@ -3,12 +3,14 @@
 import json
 import logging
 import uuid
-from abc import ABCMeta, abstractmethod
-from typing import Dict, Optional, Any
+from abc import ABCMeta
+from typing import Dict, Optional, Any, List
 
 from .. import constants
-from ..exceptions import InvalidDatasetError
+from ..exceptions import InvalidDatasetError, LabellerrError
 from ..client import LabellerrClient
+
+from ..files import LabellerrFile
 
 
 class LabellerrDatasetMeta(ABCMeta):
@@ -170,10 +172,69 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
             on_success=on_success,
         )
 
-    @abstractmethod
-    def fetch_files(self):
-        """Each file type must implement its own download logic"""
-        pass
+    def fetch_files(self, page_size: int = 1000) -> List[LabellerrFile]:
+        """
+        Fetch all files in this dataset as LabellerrFile instances.
+
+        :param page_size: Number of files to fetch per API request (default: 10)
+        :return: List of file IDs
+        """
+        print(f"Fetching files for dataset: {self.dataset_id}")
+        file_ids = []
+        next_search_after = None  # Start with None for first page
+
+        while True:
+            unique_id = str(uuid.uuid4())
+            url = f"{constants.BASE_URL}/search/files/all"
+            params = {
+                "sort_by": "created_at",
+                "sort_order": "desc",
+                "size": page_size,
+                "uuid": unique_id,
+                "dataset_id": self.dataset_id,
+                "client_id": self.client.client_id,
+            }
+
+            # Add next_search_after only if it exists (don't send on first request)
+            if next_search_after:
+                url += f"?next_search_after={next_search_after}"
+
+            response = self.client.make_request(
+                "GET", url, extra_headers=None, request_id=unique_id, params=params
+            )
+            print(response)
+            # Extract files from the response
+            files = response.get("response", {}).get("files", [])
+
+            # Collect file IDs
+            for file_info in files:
+                file_id = file_info.get("file_id")
+                if file_id:
+                    file_ids.append(file_id)
+
+            # Get next_search_after for pagination
+            next_search_after = response.get("response", {}).get("next_search_after")
+
+            # Break if no more pages or no files returned
+            if not next_search_after or not files:
+                break
+
+        files = []
+
+        for file_id in file_ids:
+            try:
+                _file = LabellerrFile(
+                    client=self.client,
+                    file_id=file_id,
+                    dataset_id=self.dataset_id,
+                )
+                files.append(_file)
+            except LabellerrError as e:
+                logging.warning(
+                    f"Warning: Failed to create file instance for {file_id}: {str(e)}"
+                )
+
+        return files
 
     def sync_with_connection(
         self,

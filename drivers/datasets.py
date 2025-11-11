@@ -59,3 +59,6 @@ dataset = LabellerrDataset(
     client=client, dataset_id="455e3d45-55f9-436d-98c2-07a514b7894e"
 )
 print(dataset.files_count)
+
+for file in dataset.fetch_files():
+    print(file.file_id)

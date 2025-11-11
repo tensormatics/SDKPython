@@ -8,7 +8,7 @@ from labellerr.client import LabellerrClient
 # from labellerr.core.schemas.annotation_templates import CreateTemplateParams, AnnotationQuestion, QuestionType
 # from labellerr.core.annotation_templates import create_template
 # from labellerr.core.schemas.projects import CreateProjectParams, RotationConfig
-# from labellerr.core.projects import create_project
+# from labellerr.core.projects import create_project, list_projects
 # from labellerr.core.datasets import LabellerrDataset
 
 

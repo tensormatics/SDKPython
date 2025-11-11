@@ -3,8 +3,7 @@ from .base import LabellerrDataset, LabellerrDatasetMeta
 
 
 class ImageDataset(LabellerrDataset):
-    def fetch_files(self):
-        print("Yo I am gonna fetch some files!")
+    pass
 
 
 LabellerrDatasetMeta._register(DatasetDataType.image, ImageDataset)

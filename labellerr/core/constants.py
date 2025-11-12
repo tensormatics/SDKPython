@@ -7,7 +7,7 @@ FILE_BATCH_COUNT = 900
 TOTAL_FILES_SIZE_LIMIT_PER_DATASET = 2.5 * 1024 * 1024 * 1024  # 2.5GB
 TOTAL_FILES_COUNT_LIMIT_PER_DATASET = 2500
 
-ANNOTATION_FORMAT = ["json", "coco_json", "csv", "png"]
+ANNOTATION_FORMAT = ["json", "coco_json", "csv", "png", "video_json", "video_json"]
 LOCAL_EXPORT_FORMAT = ["json", "coco_json", "csv", "png"]
 LOCAL_EXPORT_STATUS = [
     "review",
@@ -17,6 +17,8 @@ LOCAL_EXPORT_STATUS = [
     "accepted",
 ]
 
+# DATA TYPES: image, video, audio, document, text
+DATA_TYPES = ("image", "video", "audio", "document", "text")
 DATA_TYPE_FILE_EXT = {
     "image": [".jpg", ".jpeg", ".png", ".tiff"],
     "video": [".mp4"],
@@ -40,4 +42,5 @@ OPTION_TYPE_LIST = [
     "dot",
     "audio",
 ]
+CONNECTION_TYPES = ["s3", "gcs", "local"]
 cdn_server_address = "cdn-951134552678.us-central1.run.app:443"

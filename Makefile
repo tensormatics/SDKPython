@@ -71,8 +71,6 @@ check-release: ## Check if everything is ready for release
 	@echo "3. Commit: git commit -m '[LABIMP-XXXX] Prepare release vX.X.X'"
 	@echo "4. Push and create PR to main (patch) or develop (minor)"
 
-integration-test:
-	$(PYTHON) -m pytest  -v labellerr_integration_tests.py
 
 pre-commit-install:
 	pip install pre-commit

@@ -1,4 +1,5 @@
 import uuid
+from concurrent.futures import Future
 from typing import List
 
 from .. import constants
@@ -81,6 +82,83 @@ class VideoProject(LabellerrProject):
             raise e
         except Exception as e:
             raise LabellerrError(f"Failed to delete key frames: {str(e)}")
+
+    def upload_preannotation(
+        self, annotation_format: str, annotation_file: str, conf_bucket: str = None
+    ):
+        """
+        Upload pre-annotations for video project.
+
+        For video projects, use annotation_format="video_json" with a JSON file containing
+        video annotations in the format:
+        [
+            {
+                "file_name": "video.mp4",
+                "annotations": [
+                    {
+                        "question_name": "Label name",
+                        "question_type": "BoundingBox" or "polygon",
+                        "answer": [
+                            {
+                                "frames": {
+                                    "0": {
+                                        "frame": 0,
+                                        "answer": {
+                                            "xmin": 100, "ymin": 100, "xmax": 300, "ymax": 300, "rotation": 0
+                                        },
+                                        "timestamp": 0.0
+                                    },
+                                    "25": {
+                                        "frame": 25,
+                                        "answer": {
+                                            "xmin": 150, "ymin": 150, "xmax": 350, "ymax": 350, "rotation": 0
+                                        },
+                                        "timestamp": 1.0
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+
+        For polygon annotations, use answer format:
+        "answer": [{"x": 0, "y": 600}, {"x": 1920, "y": 600}, ...]
+
+        :param annotation_format: Format of annotations ("video_json", "coco_json", etc.)
+        :param annotation_file: Path to the annotation file
+        :param conf_bucket: Optional confidence bucket ("low", "medium", "high")
+        :return: Response with job status
+        :raises LabellerrError: If upload fails
+        """
+        # Delegate to the base class synchronous upload (blocks until completion)
+        return self.upload_preannotations(
+            annotation_format, annotation_file, conf_bucket, _async=False
+        )
+
+    def upload_preannotation_async(
+        self, annotation_format: str, annotation_file: str, conf_bucket: str = None
+    ) -> Future:
+        """
+        Asynchronously upload pre-annotations for video project and monitor the job status.
+
+        This method returns immediately with a Future object. The actual upload and monitoring
+        happens in a background thread. Use future.result() to wait for completion.
+
+        For video projects, use annotation_format="video_json" with a JSON file containing
+        video annotations.
+
+        :param annotation_format: Format of annotations ("video_json", "coco_json", etc.)
+        :param annotation_file: Path to the annotation file
+        :param conf_bucket: Optional confidence bucket ("low", "medium", "high")
+        :return: Future object that will contain the response when complete
+        :raises LabellerrError: If upload fails
+        """
+        # Delegate to the base class async upload (returns Future immediately)
+        return self.upload_preannotations(
+            annotation_format, annotation_file, conf_bucket, _async=True
+        )
 
 
 LabellerrProjectMeta._register(DatasetDataType.video, VideoProject)

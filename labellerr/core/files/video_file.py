@@ -1,10 +1,11 @@
+import json
 import os
 import shutil
 import subprocess
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from threading import Lock
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 import requests
 
@@ -25,7 +26,7 @@ class LabellerrVideoFile(LabellerrFile):
         client: "LabellerrClient",
         file_id: str,
         project_id: str,
-        dataset_id: str | None = None,
+        dataset_id: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(client, file_id, project_id, dataset_id=dataset_id, **kwargs)
@@ -35,7 +36,7 @@ class LabellerrVideoFile(LabellerrFile):
         """Get total number of frames in the video."""
         return self.metadata.get("total_frames", 0)
 
-    def get_frames(self, frame_start: int = 0, frame_end: int | None = None):
+    def get_frames(self, frame_start: int = 0, frame_end: Optional[int] = None):
         """
         Retrieve video frames data from Labellerr API.
 
@@ -102,7 +103,10 @@ class LabellerrVideoFile(LabellerrFile):
             return False, frame_number, error_info
 
     def download_frames(
-        self, frames_data: dict, output_folder: str | None = None, max_workers: int = 30
+        self,
+        frames_data: dict,
+        output_folder: Optional[str] = None,
+        max_workers: int = 30,
     ):
         """
         Download video frames from URLs to a local folder using multithreading.
@@ -189,7 +193,7 @@ class LabellerrVideoFile(LabellerrFile):
         frames_folder: str,
         framerate: int = 30,
         pattern: str = "%d.jpg",
-        output_file: str | None = None,
+        output_file: Optional[str] = None,
     ):
         """
         Join frames into a video using ffmpeg.
@@ -329,6 +333,90 @@ class LabellerrVideoFile(LabellerrFile):
                 shutil.rmtree(cleanup_folder)
 
             raise LabellerrError(f"Failed in video processing: {str(e)}")
+
+    def upload_pre_annotations(
+        self,
+        annotations: List[Dict],
+        annotation_format: str = "video_json",
+        conf_bucket: str = None,
+    ):
+        """
+        Upload pre-annotations for this video file.
+
+        This is a convenience method that creates a properly formatted annotation file
+        for a single video and uploads it using the project's upload_preannotation method.
+
+        :param annotations: List of question annotations in format:
+            [
+                {
+                    "question_name": "Label name",
+                    "question_type": "BoundingBox" or "polygon",
+                    "answer": [
+                        {
+                            "frames": {
+                                "0": {
+                                    "frame": 0,
+                                    "answer": {
+                                        "xmin": 100, "ymin": 100, "xmax": 300, "ymax": 300, "rotation": 0
+                                    },
+                                    "timestamp": 0.0
+                                },
+                                "25": {
+                                    "frame": 25,
+                                    "answer": {
+                                        "xmin": 150, "ymin": 150, "xmax": 350, "ymax": 350, "rotation": 0
+                                    },
+                                    "timestamp": 1.0
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+
+            For polygon annotations, use answer format:
+            "answer": [{"x": 0, "y": 600}, {"x": 1920, "y": 600}, ...]
+
+        :param annotation_format: Format of annotations (default: "video_json")
+        :param conf_bucket: Optional confidence bucket ("low", "medium", "high")
+        :return: Response with job status
+        :raises LabellerrError: If upload fails
+        """
+        try:
+            # Get project instance
+            from ..projects.base import LabellerrProject
+
+            project = LabellerrProject(self.client, self.project_id)
+
+            # Create properly formatted video answer data
+            video_data = [
+                {
+                    "file_name": self.metadata.get("file_name", f"{self.file_id}.mp4"),
+                    "annotations": annotations,
+                }
+            ]
+
+            # Create temporary file with the annotations
+            temp_file_path = f"/tmp/{self.file_id}_preannotations.json"
+            with open(temp_file_path, "w") as f:
+                json.dump(video_data, f, indent=2)
+
+            # Upload using project method
+            result = project.upload_preannotations(
+                annotation_format=annotation_format,
+                annotation_file=temp_file_path,
+                conf_bucket=conf_bucket,
+                _async=True,
+            )
+
+            # Clean up temp file
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+            return result
+
+        except Exception as e:
+            raise LabellerrError(f"Failed to upload video pre-annotations: {str(e)}")
 
 
 LabellerrFileMeta._register("video", LabellerrVideoFile)

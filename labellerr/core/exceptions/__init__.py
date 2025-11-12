@@ -25,3 +25,9 @@ class InvalidDatasetIDError(Exception):
 
 class InvalidConnectionError(Exception):
     pass
+
+
+class InvalidAnnotationTemplateError(Exception):
+    """Custom exception for invalid annotation template errors."""
+
+    pass

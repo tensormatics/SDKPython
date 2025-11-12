@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import List, Literal
 from uuid import UUID
 
+from .base import DatasetDataType
 from pydantic import BaseModel, Field, field_validator
 
 
@@ -107,6 +108,6 @@ class DatasetConfig(BaseModel):
     """Configuration for creating a dataset."""
 
     dataset_name: str = Field(min_length=1)
-    data_type: Literal["image", "video", "audio", "document", "text"]
+    data_type: DatasetDataType
     dataset_description: str = ""
-    connector_type: Literal["local", "aws", "gcp"] = "local"
+    multimodal_indexing: bool = False

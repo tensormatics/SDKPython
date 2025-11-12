@@ -3,6 +3,17 @@ Base custom types and validators for schemas.
 """
 
 import os
+from enum import Enum
+
+
+class DatasetDataType(str, Enum):
+    """Enum for dataset data types."""
+
+    image = "image"
+    video = "video"
+    audio = "audio"
+    document = "document"
+    text = "text"
 
 
 class NonEmptyStr(str):

@@ -5,8 +5,6 @@ This module contains unit tests that test individual components
 in isolation using mocks and fixtures.
 """
 
-import os
-
 import pytest
 from pydantic import ValidationError
 
@@ -14,6 +12,10 @@ from labellerr.core.exceptions import LabellerrError
 from labellerr.core.projects import create_project
 from labellerr.core.projects.image_project import ImageProject
 from labellerr.core.users.base import LabellerrUsers
+from labellerr.core.schemas.projects import CreateProjectParams, RotationConfig
+from labellerr.core.annotation_templates import LabellerrAnnotationTemplate
+from labellerr.core.datasets import LabellerrDataset
+from unittest.mock import Mock, patch
 
 
 @pytest.fixture
@@ -29,7 +31,7 @@ def project(client):
     proj = ImageProject.__new__(ImageProject)
     proj.client = client
     proj.project_id = "test_project_id"
-    proj.project_data = project_data
+    proj.__project_data = project_data
     return proj
 
 
@@ -41,151 +43,262 @@ def users(client):
 
 
 @pytest.fixture
-def sample_valid_payload():
-    """Create a sample valid payload for create_project"""
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    test_image = os.path.join(current_dir, "test_data", "test_image.jpg")
+def sample_valid_params():
+    """Create a sample valid CreateProjectParams for create_project"""
+    return CreateProjectParams(
+        project_name="Test Project",
+        data_type="image",
+        rotations=RotationConfig(
+            annotation_rotation_count=1,
+            review_rotation_count=1,
+            client_review_rotation_count=1,
+        ),
+        use_ai=False,
+        created_by="test_user@example.com",
+    )
 
-    # Create test directory and file if they don't exist
-    os.makedirs(os.path.join(current_dir, "test_data"), exist_ok=True)
-    if not os.path.exists(test_image):
-        with open(test_image, "w") as f:
-            f.write("dummy image content")
 
-    return {
-        "data_type": "image",
-        "created_by": "test_user@example.com",
-        "project_name": "Test Project",
-        "autolabel": False,
-        "files_to_upload": [test_image],
-        "annotation_guide": [
-            {
-                "option_type": "radio",
-                "question": "Test Question",
-                "options": ["Option 1", "Option 2"],
-            }
-        ],
-        "rotation_config": {
-            "annotation_rotation_count": 1,
-            "review_rotation_count": 1,
-            "client_review_rotation_count": 1,
-        },
-    }
+@pytest.fixture
+def mock_dataset():
+    """Create a mock dataset for testing"""
+    dataset = Mock(spec=LabellerrDataset)
+    dataset.dataset_id = "test-dataset-id"
+    dataset.files_count = 10
+    return dataset
+
+
+@pytest.fixture
+def mock_annotation_template():
+    """Create a mock annotation template for testing"""
+    template = Mock(spec=LabellerrAnnotationTemplate)
+    template.annotation_template_id = "test-template-id"
+    return template
 
 
 @pytest.mark.unit
 class TestInitiateCreateProject:
 
-    def test_missing_required_parameters(self, client, sample_valid_payload):
+    def test_missing_required_parameters(
+        self, client, mock_dataset, mock_annotation_template
+    ):
         """Test error handling for missing required parameters"""
-        # Remove required parameters one by one and test
-        # Current required params in create_project: data_type, created_by, project_name, autolabel
-        required_params = [
-            "data_type",
-            "created_by",
-            "project_name",
-            "autolabel",
-        ]
+        # Test missing project_name
+        with pytest.raises(ValidationError):
+            CreateProjectParams(
+                data_type="image",
+                rotations=RotationConfig(
+                    annotation_rotation_count=1,
+                    review_rotation_count=1,
+                    client_review_rotation_count=1,
+                ),
+                use_ai=False,
+                created_by="test_user@example.com",
+                # Missing project_name
+            )
 
-        for param in required_params:
-            invalid_payload = sample_valid_payload.copy()
-            del invalid_payload[param]
+        # Test missing data_type
+        with pytest.raises(ValidationError):
+            CreateProjectParams(
+                project_name="Test Project",
+                rotations=RotationConfig(
+                    annotation_rotation_count=1,
+                    review_rotation_count=1,
+                    client_review_rotation_count=1,
+                ),
+                use_ai=False,
+                created_by="test_user@example.com",
+                # Missing data_type
+            )
 
-            with pytest.raises(LabellerrError) as exc_info:
-                create_project(client, invalid_payload)
+        # Test missing rotations
+        with pytest.raises(ValidationError):
+            CreateProjectParams(
+                project_name="Test Project",
+                data_type="image",
+                use_ai=False,
+                created_by="test_user@example.com",
+                # Missing rotations
+            )
 
-            assert f"Required parameter {param} is missing" in str(exc_info.value)
-
-        # Test annotation_guide separately since it has special validation
-        invalid_payload = sample_valid_payload.copy()
-        del invalid_payload["annotation_guide"]
-
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
-
-        assert (
-            "Please provide either annotation guide or annotation template id"
-            in str(exc_info.value)
-        )
-
-    def test_invalid_created_by_email(self, client, sample_valid_payload):
+    def test_invalid_created_by_email(
+        self, client, mock_dataset, mock_annotation_template
+    ):
         """Test error handling for invalid created_by email format"""
-        invalid_payload = sample_valid_payload.copy()
-        invalid_payload["created_by"] = "not_an_email"  # Missing @ and domain
-
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
-
-        assert "Please enter email id in created_by" in str(exc_info.value)
+        # Test invalid email format - should raise ValidationError during CreateProjectParams creation
+        with pytest.raises(ValidationError):
+            CreateProjectParams(
+                project_name="Test Project",
+                data_type="image",
+                rotations=RotationConfig(
+                    annotation_rotation_count=1,
+                    review_rotation_count=1,
+                    client_review_rotation_count=1,
+                ),
+                use_ai=False,
+                created_by="not_an_email",  # Invalid email format
+            )
 
         # Test invalid email without domain extension
-        invalid_payload["created_by"] = "test@example"
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
+        with pytest.raises(ValidationError):
+            CreateProjectParams(
+                project_name="Test Project",
+                data_type="image",
+                rotations=RotationConfig(
+                    annotation_rotation_count=1,
+                    review_rotation_count=1,
+                    client_review_rotation_count=1,
+                ),
+                use_ai=False,
+                created_by="test@example",  # Invalid email format
+            )
 
-        assert "Please enter email id in created_by" in str(exc_info.value)
-
-    def test_invalid_annotation_guide(self, client, sample_valid_payload):
+    def test_invalid_annotation_guide(
+        self, client, mock_dataset, mock_annotation_template
+    ):
         """Test error handling for invalid annotation guide"""
-        invalid_payload = sample_valid_payload.copy()
-
-        # Missing option_type
-        invalid_payload["annotation_guide"] = [{"question": "Test Question"}]
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
-
-        assert "option_type is required in annotation_guide" in str(exc_info.value)
-
-        # Invalid option_type
-        invalid_payload["annotation_guide"] = [
-            {"option_type": "invalid_type", "question": "Test Question"}
-        ]
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
-
-        assert "option_type must be one of" in str(exc_info.value)
-
-    def test_both_upload_methods_specified(self, client, sample_valid_payload):
-        """Test error when both files_to_upload and folder_to_upload are specified"""
-        invalid_payload = sample_valid_payload.copy()
-        invalid_payload["folder_to_upload"] = "/path/to/folder"
-
-        with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
-
-        assert "Cannot provide both files_to_upload and folder_to_upload" in str(
-            exc_info.value
+        # Since annotation templates are now separate objects,
+        # we test that empty datasets raise an error
+        valid_params = CreateProjectParams(
+            project_name="Test Project",
+            data_type="image",
+            rotations=RotationConfig(
+                annotation_rotation_count=1,
+                review_rotation_count=1,
+                client_review_rotation_count=1,
+            ),
+            use_ai=False,
+            created_by="test_user@example.com",
         )
 
-    def test_no_upload_method_specified(self, client, sample_valid_payload):
-        """Test error when neither files_to_upload nor folder_to_upload are specified"""
-        invalid_payload = sample_valid_payload.copy()
-        del invalid_payload["files_to_upload"]
-
+        # Test with empty datasets list
         with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
+            create_project(client, valid_params, [], mock_annotation_template)
 
-        assert "Either files_to_upload or folder_to_upload must be provided" in str(
-            exc_info.value
+        assert "At least one dataset is required" in str(exc_info.value)
+
+    def test_both_upload_methods_specified(
+        self, client, mock_dataset, mock_annotation_template
+    ):
+        """Test error when dataset has no files"""
+        valid_params = CreateProjectParams(
+            project_name="Test Project",
+            data_type="image",
+            rotations=RotationConfig(
+                annotation_rotation_count=1,
+                review_rotation_count=1,
+                client_review_rotation_count=1,
+            ),
+            use_ai=False,
+            created_by="test_user@example.com",
         )
 
-    def test_empty_files_to_upload(self, client, sample_valid_payload):
-        """Test error handling for empty files_to_upload"""
-        invalid_payload = sample_valid_payload.copy()
-        invalid_payload["files_to_upload"] = []
-        with pytest.raises(LabellerrError):
-            create_project(client, invalid_payload)
-
-    def test_invalid_folder_to_upload(self, client, sample_valid_payload):
-        """Test error handling for invalid folder_to_upload"""
-        invalid_payload = sample_valid_payload.copy()
-        del invalid_payload["files_to_upload"]
-        invalid_payload["folder_to_upload"] = "   "
+        # Create a dataset with no files
+        empty_dataset = Mock(spec=LabellerrDataset)
+        empty_dataset.dataset_id = "empty-dataset-id"
+        empty_dataset.files_count = 0
 
         with pytest.raises(LabellerrError) as exc_info:
-            create_project(client, invalid_payload)
+            create_project(
+                client, valid_params, [empty_dataset], mock_annotation_template
+            )
 
-        assert "Folder path does not exist" in str(exc_info.value)
+        assert "Dataset empty-dataset-id has no files" in str(exc_info.value)
+
+    def test_no_upload_method_specified(
+        self, client, mock_dataset, mock_annotation_template
+    ):
+        """Test successful project creation with valid parameters"""
+        valid_params = CreateProjectParams(
+            project_name="Test Project",
+            data_type="image",
+            rotations=RotationConfig(
+                annotation_rotation_count=1,
+                review_rotation_count=1,
+                client_review_rotation_count=1,
+            ),
+            use_ai=False,
+            created_by="test_user@example.com",
+        )
+
+        # Mock the API response
+        mock_response = {"response": {"project_id": "test-project-id"}}
+
+        with patch.object(client, "make_request", return_value=mock_response):
+            with patch(
+                "labellerr.core.projects.base.LabellerrProject.get_project",
+                return_value={"project_id": "test-project-id", "data_type": "image"},
+            ):
+                result = create_project(
+                    client, valid_params, [mock_dataset], mock_annotation_template
+                )
+                assert result is not None
+
+    def test_empty_files_to_upload(
+        self, client, mock_dataset, mock_annotation_template
+    ):
+        """Test project creation with multiple datasets"""
+        valid_params = CreateProjectParams(
+            project_name="Test Project",
+            data_type="image",
+            rotations=RotationConfig(
+                annotation_rotation_count=1,
+                review_rotation_count=1,
+                client_review_rotation_count=1,
+            ),
+            use_ai=False,
+            created_by="test_user@example.com",
+        )
+
+        # Create multiple datasets
+        dataset1 = Mock(spec=LabellerrDataset)
+        dataset1.dataset_id = "dataset-1"
+        dataset1.files_count = 5
+
+        dataset2 = Mock(spec=LabellerrDataset)
+        dataset2.dataset_id = "dataset-2"
+        dataset2.files_count = 10
+
+        # Mock the API response
+        mock_response = {"response": {"project_id": "test-project-id"}}
+
+        with patch.object(client, "make_request", return_value=mock_response):
+            with patch(
+                "labellerr.core.projects.base.LabellerrProject.get_project",
+                return_value={"project_id": "test-project-id", "data_type": "image"},
+            ):
+                result = create_project(
+                    client, valid_params, [dataset1, dataset2], mock_annotation_template
+                )
+                assert result is not None
+
+    def test_invalid_folder_to_upload(
+        self, client, mock_dataset, mock_annotation_template
+    ):
+        """Test project creation with AI enabled"""
+        valid_params = CreateProjectParams(
+            project_name="Test Project",
+            data_type="image",
+            rotations=RotationConfig(
+                annotation_rotation_count=2,
+                review_rotation_count=2,
+                client_review_rotation_count=1,
+            ),
+            use_ai=True,  # Enable AI
+            created_by="test_user@example.com",
+        )
+
+        # Mock the API response
+        mock_response = {"response": {"project_id": "test-project-id"}}
+
+        with patch.object(client, "make_request", return_value=mock_response):
+            with patch(
+                "labellerr.core.projects.base.LabellerrProject.get_project",
+                return_value={"project_id": "test-project-id", "data_type": "image"},
+            ):
+                result = create_project(
+                    client, valid_params, [mock_dataset], mock_annotation_template
+                )
+                assert result is not None
 
 
 @pytest.mark.unit

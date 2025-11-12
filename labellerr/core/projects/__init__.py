@@ -6,8 +6,8 @@ import requests
 
 from labellerr import LabellerrClient
 
-from .. import client_utils, constants, schemas, utils
-from ..datasets import LabellerrDataset, create_dataset
+from .. import constants, schemas, utils
+from ..datasets import LabellerrDataset, create_dataset_from_local
 from ..exceptions import LabellerrError
 from .audio_project import AudioProject as LabellerrAudioProject
 from .base import LabellerrProject
@@ -17,11 +17,11 @@ from .utils import validate_rotation_config
 from .video_project import VideoProject as LabellerrVideoProject
 
 __all__ = [
+    "LabellerrProject",
+    "LabellerrAudioProject",
+    "LabellerrDocumentProject",
     "LabellerrImageProject",
     "LabellerrVideoProject",
-    "LabellerrProject",
-    "LabellerrDocumentProject",
-    "LabellerrAudioProject",
 ]
 
 
@@ -32,6 +32,17 @@ def create_project(client: "LabellerrClient", payload: dict):
     """
 
     try:
+        # Validate client_id
+        if "client_id" not in payload:
+            raise LabellerrError("Required parameter client_id is missing")
+
+        # Validate client_id is a non-empty string
+        if (
+            not isinstance(payload.get("client_id"), str)
+            or not payload["client_id"].strip()
+        ):
+            raise LabellerrError("client_id must be a non-empty string")
+
         # validate all the parameters
         required_params = [
             "data_type",
@@ -43,6 +54,10 @@ def create_project(client: "LabellerrClient", payload: dict):
         for param in required_params:
             if param not in payload:
                 raise LabellerrError(f"Required parameter {param} is missing")
+
+        # Check for dataset_name when creating new dataset
+        if "datasets" not in payload and "dataset_name" not in payload:
+            raise LabellerrError("Required parameter dataset_name is missing")
 
         # Validate created_by email format
         created_by = payload.get("created_by")
@@ -97,7 +112,7 @@ def create_project(client: "LabellerrClient", payload: dict):
             logging.info("Validating existing datasets . . .")
             for dataset_id in datasets:
                 try:
-                    dataset = LabellerrDataset(client, dataset_id)
+                    dataset = LabellerrDataset(client, dataset_id)  # type: ignore[abstract]
                     if dataset.files_count <= 0:
                         raise LabellerrError(f"Dataset {dataset_id} has no files")
                 except Exception as e:
@@ -147,7 +162,7 @@ def create_project(client: "LabellerrClient", payload: dict):
 
             logging.info("Creating dataset . . .")
 
-            dataset = create_dataset(
+            dataset = create_dataset_from_local(
                 client,
                 schemas.DatasetConfig(
                     client_id=client.client_id,
@@ -256,18 +271,14 @@ def __create_project_api_call(
             "created_by": params.created_by,
         }
     )
-    headers = client_utils.build_headers(
-        api_key=client.api_key,
-        api_secret=client.api_secret,
-        client_id=params.client_id,
-        extra_headers={
-            "Origin": constants.ALLOWED_ORIGINS,
-            "Content-Type": "application/json",
-        },
-    )
 
     return client.make_request(
-        "POST", url, headers=headers, data=payload, request_id=unique_id
+        "POST",
+        url,
+        client_id=params.client_id,
+        extra_headers={"content-type": "application/json"},
+        request_id=unique_id,
+        data=payload,
     )
 
 
@@ -291,3 +302,25 @@ def create_annotation_guideline(
     except requests.exceptions.RequestException as e:
         logging.error(f"Failed to update project annotation guideline: {str(e)}")
         raise
+
+
+def list_projects(client: "LabellerrClient"):
+    """
+    Retrieves a list of projects associated with a client ID.
+
+    :param client: The client instance.
+    :return: A list of LabellerrProject objects.
+    """
+    unique_id = str(uuid.uuid4())
+    url = f"{constants.BASE_URL}/project_drafts/projects/detailed_list?client_id={client.client_id}&uuid={unique_id}"
+
+    response = client.make_request(
+        "GET",
+        url,
+        extra_headers={"content-type": "application/json"},
+        request_id=unique_id,
+    )
+    return [
+        LabellerrProject(client, project_id=project["project_id"])
+        for project in response["response"]["projects"]
+    ]

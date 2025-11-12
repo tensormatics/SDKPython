@@ -147,7 +147,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         def is_completed(dataset_data):
             status_code = dataset_data.get("status_code", 500)
             # Consider dataset complete when status_code is 200 (success) or >= 400 (error/failed)
-            return status_code == 200 or status_code >= 400
+            return status_code == 300 or status_code >= 400
 
         def on_success(dataset_data):
             status_code = dataset_data.get("status_code", 500)

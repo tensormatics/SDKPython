@@ -98,10 +98,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return self.__dataset_data.get("data_type")
 
     def status(
-        self,
-        interval: float = 2.0,
-        timeout: Optional[float] = None,
-        max_retries: Optional[int] = None,
+        self
     ) -> Dict[str, Any]:
         """
         Poll dataset status until completion or timeout.
@@ -166,9 +163,9 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         return poll(
             function=get_dataset_status,
             condition=is_completed,
-            interval=interval,
-            timeout=timeout,
-            max_retries=max_retries,
+            interval=2.0,
+            timeout=None,
+            max_retries=None,
             on_success=on_success,
         )
 

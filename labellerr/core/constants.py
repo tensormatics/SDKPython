@@ -1,4 +1,4 @@
-BASE_URL = "https://api-gateway-722091373895.us-central1.run.app"
+BASE_URL = "https://api.labellerr.com"
 ALLOWED_ORIGINS = "https://pro.labellerr.com"
 
 

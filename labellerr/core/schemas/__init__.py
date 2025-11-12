@@ -75,6 +75,16 @@ from labellerr.core.schemas.autolabel import (
 # Export schemas
 from labellerr.core.schemas.exports import CreateExportParams, ExportDestination
 
+
+# Export annotation templates
+from labellerr.core.schemas.annotation_templates import (
+    AnnotationQuestion,
+    Option,
+    QuestionType,
+)
+
+
+
 __all__ = [
     # Base types
     "NonEmptyStr",

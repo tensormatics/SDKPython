@@ -1,65 +1,64 @@
-import os
-import uuid
-
-import pytest
-from dotenv import load_dotenv
-
 from labellerr.client import LabellerrClient
-from labellerr.core.annotation_templates import create_template
 from labellerr.core.datasets import create_dataset_from_local
+from labellerr.core.annotation_templates import create_template
 from labellerr.core.projects import create_project
-from labellerr.core.schemas import DatasetDataType
 
 # from labellerr.core.schemas import *  remove this code
 from labellerr.core.schemas.annotation_templates import (
     AnnotationQuestion,
-    CreateTemplateParams,
     QuestionType,
+    CreateTemplateParams,
 )
 from labellerr.core.schemas.datasets import DatasetConfig
+from labellerr.core.schemas import DatasetDataType
 from labellerr.core.schemas.projects import CreateProjectParams, RotationConfig
+
+import uuid
+import pytest
+from dotenv import load_dotenv
+import os
 
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 CLIENT_ID = os.getenv("CLIENT_ID")
-IMG_DATASET_PATH = os.getenv("IMG_DATASET_PATH")
+IMAGES_DATASET_UPLOAD_PATH = os.getenv("IMAGES_DATASET_UPLOAD_PATH")
 
 
-CLIENT = LabellerrClient(api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID)
+client = LabellerrClient(api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID)
 
 
 @pytest.fixture
-def create_dataset_fixture(client=CLIENT):
-    # client = LabellerrClient(
-    #     api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
-    # )
+def create_dataset_fixture():
+    client = LabellerrClient(
+        api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
+    )
 
     dataset = create_dataset_from_local(
         client=client,
-        dataset_config=DatasetConfig(dataset_name="TEST DATASET", data_type="image"),
-        folder_to_upload=IMG_DATASET_PATH,
+        dataset_config=DatasetConfig(dataset_name="My Dataset", data_type="image"),
+        folder_to_upload=IMAGES_DATASET_UPLOAD_PATH,
     )
 
     return dataset
 
 
 @pytest.fixture
-def create_annotation_template_fixture(client=CLIENT):
-    # client = LabellerrClient(
-    #     api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
-    # )
+def create_annotation_template_fixture():
+    client = LabellerrClient(
+        api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
+    )
 
     template = create_template(
         client=client,
         params=CreateTemplateParams(
-            template_name="TEST TEMPLATE",
+            template_name="My Template",
             data_type=DatasetDataType.image,
             questions=[
                 AnnotationQuestion(
                     question_number=1,
-                    question="TEST QUESTION - Bounding Box",
+                    question="Object",
                     question_id=str(uuid.uuid4()),
                     question_type=QuestionType.bounding_box,
                     required=True,
@@ -73,19 +72,17 @@ def create_annotation_template_fixture(client=CLIENT):
 
 
 @pytest.fixture
-def create_project_fixture(
-    create_dataset_fixture, create_annotation_template_fixture, client=CLIENT
-):
-    # client = LabellerrClient(
-    #     api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
-    # )
+def create_project_fixture(create_dataset_fixture, create_annotation_template_fixture):
+    client = LabellerrClient(
+        api_key=API_KEY, api_secret=API_SECRET, client_id=CLIENT_ID
+    )
     dataset = create_dataset_fixture
     template = create_annotation_template_fixture
 
     project = create_project(
         client=client,
         params=CreateProjectParams(
-            project_name="TEST PROJECT",
+            project_name="My Project",
             data_type=DatasetDataType.image,
             rotations=RotationConfig(
                 annotation_rotation_count=1,

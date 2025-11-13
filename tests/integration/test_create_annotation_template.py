@@ -34,12 +34,20 @@ def create_annotation_template_fixture():
             questions=[
                 AnnotationQuestion(
                     question_number=1,
-                    question="Object",
+                    question="TEST QUESTION - Bounding Box",
                     question_id=str(uuid.uuid4()),
                     question_type=QuestionType.bounding_box,
                     required=True,
                     color="#FF0000",
-                )
+                ),
+                AnnotationQuestion(
+                    question_number=2,
+                    question="TEST QUESTION - Polygon",
+                    question_id=str(uuid.uuid4()),
+                    question_type=QuestionType.polygon,
+                    required=True,
+                    color="#FFC800",
+                ),
             ],
         ),
     )

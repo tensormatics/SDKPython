@@ -84,7 +84,6 @@ from labellerr.core.schemas.annotation_templates import (
 )
 
 
-
 __all__ = [
     # Base types
     "NonEmptyStr",
@@ -133,4 +132,8 @@ __all__ = [
     # Export schemas
     "CreateExportParams",
     "ExportDestination",
+    # Annotation templates schemas
+    "AnnotationQuestion",
+    "Option",
+    "QuestionType",
 ]

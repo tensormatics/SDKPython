@@ -71,8 +71,12 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
     def __init__(self, client: "LabellerrClient", project_id: str, **kwargs):
         self.client = client
-        self.project_id = project_id
+        self.__project_id_input = project_id
         self.__project_data = kwargs["project_data"]
+
+    @property
+    def project_id(self):
+        return self.__project_id_input
 
     @property
     def status_code(self):

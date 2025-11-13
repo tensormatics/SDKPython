@@ -62,7 +62,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
 
     def __init__(self, client: "LabellerrClient", connection_id: str, **kwargs):
         self.client = client
-        self._connection_id_input = connection_id
+        self.__connection_id_input = connection_id
         self.__connection_data = kwargs["connection_data"]
 
     @property
@@ -75,7 +75,7 @@ class LabellerrConnection(metaclass=LabellerrConnectionMeta):
 
     @property
     def connection_id(self):
-        return self.__connection_data.get("connection_id")
+        return self.__connection_id_input
 
     @property
     def connection_type(self):

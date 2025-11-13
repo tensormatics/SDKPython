@@ -46,7 +46,11 @@ def create_dataset_from_connection(
             "dataset_name": dataset_config.dataset_name,
             "dataset_description": dataset_config.dataset_description,
             "data_type": dataset_config.data_type,
-            "connection_id": connection.connection_id if isinstance(connection, LabellerrConnection) else connection,
+            "connection_id": (
+                connection.connection_id
+                if isinstance(connection, LabellerrConnection)
+                else connection
+            ),
             "path": path,
             "client_id": client.client_id,
             "es_multimodal_index": dataset_config.multimodal_indexing,

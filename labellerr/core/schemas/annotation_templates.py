@@ -4,6 +4,7 @@ from enum import Enum
 from ..schemas import DatasetDataType
 import uuid
 
+
 class QuestionType(str, Enum):
     bounding_box = "BoundingBox"
     polygon = "polygon"

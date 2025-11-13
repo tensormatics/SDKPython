@@ -4,13 +4,17 @@ import json
 import logging
 import uuid
 from abc import ABCMeta
-from typing import Dict, Optional, Any, List
+from typing import Dict, Any, List, TYPE_CHECKING
 
 from .. import constants
 from ..exceptions import InvalidDatasetError, LabellerrError
 from ..client import LabellerrClient
 
 from ..files import LabellerrFile
+from ..connectors import LabellerrConnection
+
+if TYPE_CHECKING:
+    from ..projects import LabellerrProject
 
 
 class LabellerrDatasetMeta(ABCMeta):
@@ -66,8 +70,12 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
     def __init__(self, client: "LabellerrClient", dataset_id: str, **kwargs):
         self.client = client
-        self.dataset_id = dataset_id
+        self.__dataset_id_input = dataset_id
         self.__dataset_data = kwargs["dataset_data"]
+
+    @property
+    def dataset_id(self):
+        return self.__dataset_id_input
 
     @property
     def name(self):
@@ -97,9 +105,7 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
     def data_type(self):
         return self.__dataset_data.get("data_type")
 
-    def status(
-        self
-    ) -> Dict[str, Any]:
+    def status(self) -> Dict[str, Any]:
         """
         Poll dataset status until completion or timeout.
 
@@ -235,20 +241,18 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
 
     def sync_with_connection(
         self,
-        project_id,
-        path,
-        data_type,
-        email_id,
-        connection_id,
+        project: "LabellerrProject",
+        path: str,
+        data_type: str,
+        connection: LabellerrConnection,
     ):
         """
         Syncs datasets with the backend.
 
-        :param project_id: The ID of the project
+        :param project: The project instance
         :param path: The path to sync
         :param data_type: Type of data (image, video, audio, document, text)
-        :param email_id: Email ID of the user
-        :param connection_id: The connection ID
+        :param connection: The connection instance
         :return: Dictionary containing sync status
         :raises LabellerrError: If the sync fails
         """
@@ -259,12 +263,12 @@ class LabellerrDataset(metaclass=LabellerrDatasetMeta):
         payload = json.dumps(
             {
                 "client_id": self.client.client_id,
-                "project_id": project_id,
+                "project_id": project.project_id,
                 "dataset_id": self.dataset_id,
                 "path": path,
                 "data_type": data_type,
-                "email_id": email_id,
-                "connection_id": connection_id,
+                "email_id": self.client.api_key,
+                "connection_id": connection.connection_id,
             }
         )
 

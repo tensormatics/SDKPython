@@ -41,16 +41,13 @@ class TestCreateDatasetFunctions:
                 "labellerr.core.datasets.base.LabellerrDataset.get_dataset",
                 return_value={"dataset_id": "test-dataset-id", "data_type": "image"},
             ):
-                # Create a mock connection object
-                from unittest.mock import Mock
-
-                mock_connection = Mock()
-                mock_connection.connection_id = "test-connection-id"
+                # Use string connection_id instead of Mock object
+                connection_id = "test-connection-id"
 
                 dataset = create_dataset_from_connection(
                     client=client,
                     dataset_config=dataset_config,
-                    connection=mock_connection,
+                    connection=connection_id,
                     path="s3://test-bucket/path/to/data",
                 )
 
@@ -177,16 +174,13 @@ class TestCreateDatasetFunctions:
                 "labellerr.core.datasets.base.LabellerrDataset.get_dataset",
                 return_value={"dataset_id": "test-dataset-id", "data_type": "image"},
             ):
-                # Create a mock connection object
-                from unittest.mock import Mock
-
-                mock_connection = Mock()
-                mock_connection.connection_id = "test-gcp-connection-id"
+                # Use string connection_id instead of Mock object
+                connection_id = "test-gcp-connection-id"
 
                 dataset = create_dataset_from_connection(
                     client=client,
                     dataset_config=dataset_config,
-                    connection=mock_connection,
+                    connection=connection_id,
                     path="gs://test-bucket/path/to/data",
                 )
 

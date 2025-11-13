@@ -30,8 +30,8 @@ def project(client):
     # Use __new__ to create instance without calling __init__ through metaclass
     proj = ImageProject.__new__(ImageProject)
     proj.client = client
-    proj.project_id = "test_project_id"
-    proj.__project_data = project_data
+    proj._LabellerrProject__project_id_input = "test_project_id"
+    proj._LabellerrProject__project_data = project_data
     return proj
 
 

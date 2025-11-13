@@ -6,13 +6,14 @@ import logging
 import os
 import uuid
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Dict, List
+from typing import TYPE_CHECKING, Dict
 
 import requests
 
 from .. import client_utils, constants, gcs, schemas
 from ..exceptions import InvalidProjectError, LabellerrError
-from ..utils import poll, validate_params
+from ..utils import poll
+from ..exports import Export
 
 if TYPE_CHECKING:
     from ..client import LabellerrClient
@@ -588,20 +589,44 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             logging.error(f"Failed to upload preannotation: {str(e)}")
             raise
 
+    def create_export(self, export_config: schemas.CreateExportParams):
+        """
+        Creates an export with the given configuration.
+
+        :param export_config: Export configuration dictionary
+        :return: Export instance with report_id and status tracking
+        :raises LabellerrError: If the export creation fails
+        """
+        if export_config.export_destination == schemas.ExportDestination.LOCAL:
+            return self.create_local_export(export_config)
+
+        else:
+            payload = export_config.model_dump()
+            if not export_config.connection_id or export_config.connection_id == "":
+                raise LabellerrError("connection_id is required")
+            payload.update(
+                {
+                    "question_ids": ["all"],
+                }
+            )
+
+            response = self.client.make_request(
+                "POST",
+                f"{constants.BASE_URL}/sdk/export/files?project_id={self.project_id}&client_id={self.client.client_id}",
+                extra_headers={"Content-Type": "application/json"},
+                data=json.dumps(payload),
+            )
+            report_id = response.get("response", {}).get("report_id")
+            return Export(report_id=report_id, project=self)
+
     def create_local_export(self, export_config):
         """
         Creates a local export with the given configuration.
 
         :param export_config: Export configuration dictionary
-        :return: The response from the API
+        :return: Export instance with report_id and status tracking
         :raises LabellerrError: If the export creation fails
         """
-        # Validate parameters using Pydantic
-        schemas.CreateLocalExportParams(
-            project_id=self.project_id,
-            client_id=self.client.client_id,
-            export_config=export_config,
-        )
         # Validate export config using client_utils
         client_utils.validate_export_config(export_config)
 
@@ -610,7 +635,7 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
 
         payload = json.dumps(export_config)
 
-        return self.client.make_request(
+        response = self.client.make_request(
             "POST",
             f"{constants.BASE_URL}/sdk/export/files?project_id={self.project_id}&client_id={self.client.client_id}",
             extra_headers={
@@ -620,9 +645,10 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             request_id=unique_id,
             data=payload,
         )
+        report_id = response.get("response", {}).get("report_id")
+        return Export(report_id=report_id, project=self)
 
-    @validate_params(report_ids=list)
-    def check_export_status(self, report_ids: List[str]):
+    def check_export_status(self, report_ids: list[str]):
         request_uuid = client_utils.generate_request_id()
         try:
             if not report_ids:
@@ -747,7 +773,6 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             response = self.client.make_request(
                 "GET",
                 url,
-                client_id=client_id,
                 extra_headers={"Content-Type": "application/json"},
                 request_id=uuid,
             )

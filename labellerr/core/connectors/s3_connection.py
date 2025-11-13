@@ -2,7 +2,7 @@ import json
 import uuid
 from typing import TYPE_CHECKING
 
-from ...schemas import AWSConnectionParams
+from ..schemas import AWSConnectionParams, AWSConnectionTestParams
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
 
@@ -11,35 +11,27 @@ if TYPE_CHECKING:
 
 
 class S3Connection(LabellerrConnection):
-    @staticmethod
-    def setup_full_connection(
-        client: "LabellerrClient", params: AWSConnectionParams
-    ) -> dict:
-        """
-        AWS S3 connector and, if valid, save the connection.
-        :param client: The LabellerrClient instance
-        :param connection_config: Dictionary containing:
-            - aws_access_key: The AWS access key
-            - aws_secrets_key: The AWS secrets key
-            - s3_path: The S3 path
-            - data_type: The data type
-            - name: The name of the connection
-            - description: The description
-            - connection_type: The connection type (default: import)
-        :return: Parsed JSON response
-        """
-        # Validate parameters using Pydantic
 
+    @staticmethod
+    def test_connection(
+        client: "LabellerrClient", params: AWSConnectionTestParams
+    ) -> bool:
+        """
+        Tests an AWS S3 connection.
+        :param client: The LabellerrClient instance
+        :param params: The AWS connection parameters
+        :return: True if the connection is successful, False otherwise
+        """
         request_uuid = str(uuid.uuid4())
         test_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={params.client_id}&uuid={request_uuid}"
+            f"?client_id={client.client_id}&uuid={request_uuid}"
         )
 
         headers = client_utils.build_headers(
             api_key=client.api_key,
             api_secret=client.api_secret,
-            client_id=params.client_id,
+            client_id=client.client_id,
             extra_headers={"email_id": client.api_key},
         )
 
@@ -55,8 +47,7 @@ class S3Connection(LabellerrConnection):
             "credentials": (None, aws_credentials_json),
             "connector": (None, "s3"),
             "path": (None, params.s3_path),
-            "connection_type": (None, str(params.connection_type)),
-            "data_type": (None, str(params.data_type)),
+            "connection_type": (None, params.connection_type.value),
         }
 
         # Remove content-type from headers to let requests set it with boundary
@@ -71,84 +62,49 @@ class S3Connection(LabellerrConnection):
             files=test_request,
             request_id=request_uuid,
         )
-
-        create_url = (
-            f"{constants.BASE_URL}/connectors/connections/create"
-            f"?uuid={request_uuid}&client_id={params.client_id}"
-        )
-
-        # Use multipart/form-data as expected by the API
-        create_request = {
-            "client_id": (None, str(params.client_id)),
-            "connector": (None, "s3"),
-            "name": (None, params.name),
-            "description": (None, params.description),
-            "connection_type": (None, str(params.connection_type)),
-            "data_type": (None, str(params.data_type)),
-            "credentials": (None, aws_credentials_json),
-        }
-
-        # Remove content-type from headers to let requests set it with boundary
-        headers_without_content_type = {
-            k: v for k, v in headers.items() if k.lower() != "content-type"
-        }
-
-        return client_utils.request(
-            "POST",
-            create_url,
-            headers=headers_without_content_type,
-            files=create_request,
-            request_id=request_uuid,
-        )
-
-    def test_connection(self):
-        print("Testing S3 connection!")
         return True
 
     @staticmethod
     def create_connection(
-        client: "LabellerrClient", client_id: str, aws_config: dict
-    ) -> str:
+        client: "LabellerrClient", params: AWSConnectionParams
+    ) -> dict:
         """
-        Sets up AWS S3 connector for dataset creation (quick connection).
+        Creates an AWS S3 connection.
 
         :param client: The LabellerrClient instance
-        :param client_id: Client ID
-        :param aws_config: AWS configuration containing bucket_name, folder_path, access_key_id, secret_access_key, region
-        :return: Connection ID for AWS connector
+        :param params: AWSConnectionParams instance
+        :return: Dictionary containing the response from the API
         """
-        from ... import LabellerrError
-
-        # TODO: gaurav  recheck this for bucket name in connection string
-        required_fields = ["bucket_name"]
-        for field in required_fields:
-            if field not in aws_config:
-                raise LabellerrError(f"Required field '{field}' missing in aws_config")
 
         unique_id = str(uuid.uuid4())
-        url = f"{constants.BASE_URL}/connectors/connect/aws?client_id={client_id}&uuid={unique_id}"
+        url = f"{constants.BASE_URL}/connectors/connections/create?client_id={client.client_id}&uuid={unique_id}"
 
         headers = client_utils.build_headers(
             api_key=client.api_key,
             api_secret=client.api_secret,
-            client_id=client_id,
-            extra_headers={"content-type": "application/json"},
+            client_id=client.client_id,
+            extra_headers={"email_id": client.api_key},
         )
 
-        payload = json.dumps(
+        creds_payload = json.dumps(
             {
-                "bucket_name": aws_config["bucket_name"],
-                "folder_path": aws_config.get("folder_path", ""),
-                "access_key_id": aws_config.get("access_key_id"),
-                "secret_access_key": aws_config.get("secret_access_key"),
-                "region": aws_config.get("region", "us-east-1"),
+                "access_key_id": params.aws_access_key,
+                "secret_access_key": params.aws_secrets_key,
             }
         )
-
+        request_payload = {
+            "credentials": (None, creds_payload),
+            "connector": (None, "s3"),
+            "path": (None, params.s3_path),
+            "connection_type": (None, params.connection_type.value),
+            "name": (None, params.name),
+            "description": (None, params.description),
+            "client_id": (None, client.client_id),
+        }
         response_data = client_utils.request(
-            "POST", url, headers=headers, data=payload, request_id=unique_id
+            "POST", url, headers=headers, files=request_payload, request_id=unique_id
         )
-        return response_data["response"]["connection_id"]
+        return response_data.get("response", {})
 
 
 LabellerrConnectionMeta._register("s3", S3Connection)

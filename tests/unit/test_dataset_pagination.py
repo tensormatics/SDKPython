@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from labellerr.core.datasets.base import LabellerrDataset
-from labellerr.schemas import DataSetScope
+from labellerr.core.schemas import DataSetScope
 
 # Helper to use correct enum values
 SCOPE_CLIENT = DataSetScope.client

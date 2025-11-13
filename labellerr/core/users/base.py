@@ -1,10 +1,10 @@
 import json
 import uuid
 
-from labellerr import LabellerrClient, schemas
-from labellerr.core import constants
-from labellerr.core.base.singleton import Singleton
-from labellerr.schemas import CreateUserParams, DeleteUserParams, UpdateUserRoleParams
+from .. import LabellerrClient
+from .. import constants, schemas
+from ..base.singleton import Singleton
+from ..schemas import CreateUserParams, DeleteUserParams, UpdateUserRoleParams
 
 
 class LabellerrUsers(Singleton):

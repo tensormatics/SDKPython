@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from labellerr.client import LabellerrClient
 from labellerr.core.datasets import LabellerrDataset, create_dataset
-from labellerr.core.connectors import LabellerrS3Connection
+from labellerr.core.connectors import LabellerrS3Connection, LabellerrConnection
 from labellerr.core.files import LabellerrFile
 from labellerr.core.projects import (
     LabellerrProject,
@@ -25,26 +25,6 @@ from labellerr.core.schemas import (
 )
 from labellerr.core.autolabel import LabellerrAutoLabel
 
-# Set logging level to DEBUG
-logging.basicConfig(level=logging.DEBUG)
-
-load_dotenv()
-
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
-CLIENT_ID = os.getenv("CLIENT_ID")
-
-if not all([API_KEY, API_SECRET, CLIENT_ID]):
-    raise ValueError(
-        "API_KEY, API_SECRET, and CLIENT_ID must be set in environment variables"
-    )
-
-# Initialize client
-client = LabellerrClient(
-    api_key=API_KEY,
-    api_secret=API_SECRET,
-    client_id=CLIENT_ID,
-)
 
 # if os.getenv("CREATE_DATASET", "").lower() == "true":
 #     from labellerr import schemas
@@ -160,25 +140,25 @@ client = LabellerrClient(
 #     name="Amazon S3 Export Test",
 #     description="Amazon S3 Export Test",
 # )))
-project = LabellerrProject(client=client, project_id="")
+# project = LabellerrProject(client=client, project_id="")
 
-export = project.create_export(
-    export_config=CreateExportParams(
-        export_name="Amazon S3 Export Test",
-        export_description="Amazon S3 Export Test",
-        export_format="json",
-        statuses=["review"],
-        connection_id=os.getenv("AWS_EXPORT_CONNECTION_ID"),
-        export_destination="s3",
-        export_folder_path="",  # pattern - bucket_name/path/to/folder/ - the last slash is important
-    )
-)
+# export = project.create_export(
+#     export_config=CreateExportParams(
+#         export_name="Amazon S3 Export Test",
+#         export_description="Amazon S3 Export Test",
+#         export_format="json",
+#         statuses=["review"],
+#         connection_id=os.getenv("AWS_EXPORT_CONNECTION_ID"),
+#         export_destination="s3",
+#         export_folder_path="",  # pattern - bucket_name/path/to/folder/ - the last slash is important
+#     )
+# )
 
-print(f"Export created: {export.report_id}")
-print(f"Current status: {export._status}")
+# print(f"Export created: {export.report_id}")
+# print(f"Current status: {export._status}")
 # Uncomment to poll until completion:
-final_status = export.status()
-print(f"Final status: {final_status}")
+# final_status = export.status()
+# print(f"Final status: {final_status}")
 # print(autolabel.train(training_request=TrainingRequest(model_id="yolov11", hyperparameters=Hyperparameters(epochs=10), slice_id='', min_samples_per_class=100, job_name="Yolo V11 Training")))
 
 # dataset = LabellerrDataset(client=client, dataset_id="")
@@ -201,9 +181,9 @@ print(f"Final status: {final_status}")
 # print(file.file_data)
 
 # project = LabellerrProject(client=client, project_id="")
-# res = project.upload_preannotations(
+# res = project.upload_preannotation(
 #     annotation_format="coco_json", annotation_file="horses_coco.json"
-# )
+# ).result()
 # print(res)
 
 # print(LabellerrProject.list_all_projects(client=client))

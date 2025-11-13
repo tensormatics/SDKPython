@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from labellerr.core.datasets.base import LabellerrDataset
+from labellerr.core.datasets import list_datasets
 from labellerr.core.schemas import DataSetScope
 
 # Helper to use correct enum values
@@ -87,9 +87,7 @@ class TestGetAllDatasetsDefaultBehavior:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_single_page_response
 
-            result = LabellerrDataset.get_all_datasets(
-                client=client, datatype="image", scope=SCOPE_CLIENT
-            )
+            result = list_datasets(client=client, datatype="image", scope=SCOPE_CLIENT)
 
             # Consume the generator to trigger the API call
             list(result)
@@ -109,9 +107,7 @@ class TestGetAllDatasetsDefaultBehavior:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_single_page_response
 
-            result = LabellerrDataset.get_all_datasets(
-                client=client, datatype="image", scope=SCOPE_CLIENT
-            )
+            result = list_datasets(client=client, datatype="image", scope=SCOPE_CLIENT)
 
             # Check that result is a generator
             import types
@@ -133,7 +129,7 @@ class TestGetAllDatasetsManualPagination:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_single_page_response
 
-            result = LabellerrDataset.get_all_datasets(
+            result = list_datasets(
                 client=client, datatype="image", scope=SCOPE_CLIENT, page_size=20
             )
 
@@ -149,7 +145,7 @@ class TestGetAllDatasetsManualPagination:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_second_page_response
 
-            result = LabellerrDataset.get_all_datasets(
+            result = list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -172,7 +168,7 @@ class TestGetAllDatasetsManualPagination:
         with patch.object(client, "make_request") as mock_request:
             # First page
             mock_request.return_value = mock_first_page_response
-            first_page_gen = LabellerrDataset.get_all_datasets(
+            first_page_gen = list_datasets(
                 client=client, datatype="image", scope=SCOPE_CLIENT, page_size=2
             )
             first_page_datasets = list(first_page_gen)
@@ -187,7 +183,7 @@ class TestGetAllDatasetsManualPagination:
 
             # Second page
             mock_request.return_value = mock_last_page_response
-            second_page_gen = LabellerrDataset.get_all_datasets(
+            second_page_gen = list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -209,7 +205,7 @@ class TestGetAllDatasetsAutoPagination:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_single_page_response
 
-            result = LabellerrDataset.get_all_datasets(
+            result = list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -229,7 +225,7 @@ class TestGetAllDatasetsAutoPagination:
             mock_request.return_value = mock_single_page_response
 
             datasets = list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -249,7 +245,7 @@ class TestGetAllDatasetsAutoPagination:
             mock_request.return_value = mock_single_page_response
 
             datasets = list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -278,7 +274,7 @@ class TestGetAllDatasetsAutoPagination:
             ]
 
             datasets = list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -305,7 +301,7 @@ class TestGetAllDatasetsAutoPagination:
             mock_request.return_value = mock_single_page_response
 
             list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -329,7 +325,7 @@ class TestGetAllDatasetsAutoPagination:
             ]
 
             list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -351,7 +347,7 @@ class TestGetAllDatasetsAutoPagination:
                 mock_second_page_response,
             ]
 
-            generator = LabellerrDataset.get_all_datasets(
+            generator = list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -385,9 +381,7 @@ class TestGetAllDatasetsEdgeCases:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = empty_response
 
-            result = LabellerrDataset.get_all_datasets(
-                client=client, datatype="image", scope=SCOPE_CLIENT
-            )
+            result = list_datasets(client=client, datatype="image", scope=SCOPE_CLIENT)
 
             datasets = list(result)
             assert datasets == []
@@ -402,7 +396,7 @@ class TestGetAllDatasetsEdgeCases:
             mock_request.return_value = empty_response
 
             datasets = list(
-                LabellerrDataset.get_all_datasets(
+                list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -420,7 +414,7 @@ class TestGetAllDatasetsEdgeCases:
             with patch.object(client, "make_request") as mock_request:
                 mock_request.return_value = mock_single_page_response
 
-                result = LabellerrDataset.get_all_datasets(
+                result = list_datasets(
                     client=client, datatype=data_type, scope=SCOPE_CLIENT
                 )
                 list(result)  # Consume generator
@@ -437,9 +431,7 @@ class TestGetAllDatasetsEdgeCases:
             with patch.object(client, "make_request") as mock_request:
                 mock_request.return_value = mock_single_page_response
 
-                result = LabellerrDataset.get_all_datasets(
-                    client=client, datatype="image", scope=scope
-                )
+                result = list_datasets(client=client, datatype="image", scope=scope)
                 list(result)  # Consume generator
 
                 call_args = mock_request.call_args
@@ -451,7 +443,7 @@ class TestGetAllDatasetsEdgeCases:
         with patch.object(client, "make_request") as mock_request:
             mock_request.return_value = mock_single_page_response
 
-            result = LabellerrDataset.get_all_datasets(
+            result = list_datasets(
                 client=client, datatype="image", scope=SCOPE_CLIENT, page_size=1000
             )
             list(result)  # Consume generator
@@ -470,7 +462,7 @@ class TestGetAllDatasetsEdgeCases:
                 mock_last_page_response,
             ]
 
-            generator = LabellerrDataset.get_all_datasets(
+            generator = list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -500,7 +492,7 @@ class TestGetAllDatasetsIntegration:
             ]
 
             dataset_ids = []
-            for dataset in LabellerrDataset.get_all_datasets(
+            for dataset in list_datasets(
                 client=client,
                 datatype="image",
                 scope=SCOPE_CLIENT,
@@ -522,7 +514,7 @@ class TestGetAllDatasetsIntegration:
 
             dataset_names = [
                 d["name"]
-                for d in LabellerrDataset.get_all_datasets(
+                for d in list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,
@@ -545,7 +537,7 @@ class TestGetAllDatasetsIntegration:
             # Get only datasets with even IDs
             even_datasets = [
                 d
-                for d in LabellerrDataset.get_all_datasets(
+                for d in list_datasets(
                     client=client,
                     datatype="image",
                     scope=SCOPE_CLIENT,

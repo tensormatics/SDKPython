@@ -5,7 +5,7 @@ This module contains unit tests for KeyFrame dataclass,
 validation decorators, and keyframe-related client methods.
 """
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import ValidationError
@@ -200,8 +200,8 @@ def mock_video_project(mock_client):
     # Create instance bypassing metaclass
     project = VideoProject.__new__(VideoProject)
     project.client = mock_client
-    project.project_id = "test_project_id"
-    project.project_data = {
+    project._LabellerrProject__project_id_input = "test_project_id"
+    project._LabellerrProject__project_data = {
         "project_id": "test_project_id",
         "data_type": "video",
         "attached_datasets": [],
@@ -298,12 +298,11 @@ class TestAddOrUpdateKeyFramesMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_video_project.add_or_update_keyframes(file_id, keyframes)
 
-    @patch("labellerr.core.client.LabellerrClient.make_request")
-    def test_add_or_update_keyframes_api_error(
-        self, mock_make_request, mock_video_project
-    ):
+    def test_add_or_update_keyframes_api_error(self, mock_video_project):
         """Test add_or_update_keyframes when API call fails"""
-        mock_make_request.side_effect = Exception("API Error")
+        mock_video_project.client.make_request = MagicMock(
+            side_effect=Exception("API Error")
+        )
         keyframes = [KeyFrame(frame_number=0)]
 
         with pytest.raises(
@@ -391,10 +390,11 @@ class TestDeleteKeyFramesMethod:
         with pytest.raises(LabellerrError, match=expected_error):
             mock_video_project.delete_keyframes(file_id, keyframes)
 
-    @patch("labellerr.core.client.LabellerrClient.make_request")
-    def test_delete_keyframes_api_error(self, mock_make_request, mock_video_project):
+    def test_delete_keyframes_api_error(self, mock_video_project):
         """Test delete_keyframes when API call fails"""
-        mock_make_request.side_effect = Exception("API Error")
+        mock_video_project.client.make_request = MagicMock(
+            side_effect=Exception("API Error")
+        )
 
         with pytest.raises(
             LabellerrError, match="Failed to delete key frames: API Error"

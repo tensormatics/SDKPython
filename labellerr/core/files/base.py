@@ -51,7 +51,6 @@ class LabellerrFileMeta(ABCMeta):
             elif dataset_id:
                 params["dataset_id"] = dataset_id
 
-            # TODO: Add dataset_id to params based on precedence logic
             # Priority: project_id > dataset_id
             url = f"{constants.BASE_URL}/data/file_data"
             response = client.make_request(
@@ -96,20 +95,20 @@ class LabellerrFile(metaclass=LabellerrFileMeta):
         :param kwargs: Additional file data (file_metadata, response, etc.)
         """
         self.client = client
-        self.file_data = kwargs.get("file_data", {})
+        self.__file_data = kwargs.get("file_data", {})
 
     @property
     def file_id(self):
-        return self.file_data.get("file_id", "")
+        return self.__file_data.get("file_id", "")
 
     @property
     def project_id(self):
-        return self.file_data.get("project_id", "")
+        return self.__file_data.get("project_id", "")
 
     @property
     def dataset_id(self):
-        return self.file_data.get("dataset_id", "")
+        return self.__file_data.get("dataset_id", "")
 
     @property
     def metadata(self):
-        return self.file_data.get("file_metadata", {})
+        return self.__file_data.get("file_metadata", {})

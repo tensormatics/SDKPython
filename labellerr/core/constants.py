@@ -17,8 +17,6 @@ LOCAL_EXPORT_STATUS = [
     "accepted",
 ]
 
-# DATA TYPES: image, video, audio, document, text
-DATA_TYPES = ("image", "video", "audio", "document", "text")
 DATA_TYPE_FILE_EXT = {
     "image": [".jpg", ".jpeg", ".png", ".tiff"],
     "video": [".mp4"],
@@ -42,5 +40,4 @@ OPTION_TYPE_LIST = [
     "dot",
     "audio",
 ]
-CONNECTION_TYPES = ["s3", "gcs", "local"]
 cdn_server_address = "cdn-951134552678.us-central1.run.app:443"

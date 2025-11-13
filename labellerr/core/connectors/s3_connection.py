@@ -1,13 +1,10 @@
 import json
 import uuid
-from typing import TYPE_CHECKING
-
+from ..client import LabellerrClient
 from ..schemas import AWSConnectionParams, AWSConnectionTestParams
 from .. import client_utils, constants
 from .connections import LabellerrConnection, LabellerrConnectionMeta
-
-if TYPE_CHECKING:
-    from labellerr import LabellerrClient
+import logging
 
 
 class S3Connection(LabellerrConnection):
@@ -15,17 +12,17 @@ class S3Connection(LabellerrConnection):
     @staticmethod
     def test_connection(
         client: "LabellerrClient", params: AWSConnectionTestParams
-    ) -> bool:
+    ) -> dict:
         """
         Tests an AWS S3 connection.
         :param client: The LabellerrClient instance
         :param params: The AWS connection parameters
         :return: True if the connection is successful, False otherwise
         """
-        request_uuid = str(uuid.uuid4())
+        request_id = str(uuid.uuid4())
         test_connection_url = (
             f"{constants.BASE_URL}/connectors/connections/test"
-            f"?client_id={client.client_id}&uuid={request_uuid}"
+            f"?client_id={client.client_id}&uuid={request_id}"
         )
 
         headers = client_utils.build_headers(
@@ -46,8 +43,9 @@ class S3Connection(LabellerrConnection):
         test_request = {
             "credentials": (None, aws_credentials_json),
             "connector": (None, "s3"),
-            "path": (None, params.s3_path),
+            "path": (None, params.path),
             "connection_type": (None, params.connection_type.value),
+            "data_type": (None, params.data_type.value),
         }
 
         # Remove content-type from headers to let requests set it with boundary
@@ -55,14 +53,14 @@ class S3Connection(LabellerrConnection):
             k: v for k, v in headers.items() if k.lower() != "content-type"
         }
 
-        client_utils.request(
+        response = client_utils.request(
             "POST",
             test_connection_url,
             headers=headers_without_content_type,
             files=test_request,
-            request_id=request_uuid,
+            request_id=request_id,
         )
-        return True
+        return response.get("response", {})
 
     @staticmethod
     def create_connection(
@@ -75,6 +73,11 @@ class S3Connection(LabellerrConnection):
         :param params: AWSConnectionParams instance
         :return: Dictionary containing the response from the API
         """
+
+        # Tests the connection before creating it
+        response = S3Connection.test_connection(client, params)
+
+        logging.info(f"Connection test response: {response}")
 
         unique_id = str(uuid.uuid4())
         url = f"{constants.BASE_URL}/connectors/connections/create?client_id={client.client_id}&uuid={unique_id}"
@@ -95,7 +98,6 @@ class S3Connection(LabellerrConnection):
         request_payload = {
             "credentials": (None, creds_payload),
             "connector": (None, "s3"),
-            "path": (None, params.s3_path),
             "connection_type": (None, params.connection_type.value),
             "name": (None, params.name),
             "description": (None, params.description),
@@ -104,7 +106,10 @@ class S3Connection(LabellerrConnection):
         response_data = client_utils.request(
             "POST", url, headers=headers, files=request_payload, request_id=unique_id
         )
-        return response_data.get("response", {})
+        return LabellerrConnection(
+            client=client,
+            connection_id=response_data.get("response", {}).get("connection_id"),
+        )
 
 
 LabellerrConnectionMeta._register("s3", S3Connection)

@@ -4,16 +4,14 @@ from typing import List
 from .. import constants
 from ..exceptions import LabellerrError
 from ..schemas import DatasetDataType, KeyFrame
-from ..utils import validate_params
 from .base import LabellerrProject, LabellerrProjectMeta
 
 
 class VideoProject(LabellerrProject):
     """
-    Class for handling video project operations and fetching multiple datasets.
+    Class for handling video project operations and fething multiple datasets.
     """
 
-    @validate_params(file_id=str, keyframes=list)
     def add_or_update_keyframes(
         self,
         file_id: str,
@@ -26,6 +24,13 @@ class VideoProject(LabellerrProject):
         :param keyframes: List of KeyFrame objects to link
         :return: Response from the API
         """
+        # Parameter validation
+        if not isinstance(file_id, str):
+            raise LabellerrError("file_id must be a str")
+
+        if not isinstance(keyframes, list):
+            raise LabellerrError("keyframes must be a list")
+
         try:
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/actions/add_update_keyframes?client_id={self.client.client_id}&uuid={unique_id}"
@@ -46,13 +51,11 @@ class VideoProject(LabellerrProject):
                 request_id=unique_id,
                 json=body,
             )
-
-        except LabellerrError as e:
-            raise e
+        except LabellerrError:
+            raise
         except Exception as e:
             raise LabellerrError(f"Failed to link key frames: {str(e)}")
 
-    @validate_params(file_id=str, keyframes=list)
     def delete_keyframes(self, file_id: str, keyframes: List[int]):
         """
         Deletes key frames from a project.
@@ -61,6 +64,13 @@ class VideoProject(LabellerrProject):
         :param keyframes: List of key frame numbers to delete
         :return: Response from the API
         """
+        # Parameter validation
+        if not isinstance(file_id, str):
+            raise LabellerrError("file_id must be a str")
+
+        if not isinstance(keyframes, list):
+            raise LabellerrError("keyframes must be a list")
+
         try:
             unique_id = str(uuid.uuid4())
             url = f"{constants.BASE_URL}/actions/delete_keyframes?project_id={self.project_id}&uuid={unique_id}&client_id={self.client.client_id}"
@@ -76,9 +86,8 @@ class VideoProject(LabellerrProject):
                     "keyframes": keyframes,
                 },
             )
-
-        except LabellerrError as e:
-            raise e
+        except LabellerrError:
+            raise
         except Exception as e:
             raise LabellerrError(f"Failed to delete key frames: {str(e)}")
 

@@ -102,6 +102,65 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
     def attached_datasets(self):
         return self.__project_data.get("attached_datasets")
 
+    def status(self) -> Dict:
+        """
+        Poll project status until completion or timeout.
+
+        Returns:
+            Final project data with status information
+
+        Examples:
+            # Get current project status
+            final_status = project.status()
+        """
+        from .utils import poll
+
+        def get_project_status():
+            unique_id = str(uuid.uuid4())
+            url = (
+                f"{constants.BASE_URL}/projects/project/{self.project_id}?client_id={self.client.client_id}"
+                f"&uuid={unique_id}"
+            )
+
+            response = self.client.make_request(
+                "GET",
+                url,
+                extra_headers={"content-type": "application/json"},
+                request_id=unique_id,
+            )
+            project_data = response.get("response", {})
+            if project_data:
+                self.__project_data = project_data
+            return project_data
+
+        def is_completed(project_data):
+            status_code = project_data.get("status_code", 500)
+            # Consider project complete when status_code is 300 (success) or >= 400 (error/failed)
+            return status_code == 300 or status_code >= 400
+
+        def on_success(project_data):
+            status_code = project_data.get("status_code", 500)
+            if status_code == 300:
+                logging.info(
+                    "Project %s processing completed successfully!", self.project_id
+                )
+            else:
+                logging.warning(
+                    "Project %s processing finished with status code: %s",
+                    self.project_id,
+                    status_code,
+                )
+            return project_data
+
+        return poll(
+            function=get_project_status,
+            condition=is_completed,
+            interval=2.0,
+            timeout=None,
+            max_retries=None,
+            on_success=on_success,
+        )
+
     def detach_dataset_from_project(self, dataset_id=None, dataset_ids=None):
         """
         Detaches one or more datasets from an existing project.
@@ -568,3 +627,19 @@ class LabellerrProject(metaclass=LabellerrProjectMeta):
             return response.get("response")
         except Exception as e:
             raise LabellerrError(f"Failed to download export: {str(e)}")
+
+    def import_users(self, from_project: "LabellerrProject"):
+        """
+        Imports users from a source project to the current project.
+
+        :param from_project: The source project to import users from
+        :return: Dictionary containing import results
+        :raises LabellerrError: If the import fails
+        """
+        # Validate parameters using Pydantic
+        unique_id = str(uuid.uuid4())
+        url = f"{constants.BASE_URL}/users/projects/import_users?selected_project_id={self.project_id}&project_id={from_project.project_id}&client_id={self.client.client_id}&uuid={unique_id}"
+        response = self.client.make_request(
+            "POST", url, extra_headers={"Content-Type": "application/json"}
+        )
+        return response.get("response")

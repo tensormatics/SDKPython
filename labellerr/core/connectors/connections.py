@@ -39,21 +39,27 @@ class LabellerrConnectionMeta(ABCMeta):
     """Metaclass that combines ABC functionality with factory pattern"""
 
     def __call__(cls, client, connection_id, **kwargs):
-        # Only intercept calls to the base LabellerrConnection class
+        # Fetch connection data if not already provided
+        if "connection_data" not in kwargs:
+            connection_data = cls.get_connection(client, connection_id)
+            if connection_data is None:
+                raise InvalidConnectionError(f"Connection not found: {connection_id}")
+            kwargs["connection_data"] = connection_data
+
+        # Only intercept calls to the base LabellerrConnection class for factory behavior
         if cls.__name__ != "LabellerrConnection":
-            # For subclasses, use normal instantiation
+            # For subclasses, use normal instantiation with connection_data
             instance = cls.__new__(cls)
             if isinstance(instance, cls):
                 instance.__init__(client, connection_id, **kwargs)
             return instance
-        connection_data = cls.get_connection(client, connection_id)
-        if connection_data is None:
-            raise InvalidConnectionError(f"Connection not found: {connection_id}")
+
+        # Factory behavior for base class
+        connection_data = kwargs["connection_data"]
         connector = connection_data.get("connector")
         connection_class = cls._registry.get(connector)
         if connection_class is None:
             raise InvalidConnectionError(f"Unknown connector type: {connector}")
-        kwargs["connection_data"] = connection_data
         return connection_class(client, connection_id, **kwargs)
 
 

@@ -66,7 +66,7 @@ class GCSConnection(LabellerrConnection):
     @staticmethod
     def create_connection(
         client: "LabellerrClient", params: GCSConnectionParams
-    ) -> str:
+    ) -> "LabellerrConnection":
         """
         Sets up GCP connector for dataset creation (quick connection).
 

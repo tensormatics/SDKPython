@@ -65,7 +65,7 @@ class S3Connection(LabellerrConnection):
     @staticmethod
     def create_connection(
         client: "LabellerrClient", params: AWSConnectionParams
-    ) -> dict:
+    ) -> "LabellerrConnection":
         """
         Creates an AWS S3 connection.
 

@@ -116,7 +116,7 @@ class LabellerrMCPServer:  # main server object
                     result = await self._handle_project_tool(name, arguments)
                 elif name.startswith("dataset_"):
                     result = await self._handle_dataset_tool(name, arguments)
-                elif name.startswith("annotation_"):
+                elif name.startswith("annotation_") or name == "template_create":
                     result = await self._handle_annotation_tool(name, arguments)
                 elif name.startswith("monitor_"):
                     result = await self._handle_monitoring_tool(name, arguments)

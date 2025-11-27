@@ -16,7 +16,14 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from labellerr.mcp_server.server import LabellerrMCPServer
+# Skip entire module if mcp is not installed
+try:
+    from labellerr.mcp_server.server import LabellerrMCPServer
+except ImportError as e:
+    pytest.skip(
+        f"MCP server dependencies not installed: {e}. Install with: pip install -e '.[mcp]'",
+        allow_module_level=True
+    )
 
 
 @pytest.fixture(scope="session")

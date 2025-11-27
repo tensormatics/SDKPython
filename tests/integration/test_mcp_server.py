@@ -15,6 +15,17 @@ import pytest
 import uuid
 from dotenv import load_dotenv
 
+# Skip entire module if mcp dependencies are not installed
+try:
+    from labellerr.mcp_server.api_client import LabellerrAPIClient
+    MCP_AVAILABLE = True
+except ImportError as e:
+    MCP_AVAILABLE = False
+    pytest.skip(
+        f"MCP server dependencies not installed: {e}. Install with: pip install -e '.[mcp]'",
+        allow_module_level=True
+    )
+
 # Load environment variables
 load_dotenv()
 
@@ -41,8 +52,6 @@ def credentials():
 @pytest.fixture(scope="session")
 def api_client(credentials):
     """Create API client instance"""
-    from labellerr.mcp_server.api_client import LabellerrAPIClient
-
     client = LabellerrAPIClient(
         api_key=credentials['api_key'],
         api_secret=credentials['api_secret'],

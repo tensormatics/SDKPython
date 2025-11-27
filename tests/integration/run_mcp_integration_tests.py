@@ -50,11 +50,16 @@ def check_and_prompt_credentials():
     env_file = get_env_file()
     load_dotenv(env_file)
 
+    api_key = os.getenv('API_KEY')
+    api_secret = os.getenv('API_SECRET')
+    client_id = os.getenv('CLIENT_ID')
+    test_data_path = os.getenv('LABELLERR_TEST_DATA_PATH')
+
     required_vars = {
-        'LABELLERR_API_KEY': 'API Key',
-        'LABELLERR_API_SECRET': 'API Secret',
-        'LABELLERR_CLIENT_ID': 'Client ID',
-        'LABELLERR_TEST_DATA_PATH': 'Test Data Path (folder with images)'
+        'API_KEY': ('API Key', api_key),
+        'API_SECRET': ('API Secret', api_secret),
+        'CLIENT_ID': ('Client ID', client_id),
+        'LABELLERR_TEST_DATA_PATH': ('Test Data Path (folder with images)', test_data_path)
     }
 
     print("=" * 60)
@@ -66,13 +71,12 @@ def check_and_prompt_credentials():
     missing = []
     found_vars = {}
 
-    for env_var, display_name in required_vars.items():
-        value = os.getenv(env_var)
+    for env_var, (display_name, value) in required_vars.items():
         if not value:
             print(f"❌ {env_var} not found")
             missing.append((env_var, display_name))
         else:
-            print(f"✓ {env_var} found")
+            print(f"✓ {display_name} found")
             found_vars[env_var] = value
 
     if missing:
@@ -107,8 +111,11 @@ def check_and_prompt_credentials():
             else:
                 print(f"  ⚠ Warning: {env_var} left empty")
 
-    # Check if all required vars are now available
-    all_present = all(os.getenv(var) for var in required_vars.keys())
+    # Check if all required vars are now available (re-check after prompting)
+    api_key = os.getenv('API_KEY')
+    api_secret = os.getenv('API_SECRET')
+    client_id = os.getenv('CLIENT_ID')
+    all_present = all([api_key, api_secret, client_id])
 
     if all_present:
         print("\n✓ All credentials configured")
@@ -136,9 +143,9 @@ def validate_credentials():
         from labellerr.mcp_server.api_client import LabellerrAPIClient
 
         client = LabellerrAPIClient(
-            api_key=os.getenv('LABELLERR_API_KEY'),
-            api_secret=os.getenv('LABELLERR_API_SECRET'),
-            client_id=os.getenv('LABELLERR_CLIENT_ID')
+            api_key=os.getenv('API_KEY'),
+            api_secret=os.getenv('API_SECRET'),
+            client_id=os.getenv('CLIENT_ID')
         )
 
         # Try to list projects as validation

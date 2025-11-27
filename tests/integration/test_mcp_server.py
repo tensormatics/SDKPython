@@ -15,6 +15,9 @@ import pytest
 import uuid
 from dotenv import load_dotenv
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 # Skip entire module if mcp dependencies are not installed
 try:
     from labellerr.mcp_server.api_client import LabellerrAPIClient
@@ -33,9 +36,9 @@ load_dotenv()
 @pytest.fixture(scope="session")
 def credentials():
     """Load API credentials from environment"""
-    api_key = os.getenv('LABELLERR_API_KEY')
-    api_secret = os.getenv('LABELLERR_API_SECRET')
-    client_id = os.getenv('LABELLERR_CLIENT_ID')
+    api_key = os.getenv('API_KEY')
+    api_secret = os.getenv('API_SECRET')
+    client_id = os.getenv('CLIENT_ID')
     test_data_path = os.getenv('LABELLERR_TEST_DATA_PATH')
 
     if not all([api_key, api_secret, client_id]):

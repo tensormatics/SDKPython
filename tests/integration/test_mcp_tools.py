@@ -12,6 +12,9 @@ import time
 import pytest
 from pathlib import Path
 
+# Mark all tests in this module as integration tests
+pytestmark = pytest.mark.integration
+
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
@@ -29,12 +32,12 @@ except ImportError as e:
 @pytest.fixture(scope="session")
 def credentials():
     """Load credentials from environment"""
-    api_key = os.getenv('LABELLERR_API_KEY')
-    api_secret = os.getenv('LABELLERR_API_SECRET')
-    client_id = os.getenv('LABELLERR_CLIENT_ID')
+    api_key = os.getenv('API_KEY')
+    api_secret = os.getenv('API_SECRET')
+    client_id = os.getenv('CLIENT_ID')
 
     if not all([api_key, api_secret, client_id]):
-        pytest.skip("Missing required environment variables")
+        pytest.skip("Missing required environment variables (API_KEY, API_SECRET, CLIENT_ID)")
 
     return {
         'api_key': api_key,
@@ -46,6 +49,7 @@ def credentials():
 @pytest.fixture(scope="session")
 def mcp_server(credentials):
     """Create MCP server instance"""
+    # Set both env var formats for compatibility with MCP server code
     os.environ['LABELLERR_API_KEY'] = credentials['api_key']
     os.environ['LABELLERR_API_SECRET'] = credentials['api_secret']
     os.environ['LABELLERR_CLIENT_ID'] = credentials['client_id']

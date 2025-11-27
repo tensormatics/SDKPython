@@ -15,9 +15,9 @@ Usage:
     python tests/integration/run_mcp_tools_tests.py TestProjectTools::test_project_list
 
 Environment Variables Required:
-    LABELLERR_API_KEY
-    LABELLERR_API_SECRET
-    LABELLERR_CLIENT_ID
+    API_KEY
+    API_SECRET
+    CLIENT_ID
     LABELLERR_TEST_DATA_PATH (optional, for file upload tests)
 """
 
@@ -30,18 +30,23 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 # Check environment variables
-required_vars = ['LABELLERR_API_KEY', 'LABELLERR_API_SECRET', 'LABELLERR_CLIENT_ID']
-missing_vars = [var for var in required_vars if not os.getenv(var)]
+api_key = os.getenv('API_KEY')
+api_secret = os.getenv('API_SECRET')
+client_id = os.getenv('CLIENT_ID')
 
-if missing_vars:
+if not all([api_key, api_secret, client_id]):
     print("❌ Missing required environment variables:")
-    for var in missing_vars:
-        print(f"   - {var}")
+    if not api_key:
+        print("   - API_KEY")
+    if not api_secret:
+        print("   - API_SECRET")
+    if not client_id:
+        print("   - CLIENT_ID")
     print("\nPlease set these variables before running tests.")
     print("\nExample:")
-    print("  export LABELLERR_API_KEY='your_key'")
-    print("  export LABELLERR_API_SECRET='your_secret'")
-    print("  export LABELLERR_CLIENT_ID='your_client_id'")
+    print("  export API_KEY='your_key'")
+    print("  export API_SECRET='your_secret'")
+    print("  export CLIENT_ID='your_client_id'")
     sys.exit(1)
 
 # Optional test data path
@@ -55,8 +60,8 @@ else:
 print("\n" + "="*80)
 print("LABELLERR MCP SERVER - INTEGRATION TESTS")
 print("="*80)
-print(f"\nAPI Key: {os.getenv('LABELLERR_API_KEY')[:10]}...")
-print(f"Client ID: {os.getenv('LABELLERR_CLIENT_ID')}")
+print(f"\nAPI Key: {api_key[:10]}...")
+print(f"Client ID: {client_id}")
 print("="*80 + "\n")
 
 # Run pytest
